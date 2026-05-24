@@ -7,6 +7,7 @@ import { registerParentChildren } from "./children.js";
 import { registerReceptionWalkIn } from "./walkin.js";
 import { registerReceptionCheckIn } from "./checkin.js";
 import { registerParentExports } from "./exports.js";
+import { registerParentStatement } from "./statement.js";
 
 export interface ParentsDeps {
   db: Database;
@@ -18,6 +19,13 @@ export interface ParentRoutesDeps extends ParentsDeps {
   exportStorage: ExportStorage;
   /** Enqueue an export job for async processing (P1-E02-S05). */
   enqueueExport: (exportId: string) => void;
+  /** Enqueue an async wallet-statement generation for long ranges (P1-E03-S08). */
+  enqueueStatement?: (input: {
+    walletId: string;
+    from: string;
+    to: string;
+    requestedBy: string;
+  }) => void;
   now?: () => number;
 }
 
@@ -32,5 +40,10 @@ export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDep
     exportStorage: deps.exportStorage,
     enqueueExport: deps.enqueueExport,
     now: deps.now,
+  });
+  registerParentStatement(app, {
+    db: deps.db,
+    sessions: deps.sessions,
+    enqueueStatement: deps.enqueueStatement,
   });
 }

@@ -25,6 +25,16 @@ export {
 } from "./refund.js";
 export type { RefundInput, RefundResult } from "./refund.js";
 
+// Wallet statement CSV generation (P1-E03-S08).
+export {
+  generateStatementCsv,
+  formatCents,
+  isAsyncRange,
+  STATEMENT_COLUMNS,
+  SYNC_RANGE_MAX_MONTHS,
+} from "./statement.js";
+export type { StatementInput, StatementRange } from "./statement.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 

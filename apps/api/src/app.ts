@@ -34,6 +34,17 @@ export interface AppDeps {
    * inject a deterministic synchronous variant.
    */
   enqueueExport?: (exportId: string) => void;
+  /**
+   * Enqueue an async wallet-statement generation for long (> 12 month) ranges
+   * (P1-E03-S08). Defaults to a no-op handle; the worker that fulfils it lives
+   * in `apps/jobs`. Tests inject a deterministic recorder.
+   */
+  enqueueStatement?: (input: {
+    walletId: string;
+    from: string;
+    to: string;
+    requestedBy: string;
+  }) => void;
 }
 
 /** Build the single API surface that serves all front-end apps. */
@@ -69,6 +80,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       sessions: deps.sessions,
       exportStorage,
       enqueueExport,
+      enqueueStatement: deps.enqueueStatement,
       now,
     });
     registerAdminRoutes(app, { db, sessions: deps.sessions });

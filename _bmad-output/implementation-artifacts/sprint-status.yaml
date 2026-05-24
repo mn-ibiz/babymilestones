@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 04:30
+last_updated: 2026-05-25 (P1-E03-S08 done; epic-3 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -40,7 +40,7 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3 — Wallet Ledger Core  (source E03)
-  epic-3: in-progress
+  epic-3: done
   3-1-append-only-wallet-ledger-schema-enforced-at: done  # P1-E03-S01
   3-2-balance-is-computed-never-stored: done  # P1-E03-S02
   3-3-idempotent-posting-interface: done  # P1-E03-S03
@@ -48,7 +48,7 @@ development_status:
   3-5-debit-at-check-in-pending-invoice-settled: done  # P1-E03-S05
   3-6-refund-recording-admin-only-creates-a-reversing: done  # P1-E03-S06
   3-7-auto-credit-toggle-per-parent: done  # P1-E03-S07
-  3-8-statement-export-csv-for-a-parent: ready-for-dev  # P1-E03-S08
+  3-8-statement-export-csv-for-a-parent: done  # P1-E03-S08
   epic-3-retrospective: optional
 
   # Epic 4 — Payments Adapter  (source E04)
