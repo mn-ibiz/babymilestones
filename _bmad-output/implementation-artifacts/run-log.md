@@ -18,3 +18,4 @@ STORY 2-3-add-and-edit-children | RESULT done | fixed=0 | deferred=0 | reason=no
 STORY 2-4-photo-and-sms-consent-flags | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E02-S04)
 STORY 2-5-data-export-for-a-parent-s-record | RESULT done | fixed=0 | deferred=4 | reason=none  (P1-E02-S05)
 STORY 3-1-append-only-wallet-ledger-schema-enforced-at | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E03-S01)
+STORY 3-2-balance-is-computed-never-stored | RESULT done | fixed=2 | deferred=2 | reason=none  (P1-E03-S02)
