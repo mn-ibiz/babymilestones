@@ -9,3 +9,4 @@ STORY 13-1-audit-outbox-table-write-helper | RESULT done | fixed=0 | deferred=0 
 STORY 1-1-parent-signs-up-with-phone-pin | RESULT done | fixed=3 | deferred=4 | reason=none  (P1-E01-S01)
 STORY 1-2-parent-logs-in-with-phone-pin | RESULT done | fixed=0 | deferred=4 | reason=none  (P1-E01-S02)
 STORY 1-3-admin-reception-cashier-login | RESULT done | fixed=0 | deferred=4 | reason=none  (P1-E01-S03)
+STORY 1-4-sso-across-subdomains | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E01-S04)
