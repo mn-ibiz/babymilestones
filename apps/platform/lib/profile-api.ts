@@ -40,6 +40,28 @@ export async function saveProfile(draft: ProfileDraft): Promise<ProfileState> {
   return (await res.json()) as ProfileState;
 }
 
+export interface DataExportRequest {
+  exportId: string;
+  status: string;
+}
+
+/**
+ * POST a data-portability export request (P1-E02-S05 AC1). Generation is async:
+ * the API returns 202 immediately and the download link arrives by SMS (AC2).
+ */
+export async function requestDataExport(): Promise<DataExportRequest> {
+  const res = await fetch("/parents/me/exports", {
+    method: "POST",
+    credentials: "include",
+    headers: { "x-csrf-token": readCsrfToken() },
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `Failed to request export (${res.status})`);
+  }
+  return (await res.json()) as DataExportRequest;
+}
+
 /** PUT the parent's SMS marketing opt-in (P1-E02-S04 AC1, AC2). */
 export async function setSmsConsent(smsMarketingOptIn: boolean): Promise<ProfileState> {
   const res = await fetch("/parents/me/consent/sms", {

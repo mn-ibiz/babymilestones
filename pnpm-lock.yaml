@@ -78,6 +78,9 @@ importers:
       '@bm/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@bm/export':
+        specifier: workspace:*
+        version: link:../../packages/export
       '@bm/payments':
         specifier: workspace:*
         version: link:../../packages/payments
@@ -99,6 +102,16 @@ importers:
         version: 4.22.3
 
   apps/jobs:
+    dependencies:
+      '@bm/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@bm/export':
+        specifier: workspace:*
+        version: link:../../packages/export
+      drizzle-orm:
+        specifier: ^0.38.2
+        version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
     devDependencies:
       tsx:
         specifier: ^4.19.2
@@ -207,6 +220,18 @@ importers:
       postgres:
         specifier: ^3.4.5
         version: 3.4.9
+
+  packages/export:
+    dependencies:
+      '@bm/db':
+        specifier: workspace:*
+        version: link:../db
+      '@bm/sms':
+        specifier: workspace:*
+        version: link:../sms
+      drizzle-orm:
+        specifier: ^0.38.2
+        version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
 
   packages/payments:
     dependencies:

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { draftFromProfile, type ProfileDraft } from "../../lib/profile";
 import { fetchProfile, setSmsConsent } from "../../lib/profile-api";
 import { ProfileForm } from "../components/ProfileForm";
+import { ExportDataButton } from "../components/ExportDataButton";
 
 /**
  * Dashboard profile edit (P1-E02-S01 AC4). Reachable from the dashboard at any
@@ -61,6 +62,8 @@ export default function ProfilePage() {
           </label>
         </section>
       )}
+
+      <ExportDataButton />
     </main>
   );
 }

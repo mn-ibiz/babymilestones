@@ -11,5 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@bm/db": "workspace:*",
+    "@bm/export": "workspace:*",
+    "drizzle-orm": "^0.38.2"
+  },
   "devDependencies": { "tsx": "^4.19.2" }
 }
