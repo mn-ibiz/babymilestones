@@ -11,3 +11,4 @@ STORY 1-2-parent-logs-in-with-phone-pin | RESULT done | fixed=0 | deferred=4 | r
 STORY 1-3-admin-reception-cashier-login | RESULT done | fixed=0 | deferred=4 | reason=none  (P1-E01-S03)
 STORY 1-4-sso-across-subdomains | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E01-S04)
 STORY 1-5-password-pin-reset-by-otp | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E01-S05)
+STORY 1-6-role-permission-model-seeded | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E01-S06)
