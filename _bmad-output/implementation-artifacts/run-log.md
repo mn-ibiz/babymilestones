@@ -25,3 +25,4 @@ STORY 3-5-debit-at-check-in-pending-invoice-settled | RESULT done | fixed=1 | de
 STORY 3-6-refund-recording-admin-only-creates-a-reversing | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E03-S06)
 STORY 3-7-auto-credit-toggle-per-parent | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E03-S07)
 STORY 3-8-statement-export-csv-for-a-parent | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S08)
+STORY 4-1-m-pesa-stk-push-initiated-from-parent | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E04-S01)
