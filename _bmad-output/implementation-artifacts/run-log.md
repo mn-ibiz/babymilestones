@@ -22,3 +22,4 @@ STORY 3-2-balance-is-computed-never-stored | RESULT done | fixed=2 | deferred=2 
 STORY 3-3-idempotent-posting-interface | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S03)
 STORY 3-4-top-up-applies-fifo-to-outstanding-invoices | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S04)
 STORY 3-5-debit-at-check-in-pending-invoice-settled | RESULT done | fixed=1 | deferred=4 | reason=none  (P1-E03-S05)
+STORY 3-6-refund-recording-admin-only-creates-a-reversing | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E03-S06)
