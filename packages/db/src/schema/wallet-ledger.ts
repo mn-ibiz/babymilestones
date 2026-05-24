@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   bigint,
@@ -51,6 +52,11 @@ export const walletLedger = pgTable(
   (t) => ({
     walletIdIdx: index("wallet_ledger_wallet_id_idx").on(t.walletId),
     reversesEntryIdx: index("wallet_ledger_reverses_entry_id_idx").on(t.reversesEntryId),
+    // P1-E03-S02: backs balance reads (SUM by wallet) and recency scans.
+    walletIdCreatedAtIdx: index("wallet_ledger_wallet_id_created_at_idx").on(
+      t.walletId,
+      sql`${t.createdAt} DESC`,
+    ),
   }),
 );
 
