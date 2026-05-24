@@ -12,3 +12,4 @@ STORY 1-3-admin-reception-cashier-login | RESULT done | fixed=0 | deferred=4 | r
 STORY 1-4-sso-across-subdomains | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E01-S04)
 STORY 1-5-password-pin-reset-by-otp | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E01-S05)
 STORY 1-6-role-permission-model-seeded | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E01-S06)
+STORY 2-1-parent-self-registers-with-profile-details | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E02-S01)
