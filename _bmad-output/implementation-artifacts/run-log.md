@@ -24,3 +24,4 @@ STORY 3-4-top-up-applies-fifo-to-outstanding-invoices | RESULT done | fixed=0 | 
 STORY 3-5-debit-at-check-in-pending-invoice-settled | RESULT done | fixed=1 | deferred=4 | reason=none  (P1-E03-S05)
 STORY 3-6-refund-recording-admin-only-creates-a-reversing | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E03-S06)
 STORY 3-7-auto-credit-toggle-per-parent | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E03-S07)
+STORY 3-8-statement-export-csv-for-a-parent | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S08)
