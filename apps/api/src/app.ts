@@ -9,6 +9,7 @@ import {
   type SessionStore,
 } from "@bm/auth";
 import { registerAuthRoutes } from "./routes/auth/index.js";
+import { registerParentRoutes } from "./routes/parents/index.js";
 
 export interface AppDeps {
   db?: Database;
@@ -43,6 +44,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         randomBytes(32).toString("base64url"),
       now: deps.now ?? Date.now,
     });
+    registerParentRoutes(app, { db: deps.db, sessions: deps.sessions });
   }
 
   return app;

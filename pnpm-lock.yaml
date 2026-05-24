@@ -103,6 +103,9 @@ importers:
 
   apps/platform:
     dependencies:
+      '@bm/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@bm/ui':
         specifier: workspace:*
         version: link:../../packages/ui
