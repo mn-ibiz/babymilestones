@@ -1,0 +1,22 @@
+{
+  "name": "@bm/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@bm/contracts": "workspace:*",
+    "@bm/auth": "workspace:*",
+    "@bm/wallet": "workspace:*",
+    "@bm/payments": "workspace:*"
+  },
+  "devDependencies": { "tsx": "^4.19.2" }
+}

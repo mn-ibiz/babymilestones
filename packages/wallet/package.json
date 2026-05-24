@@ -1,0 +1,16 @@
+{
+  "name": "@bm/wallet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ledger primitives: debit/credit/hold/release, FIFO settlement, idempotency",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": { "@bm/db": "workspace:*" }
+}
