@@ -13,6 +13,7 @@ const complete: ParentProfile = {
   lastName: "Otieno",
   email: "amina@example.com",
   residentialArea: "Kileleshwa",
+  smsMarketingOptIn: false,
 };
 
 describe("validateDraft (P1-E02-S01 AC2)", () => {

@@ -9,6 +9,7 @@ const child: Child = {
   dateOfBirth: "2024-01-15",
   gender: "female",
   allergiesNotes: "Peanuts",
+  photoConsent: false,
   archivedAt: null,
   ageInMonths: 6,
 };

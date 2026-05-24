@@ -4,6 +4,7 @@ import { audit, parents, users, type Database, type ParentRow } from "@bm/db";
 import { validateSession, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   parentProfileSchema,
+  smsConsentSchema,
   isProfileComplete,
   type ParentProfile,
 } from "@bm/contracts";
@@ -17,6 +18,7 @@ function toProfile(row: ParentRow): ParentProfile {
     lastName: row.lastName,
     email: row.email,
     residentialArea: row.residentialArea,
+    smsMarketingOptIn: row.smsMarketingOptIn,
   };
 }
 
@@ -116,6 +118,52 @@ export function registerParentProfile(app: FastifyInstance, { db, sessions }: Pa
     });
 
     // PUT is an idempotent upsert → always 200 with the current profile.
+    return reply.code(200).send({ profile, complete: isProfileComplete(profile) });
+  });
+
+  // PUT /parents/me/consent/sms — toggle the parent's SMS marketing opt-in
+  // (P1-E02-S04 AC1, AC2). Scoped to the session's own profile; the change is
+  // audited with a timestamp (consent is compliance-sensitive — AC2).
+  app.put("/parents/me/consent/sms", async (req: FastifyRequest, reply: FastifyReply) => {
+    const auth = await validateSession(
+      { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+      { sessions, resolveUser },
+    );
+    if (!auth.ok) return reply.code(auth.status).send({ error: auth.error });
+
+    const parsed = smsConsentSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      return reply.code(400).send({ error: first?.message ?? "Invalid consent", field: first?.path[0] });
+    }
+    const { smsMarketingOptIn } = parsed.data;
+    const userId = auth.user.id;
+
+    const profile = await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(parents).where(eq(parents.userId, userId));
+      if (!existing) return null;
+      const [updated] = await tx
+        .update(parents)
+        .set({ smsMarketingOptIn, updatedAt: new Date() })
+        .where(eq(parents.userId, userId))
+        .returning();
+      // AC2: log the consent change with a timestamp. audit_outbox rows carry
+      // their own created_at; we also stamp the new value + when into payload.
+      await audit(tx, {
+        actor: userId,
+        action: "parent.consent.sms",
+        target: { table: "parents", id: updated!.id },
+        payload: {
+          sms_marketing_opt_in: smsMarketingOptIn,
+          at: new Date().toISOString(),
+          ip: req.ip,
+          user_agent: req.headers["user-agent"] ?? null,
+        },
+      });
+      return toProfile(updated!);
+    });
+
+    if (!profile) return reply.code(404).send({ error: "Parent profile not found" });
     return reply.code(200).send({ profile, complete: isProfileComplete(profile) });
   });
 }

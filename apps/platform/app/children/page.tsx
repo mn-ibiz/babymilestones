@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import type { Child } from "@bm/contracts";
 import { ageLabel, draftFromChild, type ChildDraft } from "../../lib/children";
-import { addChild, archiveChild, fetchChildren, updateChild } from "../../lib/children-api";
+import {
+  addChild,
+  archiveChild,
+  fetchChildren,
+  setPhotoConsent,
+  updateChild,
+} from "../../lib/children-api";
 import { ChildForm } from "../components/ChildForm";
 
 /**
@@ -44,6 +50,11 @@ export default function ChildrenPage() {
     await reload();
   }
 
+  async function handlePhotoConsent(child: Child, photoConsent: boolean) {
+    await setPhotoConsent(child.id, photoConsent);
+    await reload();
+  }
+
   if (loading) return <main>Loading…</main>;
 
   return (
@@ -57,6 +68,14 @@ export default function ChildrenPage() {
             <span>
               {child.firstName} {child.lastName ?? ""} — {ageLabel(child)}
             </span>
+            <label>
+              <input
+                type="checkbox"
+                checked={child.photoConsent}
+                onChange={(e) => handlePhotoConsent(child, e.target.checked)}
+              />
+              Photo consent
+            </label>
             <button type="button" onClick={() => setEditing(child)}>
               Edit
             </button>

@@ -64,3 +64,14 @@ export async function archiveChild(id: string): Promise<Child> {
   });
   return unwrapChild(res);
 }
+
+/** PUT a child's photo consent flag (P1-E02-S04 AC1, AC2). */
+export async function setPhotoConsent(id: string, photoConsent: boolean): Promise<Child> {
+  const res = await fetch(`/parents/me/children/${id}/consent/photo`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
+    body: JSON.stringify({ photoConsent }),
+  });
+  return unwrapChild(res);
+}

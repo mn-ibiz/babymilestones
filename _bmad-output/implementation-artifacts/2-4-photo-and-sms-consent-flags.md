@@ -1,6 +1,6 @@
 # Story 2.4: Photo and SMS consent flags
 
-Status: ready-for-dev
+Status: done
 
 > Canonical ID: P1-E02-S04 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/P1-E02-S04.md
 
@@ -18,19 +18,19 @@ so that my consent preferences are respected.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add consent columns (AC: #1)
-  - [ ] In `packages/db`, add `photo_consent BOOLEAN NOT NULL DEFAULT false` to `children` and `sms_marketing_opt_in BOOLEAN NOT NULL DEFAULT false` to `parents`
-  - [ ] Add additive-only Drizzle migration
-- [ ] Task 2: Consent update API (AC: #1, #2)
-  - [ ] Extend parent/child routes under `apps/api/src/routes/` to toggle each consent flag
-  - [ ] Update `packages/contracts` Zod schemas to include the consent fields
-  - [ ] Log each consent change with timestamp to `audit_outbox`
-- [ ] Task 3: Marketing-gate in SMS sender (AC: #3)
-  - [ ] In `packages/sms`, ensure non-transactional (marketing) sends check `sms_marketing_opt_in`; transactional messages (booking confirms, OTP) always send regardless of opt-in
-- [ ] Task 4: Consent UI (AC: #1, #2)
-  - [ ] In `apps/platform/app/`, surface per-child photo-consent toggle and per-parent SMS marketing opt-in
-- [ ] Task 5: Tests (AC: all)
-  - [ ] Write vitest unit/integration tests (test-first): defaults false, timestamped audit on edit, and that marketing sends are gated by opt-in while transactional sends are not
+- [x] Task 1: Add consent columns (AC: #1)
+  - [x] In `packages/db`, add `photo_consent BOOLEAN NOT NULL DEFAULT false` to `children` and `sms_marketing_opt_in BOOLEAN NOT NULL DEFAULT false` to `parents`
+  - [x] Add additive-only Drizzle migration (`0009_consent_flags.sql`, `ADD COLUMN IF NOT EXISTS`)
+- [x] Task 2: Consent update API (AC: #1, #2)
+  - [x] Added `PUT /parents/me/consent/sms` and `PUT /parents/me/children/:id/consent/photo` (session-scoped, CSRF-guarded, ownership-scoped)
+  - [x] Update `packages/contracts` Zod schemas (`smsConsentSchema`, `photoConsentSchema`) + `Child.photoConsent` / `ParentProfile.smsMarketingOptIn`
+  - [x] Log each consent change with timestamp to `audit_outbox` (`parent.consent.sms` / `child.consent.photo`; row `created_at` + payload `at`)
+- [x] Task 3: Marketing-gate in SMS sender (AC: #3)
+  - [x] `packages/sms`: `isMarketingOptedIn(db, parentId)` + `ConsentAwareSmsSender` — `sendMarketing` gated by opt-in (fail-closed), `sendTransactional` always sends
+- [x] Task 4: Consent UI (AC: #1, #2)
+  - [x] `apps/platform`: per-child photo-consent checkbox on the children page; per-parent SMS marketing opt-in on the profile page (standalone toggle so it never bundles into the profile upsert)
+- [x] Task 5: Tests (AC: all)
+  - [x] vitest integration tests: defaults false, timestamped audit on edit, ownership/auth/CSRF, and marketing gated by opt-in while transactional is not
 
 ## Dev Notes
 
@@ -52,14 +52,43 @@ so that my consent preferences are respected.
 
 ### Agent Model Used
 
+claude-opus-4-7
+
 ### Debug Log References
+
+- Full gate green: `pnpm test` (76 api tests + sms/contracts/platform suites), `pnpm typecheck`, `pnpm lint`, `pnpm build`.
+- Typecheck fixes: existing `ParentProfile`/`Child` literals in `contracts`/`platform` test fixtures needed the new required fields (`smsMarketingOptIn`, `photoConsent`).
 
 ### Completion Notes List
 
+- Consent columns are additive (`0009_consent_flags.sql`, `ADD COLUMN IF NOT EXISTS`), both default `false` (explicit opt-in — no record silently consented).
+- Consent toggles live on dedicated endpoints, not the profile/child upsert, so a consent change never rewrites other fields. Profile/child PUT statements deliberately omit the consent columns, preserving their stored value.
+- AC2 timestamping: every consent change writes an `audit_outbox` row (its own `created_at`) plus an explicit `at` ISO string + the new value in the payload.
+- AC3 gate: `ConsentAwareSmsSender.sendMarketing` checks `sms_marketing_opt_in` (fail-closed for unknown parent); `sendTransactional` always sends. Consumed by the future X4 dispatcher.
+
 ### File List
+
+- packages/db/src/schema/parents.ts (+ `smsMarketingOptIn`)
+- packages/db/src/schema/children.ts (+ `photoConsent`)
+- packages/db/migrations/0009_consent_flags.sql (new)
+- packages/contracts/src/index.ts (`smsConsentSchema`, `photoConsentSchema`, interface fields)
+- packages/contracts/src/index.test.ts (fixture field)
+- packages/sms/src/index.ts (`isMarketingOptedIn`, `ConsentAwareSmsSender`)
+- packages/sms/src/index.test.ts (gate tests)
+- apps/api/src/routes/parents/profile.ts (`PUT /parents/me/consent/sms`)
+- apps/api/src/routes/parents/profile.test.ts (consent tests)
+- apps/api/src/routes/parents/children.ts (`PUT /parents/me/children/:id/consent/photo`)
+- apps/api/src/routes/parents/children.test.ts (consent tests)
+- apps/platform/lib/profile-api.ts (`setSmsConsent`)
+- apps/platform/lib/profile.test.ts (fixture field)
+- apps/platform/lib/children-api.ts (`setPhotoConsent`)
+- apps/platform/lib/children.test.ts (fixture field)
+- apps/platform/app/profile/page.tsx (SMS opt-in toggle)
+- apps/platform/app/children/page.tsx (per-child photo-consent toggle)
 
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-24 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+| 2026-05-25 | 1.0 | Implemented photo + SMS consent flags (schema, API, SMS gate, UI, tests) | claude-opus-4-7 |

@@ -86,7 +86,29 @@ export interface ParentProfile {
   lastName: string;
   email: string | null;
   residentialArea: string | null;
+  /** SMS marketing opt-in (P1-E02-S04 AC1) — defaults false. */
+  smsMarketingOptIn: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Consent flags (P1-E02-S04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-parent SMS marketing consent toggle (AC1, AC2). The only field the
+ * consent endpoint accepts — profile names/email live on a separate route, so
+ * a consent change never silently rewrites the rest of the profile.
+ */
+export const smsConsentSchema = z.object({
+  smsMarketingOptIn: z.boolean({ message: "smsMarketingOptIn must be a boolean" }),
+});
+export type SmsConsentInput = z.infer<typeof smsConsentSchema>;
+
+/** Per-child photo consent toggle (AC1, AC2). */
+export const photoConsentSchema = z.object({
+  photoConsent: z.boolean({ message: "photoConsent must be a boolean" }),
+});
+export type PhotoConsentInput = z.infer<typeof photoConsentSchema>;
 
 /**
  * Reception walk-in registration (P1-E02-S02).
@@ -182,6 +204,8 @@ export interface Child {
   dateOfBirth: string;
   gender: string | null;
   allergiesNotes: string | null;
+  /** Per-child photography consent (P1-E02-S04 AC1) — defaults false. */
+  photoConsent: boolean;
   archivedAt: string | null;
   /** Derived from DOB (AC2) — surfaced on every booking selector. */
   ageInMonths: number;

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
 /**
@@ -17,6 +17,9 @@ export const parents = pgTable("parents", {
   lastName: text("last_name").notNull(),
   email: text("email"),
   residentialArea: text("residential_area"),
+  // Consent (P1-E02-S04 AC1). Opt-in marketing SMS — defaults off; the X4 SMS
+  // dispatcher reads this before any non-transactional send (AC3).
+  smsMarketingOptIn: boolean("sms_marketing_opt_in").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

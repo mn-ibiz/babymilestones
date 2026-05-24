@@ -145,4 +145,80 @@ describe("PUT/GET /parents/me (P1-E02-S01)", () => {
     expect(after.json().complete).toBe(true);
     expect(after.json().profile.firstName).toBe("Aminah");
   });
+
+  // --- SMS marketing consent (P1-E02-S04) ---
+
+  const putConsent = (body: Record<string, unknown>, opts: { auth?: boolean; csrf?: boolean } = {}) => {
+    const { auth = true, csrf = true } = opts;
+    const headers: Record<string, string> = {};
+    const cookieParts: string[] = [];
+    if (auth) cookieParts.push(sessionCookie);
+    if (csrf) cookieParts.push(csrfCookie);
+    if (cookieParts.length) headers["cookie"] = cookieParts.join("; ");
+    if (csrf) headers["x-csrf-token"] = csrfToken;
+    return app.inject({ method: "PUT", url: "/parents/me/consent/sms", headers, payload: body });
+  };
+
+  it("SMS consent defaults false on a new profile (AC1)", async () => {
+    await put({ firstName: "Amina", lastName: "Otieno" });
+    const res = await get();
+    expect(res.json().profile.smsMarketingOptIn).toBe(false);
+  });
+
+  it("rejects an unauthenticated / CSRF-less consent toggle", async () => {
+    expect((await putConsent({ smsMarketingOptIn: true }, { auth: false, csrf: false })).statusCode).toBe(
+      401,
+    );
+    await put({ firstName: "Amina", lastName: "Otieno" });
+    expect((await putConsent({ smsMarketingOptIn: true }, { csrf: false })).statusCode).toBe(403);
+  });
+
+  it("404s when toggling consent before a profile exists", async () => {
+    const res = await putConsent({ smsMarketingOptIn: true });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("rejects a non-boolean consent value (AC1)", async () => {
+    await put({ firstName: "Amina", lastName: "Otieno" });
+    const res = await putConsent({ smsMarketingOptIn: "yes" });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("smsMarketingOptIn");
+  });
+
+  it("toggles SMS marketing consent, audited with a timestamp (AC1, AC2)", async () => {
+    await put({ firstName: "Amina", lastName: "Otieno" });
+
+    const on = await putConsent({ smsMarketingOptIn: true });
+    expect(on.statusCode).toBe(200);
+    expect(on.json().profile.smsMarketingOptIn).toBe(true);
+    // GET reflects the change.
+    expect((await get()).json().profile.smsMarketingOptIn).toBe(true);
+
+    const off = await putConsent({ smsMarketingOptIn: false });
+    expect(off.json().profile.smsMarketingOptIn).toBe(false);
+
+    const events = await dbh.db.select().from(auditOutbox);
+    const consentEvents = events.filter((e) => e.action === "parent.consent.sms");
+    expect(consentEvents).toHaveLength(2);
+    expect(consentEvents[0]!.actorUserId).toBe(userId);
+    expect(consentEvents[0]!.targetTable).toBe("parents");
+    // AC2: the change is logged with a timestamp — both the row's own created_at
+    // and the payload's explicit `at`.
+    expect(consentEvents[0]!.createdAt).toBeInstanceOf(Date);
+    const payload = consentEvents[0]!.payload as { at?: string; sms_marketing_opt_in?: boolean };
+    expect(typeof payload.at).toBe("string");
+    expect(payload.sms_marketing_opt_in).toBe(true);
+  });
+
+  it("does not disturb other profile fields when toggling consent", async () => {
+    await put({ firstName: "Amina", lastName: "Otieno", residentialArea: "Lavington" });
+    await putConsent({ smsMarketingOptIn: true });
+    const res = await get();
+    expect(res.json().profile).toMatchObject({
+      firstName: "Amina",
+      lastName: "Otieno",
+      residentialArea: "Lavington",
+      smsMarketingOptIn: true,
+    });
+  });
 });

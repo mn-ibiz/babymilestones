@@ -212,4 +212,74 @@ describe("children registry routes (P1-E02-S03)", () => {
     expect(row!.firstName).toBe("Zola");
     expect(row!.archivedAt).toBeNull();
   });
+
+  // --- Photo consent (P1-E02-S04) ---
+
+  const setPhotoConsent = (id: string, body: Record<string, unknown>, p = parent) =>
+    app.inject({
+      method: "PUT",
+      url: `/parents/me/children/${id}/consent/photo`,
+      headers: authed(p),
+      payload: body,
+    });
+
+  it("photo consent defaults false on a new child (AC1)", async () => {
+    const child = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+    expect(child.photoConsent).toBe(false);
+  });
+
+  it("rejects an unauthenticated / CSRF-less / non-boolean photo-consent toggle", async () => {
+    const child = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+    const noAuth = await app.inject({
+      method: "PUT",
+      url: `/parents/me/children/${child.id}/consent/photo`,
+      payload: { photoConsent: true },
+    });
+    expect(noAuth.statusCode).toBe(401);
+    const noCsrf = await app.inject({
+      method: "PUT",
+      url: `/parents/me/children/${child.id}/consent/photo`,
+      headers: { cookie: parent.sessionCookie },
+      payload: { photoConsent: true },
+    });
+    expect(noCsrf.statusCode).toBe(403);
+    const badValue = await setPhotoConsent(child.id, { photoConsent: 1 });
+    expect(badValue.statusCode).toBe(400);
+    expect(badValue.json().field).toBe("photoConsent");
+  });
+
+  it("toggles photo consent, audited with a timestamp (AC1, AC2)", async () => {
+    const child = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+
+    const on = await setPhotoConsent(child.id, { photoConsent: true });
+    expect(on.statusCode).toBe(200);
+    expect(on.json().child.photoConsent).toBe(true);
+
+    const [row] = await dbh.db.select().from(children).where(eq(children.id, child.id));
+    expect(row!.photoConsent).toBe(true);
+
+    await setPhotoConsent(child.id, { photoConsent: false });
+    const [after] = await dbh.db.select().from(children).where(eq(children.id, child.id));
+    expect(after!.photoConsent).toBe(false);
+
+    const events = await dbh.db.select().from(auditOutbox);
+    const consentEvents = events.filter((e) => e.action === "child.consent.photo");
+    expect(consentEvents).toHaveLength(2);
+    expect(consentEvents[0]!.actorUserId).toBe(parent.userId);
+    expect(consentEvents[0]!.targetTable).toBe("children");
+    expect(consentEvents[0]!.targetId).toBe(child.id);
+    expect(consentEvents[0]!.createdAt).toBeInstanceOf(Date);
+    const payload = consentEvents[0]!.payload as { at?: string; photo_consent?: boolean };
+    expect(typeof payload.at).toBe("string");
+    expect(payload.photo_consent).toBe(true);
+  });
+
+  it("enforces ownership on photo-consent — 404 for another parent's child", async () => {
+    const other = await makeParent(app, dbh.db, "+254799999999", "0799999999");
+    const mine = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+    const res = await setPhotoConsent(mine.id, { photoConsent: true }, other);
+    expect(res.statusCode).toBe(404);
+    const [row] = await dbh.db.select().from(children).where(eq(children.id, mine.id));
+    expect(row!.photoConsent).toBe(false);
+  });
 });

@@ -39,3 +39,18 @@ export async function saveProfile(draft: ProfileDraft): Promise<ProfileState> {
   }
   return (await res.json()) as ProfileState;
 }
+
+/** PUT the parent's SMS marketing opt-in (P1-E02-S04 AC1, AC2). */
+export async function setSmsConsent(smsMarketingOptIn: boolean): Promise<ProfileState> {
+  const res = await fetch("/parents/me/consent/sms", {
+    method: "PUT",
+    credentials: "include",
+    headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
+    body: JSON.stringify({ smsMarketingOptIn }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `Failed to save consent (${res.status})`);
+  }
+  return (await res.json()) as ProfileState;
+}

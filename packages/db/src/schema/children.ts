@@ -1,4 +1,4 @@
-import { date, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { parents } from "./parents.js";
 
 /**
@@ -22,6 +22,9 @@ export const children = pgTable(
     dateOfBirth: date("date_of_birth", { mode: "string" }).notNull(),
     gender: text("gender"),
     allergiesNotes: text("allergies_notes"),
+    // Consent (P1-E02-S04 AC1). Per-child photography consent — defaults off;
+    // gates downstream photo handling.
+    photoConsent: boolean("photo_consent").notNull().default(false),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

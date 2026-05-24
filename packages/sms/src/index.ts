@@ -1,4 +1,5 @@
-import { smsOutbox } from "@bm/db";
+import { eq } from "drizzle-orm";
+import { parents, smsOutbox } from "@bm/db";
 import type { Database, Transaction } from "@bm/db";
 
 /** @bm/sms — provider-agnostic SMS sender. Launch ships a DB-backed stub. */
@@ -34,5 +35,50 @@ export class StubSmsSender implements SmsSender {
       body: msg.body,
       template: msg.template ?? null,
     });
+  }
+}
+
+/**
+ * Marketing consent gate (P1-E02-S04 AC3). The X4 dispatcher routes
+ * NON-transactional (marketing) messages through this before any send;
+ * transactional messages (booking confirms, OTP) bypass it entirely and are
+ * always delivered. Returns true iff the targeted parent has opted in.
+ *
+ * Resolution is by parent id (callers already hold it from the booking/parent
+ * context). Unknown parent → not consented (fail closed).
+ */
+export async function isMarketingOptedIn(
+  db: SmsExecutor,
+  parentId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ optIn: parents.smsMarketingOptIn })
+    .from(parents)
+    .where(eq(parents.id, parentId));
+  return row?.optIn ?? false;
+}
+
+/**
+ * Consent-aware sender wrapping any underlying {@link SmsSender}. Transactional
+ * sends always go through; marketing sends are dropped unless the parent has
+ * opted in (AC3). Returns whether the message was actually dispatched.
+ */
+export class ConsentAwareSmsSender {
+  constructor(
+    private readonly db: SmsExecutor,
+    private readonly sender: SmsSender,
+  ) {}
+
+  /** Always send — booking confirms, OTP, receipts (never gated). */
+  async sendTransactional(msg: SmsMessage): Promise<boolean> {
+    await this.sender.send(msg);
+    return true;
+  }
+
+  /** Send only if the parent opted in to marketing SMS (AC3). */
+  async sendMarketing(parentId: string, msg: SmsMessage): Promise<boolean> {
+    if (!(await isMarketingOptedIn(this.db, parentId))) return false;
+    await this.sender.send(msg);
+    return true;
   }
 }

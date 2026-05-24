@@ -87,6 +87,7 @@ describe("isProfileComplete (P1-E02-S01 AC3)", () => {
     lastName: "Otieno",
     email: null,
     residentialArea: null,
+    smsMarketingOptIn: false,
   };
   it("is false when no profile exists yet (skip path)", () => {
     expect(isProfileComplete(null)).toBe(false);
