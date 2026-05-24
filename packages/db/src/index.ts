@@ -8,3 +8,4 @@ export const SCHEMA_VERSION = "0.0.0" as const;
 export * from "./schema/index.js";
 export { audit } from "./audit.js";
 export type { AuditInput, AuditExecutor } from "./audit.js";
+export type { Database, Transaction } from "./client.js";
