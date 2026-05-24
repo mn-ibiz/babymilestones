@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   bigint,
+  boolean,
   index,
   pgTable,
   text,
@@ -43,10 +44,16 @@ export const walletLedger = pgTable(
     postedBy: text("posted_by").notNull(),
     /** Origin of the movement (e.g. `mpesa`, `cash`, `paystack`, `admin`). */
     source: text("source").notNull(),
-    /** Self-FK: for a `reversal`, the ledger entry being reversed. Nullable. */
+    /** Self-FK: for a `refund`/`reversal`, the ledger entry being reversed. Nullable. */
     reversesEntryId: uuid("reverses_entry_id").references(
       (): AnyPgColumn => walletLedger.id,
     ),
+    /**
+     * Set true on a `refund` entry (P1-E03-S06): proportional loyalty clawback
+     * is deferred to P3 (P3-E04), so the refund only flags that a clawback is
+     * still owed. Defaults false for every other movement.
+     */
+    loyaltyClawbackPending: boolean("loyalty_clawback_pending").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

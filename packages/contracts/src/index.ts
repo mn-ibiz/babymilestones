@@ -147,6 +147,28 @@ export const checkInSchema = z.object({
 export type CheckInInput = z.infer<typeof checkInSchema>;
 
 /**
+ * Admin refund request (P1-E03-S06). An admin records an offline refund against
+ * an original debit ledger entry; the server posts a reversing `refund` entry
+ * (never mutates the original — the ledger is append-only). A reason code is
+ * required (AC1); the refund amount must be a positive integer of cents and may
+ * not exceed the remaining-refundable amount on the original (AC4, enforced by
+ * the wallet primitive). Free-text note is optional.
+ */
+export const refundSchema = z.object({
+  originalEntryId: z.string().uuid("originalEntryId must be a UUID"),
+  amount: z.number().int("amount must be integer cents").positive("amount must be positive"),
+  reasonCode: z.string().trim().min(1, "A reason code is required"),
+  note: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .transform((v) => (v === "" ? null : v)),
+  /** Optional caller dedup key; the server derives one if absent. */
+  idempotencyKey: z.string().trim().min(1).optional(),
+});
+export type RefundRequestInput = z.infer<typeof refundSchema>;
+
+/**
  * Phone-collision lookup result (AC2). When a normalised phone already maps to
  * a user, `existing` carries a minimal reference so the Reception form can offer
  * "Open existing" or set a "Merge intent" flag. Never leaks PIN/credential.

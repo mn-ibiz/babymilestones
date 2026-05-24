@@ -16,6 +16,15 @@ export type { ApplyTopupInput, ApplyTopupResult } from "./settle.js";
 export { debit, DoubleCheckInError } from "./debit.js";
 export type { DebitInput, DebitResult, DebitOutcome } from "./debit.js";
 
+// Admin refund as a reversing ledger entry (P1-E03-S06).
+export {
+  refund,
+  RefundReasonRequiredError,
+  RefundTargetNotFoundError,
+  RefundExceedsRefundableError,
+} from "./refund.js";
+export type { RefundInput, RefundResult } from "./refund.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 

@@ -11,6 +11,7 @@ import {
 import { InMemoryExportStorage, runExport, type ExportStorage } from "@bm/export";
 import { registerAuthRoutes } from "./routes/auth/index.js";
 import { registerParentRoutes } from "./routes/parents/index.js";
+import { registerAdminRoutes } from "./routes/admin/index.js";
 
 export interface AppDeps {
   db?: Database;
@@ -70,6 +71,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       enqueueExport,
       now,
     });
+    registerAdminRoutes(app, { db, sessions: deps.sessions });
   }
 
   return app;
