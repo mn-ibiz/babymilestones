@@ -180,6 +180,49 @@ export const autoCreditToggleSchema = z.object({
 });
 export type AutoCreditToggleInput = z.infer<typeof autoCreditToggleSchema>;
 
+// ---------------------------------------------------------------------------
+// M-Pesa STK push top-up (P1-E04-S01)
+// ---------------------------------------------------------------------------
+
+/** Min/max per single Daraja STK call, in whole KES (AC1). */
+export const MPESA_STK_MIN_KES = 50;
+export const MPESA_STK_MAX_KES = 70_000;
+
+/**
+ * Parent top-up via M-Pesa STK push (P1-E04-S01 AC1). The form submits a whole
+ * KES amount; Daraja transacts in whole shillings (no cents on the STK prompt).
+ * Bounds mirror the Daraja per-call limits: min 50, max 70,000 KES. The wallet
+ * is derived server-side from the session — never accepted from the client.
+ */
+export const mpesaStkInitiateSchema = z.object({
+  amountKes: z
+    .number({ message: "Amount is required" })
+    .int("Amount must be a whole number of shillings")
+    .min(MPESA_STK_MIN_KES, `Minimum top-up is KES ${MPESA_STK_MIN_KES}`)
+    .max(MPESA_STK_MAX_KES, `Maximum per top-up is KES ${MPESA_STK_MAX_KES}`),
+});
+export type MpesaStkInitiateInput = z.infer<typeof mpesaStkInitiateSchema>;
+
+/** Lifecycle state of an STK request as surfaced to the polling client (AC4). */
+export type MpesaStkState =
+  | "INITIATED"
+  | "STK_SENT"
+  | "CALLBACK_PENDING"
+  | "SUCCEEDED"
+  | "FAILED";
+
+/** Initiate response (AC2/AC3): the checkout handle the UI polls on. */
+export interface MpesaStkInitiateResponse {
+  checkoutRequestId: string;
+  state: MpesaStkState;
+}
+
+/** Polling response (AC4): the current state of a parent's STK request. */
+export interface MpesaStkStatusResponse {
+  checkoutRequestId: string;
+  state: MpesaStkState;
+}
+
 /**
  * Phone-collision lookup result (AC2). When a normalised phone already maps to
  * a user, `existing` carries a minimal reference so the Reception form can offer

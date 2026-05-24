@@ -12,6 +12,8 @@ import { InMemoryExportStorage, runExport, type ExportStorage } from "@bm/export
 import { registerAuthRoutes } from "./routes/auth/index.js";
 import { registerParentRoutes } from "./routes/parents/index.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
+import { registerMpesaRoutes } from "./routes/payments/mpesa/index.js";
+import type { MpesaRouteConfig } from "./routes/payments/mpesa/initiate.js";
 
 export interface AppDeps {
   db?: Database;
@@ -45,6 +47,28 @@ export interface AppDeps {
     to: string;
     requestedBy: string;
   }) => void;
+  /**
+   * M-Pesa (Daraja) wiring for the STK push routes (P1-E04-S01). Daraja config +
+   * an injected/mockable transport (tests pass a fake; production passes
+   * `globalThis.fetch` + env credentials). When omitted, the payment routes are
+   * not registered (no real network is ever attempted from config defaults).
+   */
+  mpesa?: MpesaRouteConfig;
+}
+
+/** Build Daraja config from env (production). Returns null if not fully set. */
+function mpesaConfigFromEnv(): MpesaRouteConfig | null {
+  const e = process.env;
+  const config = {
+    baseUrl: e.MPESA_BASE_URL ?? "",
+    consumerKey: e.MPESA_CONSUMER_KEY ?? "",
+    consumerSecret: e.MPESA_CONSUMER_SECRET ?? "",
+    shortcode: e.MPESA_SHORTCODE ?? "",
+    passkey: e.MPESA_PASSKEY ?? "",
+    callbackUrl: e.MPESA_CALLBACK_URL ?? "",
+  };
+  if (Object.values(config).some((v) => v.trim() === "")) return null;
+  return { config, transport: (url, init) => fetch(url, init) };
 }
 
 /** Build the single API surface that serves all front-end apps. */
@@ -84,6 +108,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       now,
     });
     registerAdminRoutes(app, { db, sessions: deps.sessions });
+
+    // P1-E04-S01: M-Pesa STK push routes register only when Daraja wiring is
+    // present (explicit dep in tests, or full env config in production).
+    const mpesa = deps.mpesa ?? mpesaConfigFromEnv();
+    if (mpesa) {
+      registerMpesaRoutes(app, { db, sessions: deps.sessions, mpesa });
+    }
   }
 
   return app;

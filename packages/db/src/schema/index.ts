@@ -12,3 +12,4 @@ export * from "./otp.js";
 export * from "./sms.js";
 export * from "./permissions.js";
 export * from "./data-exports.js";
+export * from "./mpesa.js";
