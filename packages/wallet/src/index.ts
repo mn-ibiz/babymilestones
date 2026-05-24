@@ -8,6 +8,10 @@ import { eq, inArray, sql } from "drizzle-orm";
 
 export const PACKAGE = "@bm/wallet" as const;
 
+// FIFO top-up settlement (P1-E03-S04).
+export { applyTopup } from "./settle.js";
+export type { ApplyTopupInput, ApplyTopupResult } from "./settle.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
