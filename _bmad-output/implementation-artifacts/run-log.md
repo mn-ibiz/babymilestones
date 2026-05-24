@@ -20,3 +20,4 @@ STORY 2-5-data-export-for-a-parent-s-record | RESULT done | fixed=0 | deferred=4
 STORY 3-1-append-only-wallet-ledger-schema-enforced-at | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E03-S01)
 STORY 3-2-balance-is-computed-never-stored | RESULT done | fixed=2 | deferred=2 | reason=none  (P1-E03-S02)
 STORY 3-3-idempotent-posting-interface | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S03)
+STORY 3-4-top-up-applies-fifo-to-outstanding-invoices | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S04)
