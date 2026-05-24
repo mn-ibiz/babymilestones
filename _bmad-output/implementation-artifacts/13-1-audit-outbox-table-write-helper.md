@@ -1,6 +1,6 @@
 # Story 13.1: audit_outbox table + write helper
 
-Status: review
+Status: done
 
 > Canonical ID: X5-S01 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/X5-S01.md
 

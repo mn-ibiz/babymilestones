@@ -1,6 +1,6 @@
 # Story 14.1: Tailwind preset with brand tokens
 
-Status: review
+Status: done
 
 > Canonical ID: X7-S01 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/X7-S01.md
 
