@@ -17,6 +17,7 @@
     "@bm/contracts": "workspace:*",
     "@bm/auth": "workspace:*",
     "@bm/db": "workspace:*",
+    "@bm/sms": "workspace:*",
     "@bm/wallet": "workspace:*",
     "@bm/payments": "workspace:*"
   },

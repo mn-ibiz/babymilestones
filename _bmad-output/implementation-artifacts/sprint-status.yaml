@@ -12,7 +12,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 11:00
+last_updated: 2026-05-25 13:00
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -25,7 +25,7 @@ development_status:
   1-2-parent-logs-in-with-phone-pin: done  # P1-E01-S02
   1-3-admin-reception-cashier-login: done  # P1-E01-S03
   1-4-sso-across-subdomains: done  # P1-E01-S04
-  1-5-password-pin-reset-by-otp: ready-for-dev  # P1-E01-S05
+  1-5-password-pin-reset-by-otp: done  # P1-E01-S05
   1-6-role-permission-model-seeded: ready-for-dev  # P1-E01-S06
   epic-1-retrospective: optional
 
