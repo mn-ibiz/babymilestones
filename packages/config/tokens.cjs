@@ -1,0 +1,61 @@
+// Brand design tokens — the single source of truth for the Tailwind preset (X7-S01).
+// Plain CommonJS so both the .cjs preset and the TS entrypoint consume one definition.
+module.exports = {
+  color: {
+    primary: {
+      50: "#FFF0F5",
+      100: "#FFD9E6",
+      200: "#FFB3CD",
+      300: "#FF8DB4",
+      400: "#FF7AA8",
+      500: "#FF6B9D",
+      600: "#E55A89",
+      700: "#B34068",
+      800: "#802E4A",
+      900: "#4D1B2C",
+    },
+    neutral: {
+      50: "#F8F8FA",
+      100: "#EEEEF2",
+      200: "#D9D9E0",
+      300: "#B8B8C4",
+      400: "#8E8EA0",
+      500: "#6B6B7B",
+      600: "#4D4D5A",
+      700: "#34343E",
+      800: "#1F1F26",
+      900: "#1A1A2E",
+    },
+    success: "#1FA971",
+    warn: "#E6A100",
+    danger: "#E5484D",
+    // Back-compat aliases used by @bm/ui and existing tests.
+    brand: "#FF6B9D",
+    ink: "#1A1A2E",
+    surface: "#FFFFFF",
+  },
+  spacing: {
+    xs: "0.25rem",
+    sm: "0.5rem",
+    md: "1rem",
+    lg: "1.5rem",
+    xl: "2rem",
+    "2xl": "3rem",
+  },
+  radius: {
+    none: "0",
+    sm: "0.25rem",
+    md: "0.5rem",
+    lg: "0.75rem",
+    full: "9999px",
+  },
+  fontSize: {
+    xs: "0.75rem",
+    sm: "0.875rem",
+    base: "1rem",
+    lg: "1.125rem",
+    xl: "1.25rem",
+    "2xl": "1.5rem",
+    "3xl": "1.875rem",
+  },
+};

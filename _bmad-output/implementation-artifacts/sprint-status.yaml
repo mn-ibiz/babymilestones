@@ -12,7 +12,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-24 23:30
+last_updated: 2026-05-24 23:47
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -136,8 +136,8 @@ development_status:
   epic-13-retrospective: optional
 
   # Epic 14 — X7 — Design System Foundation  (source X7)
-  epic-14: ready-for-dev
-  14-1-tailwind-preset-with-brand-tokens: ready-for-dev  # X7-S01
+  epic-14: in-progress
+  14-1-tailwind-preset-with-brand-tokens: review  # X7-S01
   14-2-primitive-components: ready-for-dev  # X7-S02
   14-3-compound-components-for-p1-surfaces: ready-for-dev  # X7-S03
   14-4-brand-assets-pipeline: ready-for-dev  # X7-S04
