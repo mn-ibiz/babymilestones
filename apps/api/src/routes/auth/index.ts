@@ -4,6 +4,7 @@ import type { LoginRateLimiter, SessionStore } from "@bm/auth";
 import { registerSignup } from "./signup.js";
 import { registerLogin } from "./login.js";
 import { registerStaffLogin } from "./staff-login.js";
+import { registerLogout } from "./logout.js";
 
 export interface AuthDeps {
   db: Database;
@@ -15,4 +16,5 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthDeps): void {
   registerSignup(app, deps);
   registerLogin(app, deps);
   registerStaffLogin(app, deps);
+  registerLogout(app, deps);
 }

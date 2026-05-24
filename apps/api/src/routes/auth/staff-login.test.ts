@@ -35,9 +35,10 @@ describe("POST /auth/staff/login (P1-E01-S03)", () => {
     expect(res.json()).toMatchObject({ role: "reception", redirect: "/reception" });
 
     // AC4: same cookie machinery (HttpOnly/Secure/SameSite) scoped to the apex domain.
-    const cookie = res.headers["set-cookie"] as string;
-    expect(cookie).toMatch(/bm_session=.*Domain=\.babymilestones\.co\.ke.*HttpOnly.*Secure/u);
-    const token = cookie.match(/bm_session=([^;]+)/u)![1]!;
+    const cookies = res.headers["set-cookie"] as string[];
+    const sessionCookie = cookies.find((c) => c.startsWith("bm_session="))!;
+    expect(sessionCookie).toMatch(/bm_session=.*Domain=\.babymilestones\.co\.ke.*HttpOnly.*Secure/u);
+    const token = sessionCookie.match(/bm_session=([^;]+)/u)![1]!;
     const [staff] = await dbh.db.select().from(users).where(eq(users.phone, "+254712000001"));
     expect((await sessions.get(token))?.userId).toBe(staff!.id);
 

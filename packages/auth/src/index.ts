@@ -4,10 +4,26 @@ export { LoginRateLimiter, type RateLimitResult } from "./rate-limit.js";
 export {
   InMemorySessionStore,
   SESSION_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
   serializeSessionCookie,
+  serializeCsrfCookie,
+  generateCsrfToken,
+  clearAuthCookies,
+  parseCookies,
   type SessionStore,
   type SessionData,
 } from "./session.js";
+export {
+  validateSession,
+  guardRole,
+  type AuthenticatedUser,
+  type GuardRequest,
+  type GuardOutcome,
+  type ResolveUser,
+  type ValidateSessionDeps,
+  type RoleGuardResult,
+} from "./middleware.js";
 export {
   ALL_ROLES,
   STAFF_ROLES,

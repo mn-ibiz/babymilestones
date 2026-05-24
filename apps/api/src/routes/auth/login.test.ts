@@ -32,9 +32,14 @@ describe("POST /auth/login (P1-E01-S02)", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ redirect: "/dashboard" });
 
-    const cookie = res.headers["set-cookie"] as string;
-    expect(cookie).toMatch(/bm_session=.*HttpOnly.*Secure.*SameSite=Lax/u);
-    const token = cookie.match(/bm_session=([^;]+)/u)![1]!;
+    const cookies = res.headers["set-cookie"] as string[];
+    const sessionCookie = cookies.find((c) => c.startsWith("bm_session="))!;
+    expect(sessionCookie).toMatch(/bm_session=.*HttpOnly.*Secure.*SameSite=Lax/u);
+    // AC5: a non-HttpOnly CSRF cookie is issued alongside the session.
+    const csrfCookie = cookies.find((c) => c.startsWith("bm_csrf="))!;
+    expect(csrfCookie).toBeDefined();
+    expect(csrfCookie).not.toMatch(/HttpOnly/u);
+    const token = sessionCookie.match(/bm_session=([^;]+)/u)![1]!;
     const [user] = await dbh.db.select().from(users);
     expect((await sessions.get(token))?.userId).toBe(user!.id);
 

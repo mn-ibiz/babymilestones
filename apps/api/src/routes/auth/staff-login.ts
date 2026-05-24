@@ -7,6 +7,8 @@ import {
   landingForRole,
   normalizePhone,
   serializeSessionCookie,
+  serializeCsrfCookie,
+  generateCsrfToken,
   verifyPin,
 } from "@bm/auth";
 import type { AuthDeps } from "./index.js";
@@ -90,8 +92,10 @@ export function registerStaffLogin(
       payload: { ip, user_agent: req.headers["user-agent"] ?? null, role: user.role },
     });
     const token = await sessions.create(user.id);
-    reply.header("set-cookie", serializeSessionCookie(token));
+    // Same cookie machinery as parent login, plus a CSRF double-submit cookie.
+    const csrf = generateCsrfToken();
+    reply.header("set-cookie", [serializeSessionCookie(token), serializeCsrfCookie(csrf)]);
     // AC2: role drives where the client lands.
-    return reply.code(200).send({ role: user.role, redirect: landingForRole(user.role) });
+    return reply.code(200).send({ role: user.role, redirect: landingForRole(user.role), csrfToken: csrf });
   });
 }

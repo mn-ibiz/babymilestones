@@ -6,6 +6,8 @@ import {
   isStaffRole,
   normalizePhone,
   serializeSessionCookie,
+  serializeCsrfCookie,
+  generateCsrfToken,
   verifyPin,
 } from "@bm/auth";
 import type { AuthDeps } from "./index.js";
@@ -82,7 +84,10 @@ export function registerLogin(app: FastifyInstance, { db, sessions, rateLimiter 
       payload: { ip, user_agent: req.headers["user-agent"] ?? null },
     });
     const token = await sessions.create(user.id);
-    reply.header("set-cookie", serializeSessionCookie(token));
-    return reply.code(200).send({ redirect: "/dashboard" });
+    // AC1/AC5: session cookie (SSO across subdomains) + a CSRF double-submit
+    // cookie the client echoes back on mutating requests.
+    const csrf = generateCsrfToken();
+    reply.header("set-cookie", [serializeSessionCookie(token), serializeCsrfCookie(csrf)]);
+    return reply.code(200).send({ redirect: "/dashboard", csrfToken: csrf });
   });
 }
