@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { audit, users } from "@bm/db";
 import {
   DUMMY_PIN_HASH,
+  isStaffRole,
   normalizePhone,
   serializeSessionCookie,
   verifyPin,
@@ -58,6 +59,18 @@ export function registerLogin(app: FastifyInstance, { db, sessions, rateLimiter 
         payload: { ip, user_agent: req.headers["user-agent"] ?? null },
       });
       return reply.code(401).send(INVALID);
+    }
+
+    // Flow isolation (P1-E01-S03): staff must use /auth/staff/login. Credentials
+    // are valid here, so this is a 403 (not a generic 401) and is audited.
+    if (isStaffRole(user.role)) {
+      await audit(db, {
+        actor: user.id,
+        action: "auth.login.failure",
+        target: { table: "users", id: user.id },
+        payload: { ip, user_agent: req.headers["user-agent"] ?? null, reason: "staff_on_parent_flow" },
+      });
+      return reply.code(403).send({ error: "Use the staff login" });
     }
 
     // AC1: success → fresh session cookie + dashboard redirect; clear counter.

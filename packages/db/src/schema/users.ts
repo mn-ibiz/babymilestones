@@ -5,6 +5,8 @@ export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   phone: text("phone").notNull().unique(),
   pinHash: text("pin_hash").notNull(),
+  // Role drives staff login + landing (P1-E01-S03); full RBAC lands in P1-E01-S06.
+  role: text("role").notNull().default("parent"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
