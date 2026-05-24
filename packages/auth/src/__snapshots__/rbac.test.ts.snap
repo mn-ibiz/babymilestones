@@ -1,0 +1,171 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the committed snapshot 1`] = `
+[
+  {
+    "action": "create",
+    "resource": "report",
+    "role": "accountant",
+  },
+  {
+    "action": "read",
+    "resource": "payment",
+    "role": "accountant",
+  },
+  {
+    "action": "read",
+    "resource": "receipt",
+    "role": "accountant",
+  },
+  {
+    "action": "read",
+    "resource": "reconciliation",
+    "role": "accountant",
+  },
+  {
+    "action": "read",
+    "resource": "refund",
+    "role": "accountant",
+  },
+  {
+    "action": "read",
+    "resource": "report",
+    "role": "accountant",
+  },
+  {
+    "action": "read",
+    "resource": "wallet",
+    "role": "accountant",
+  },
+  {
+    "action": "manage",
+    "resource": "receipt",
+    "role": "admin",
+  },
+  {
+    "action": "manage",
+    "resource": "refund",
+    "role": "admin",
+  },
+  {
+    "action": "manage",
+    "resource": "service",
+    "role": "admin",
+  },
+  {
+    "action": "manage",
+    "resource": "user",
+    "role": "admin",
+  },
+  {
+    "action": "read",
+    "resource": "audit",
+    "role": "admin",
+  },
+  {
+    "action": "read",
+    "resource": "report",
+    "role": "admin",
+  },
+  {
+    "action": "read",
+    "resource": "wallet",
+    "role": "admin",
+  },
+  {
+    "action": "create",
+    "resource": "payment",
+    "role": "cashier",
+  },
+  {
+    "action": "create",
+    "resource": "receipt",
+    "role": "cashier",
+  },
+  {
+    "action": "read",
+    "resource": "receipt",
+    "role": "cashier",
+  },
+  {
+    "action": "read",
+    "resource": "wallet",
+    "role": "cashier",
+  },
+  {
+    "action": "read",
+    "resource": "receipt",
+    "role": "packer",
+  },
+  {
+    "action": "read",
+    "resource": "service",
+    "role": "packer",
+  },
+  {
+    "action": "create",
+    "resource": "payment",
+    "role": "parent",
+  },
+  {
+    "action": "read",
+    "resource": "receipt",
+    "role": "parent",
+  },
+  {
+    "action": "read",
+    "resource": "wallet",
+    "role": "parent",
+  },
+  {
+    "action": "create",
+    "resource": "payment",
+    "role": "reception",
+  },
+  {
+    "action": "read",
+    "resource": "receipt",
+    "role": "reception",
+  },
+  {
+    "action": "read",
+    "resource": "service",
+    "role": "reception",
+  },
+  {
+    "action": "read",
+    "resource": "wallet",
+    "role": "reception",
+  },
+  {
+    "action": "*",
+    "resource": "*",
+    "role": "super_admin",
+  },
+  {
+    "action": "create",
+    "resource": "refund",
+    "role": "treasury",
+  },
+  {
+    "action": "manage",
+    "resource": "float",
+    "role": "treasury",
+  },
+  {
+    "action": "manage",
+    "resource": "reconciliation",
+    "role": "treasury",
+  },
+  {
+    "action": "read",
+    "resource": "refund",
+    "role": "treasury",
+  },
+  {
+    "action": "read",
+    "resource": "report",
+    "role": "treasury",
+  },
+]
+`;
