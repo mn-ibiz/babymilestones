@@ -1,6 +1,6 @@
 # Story 3.3: Idempotent posting interface
 
-Status: ready-for-dev
+Status: done
 
 > Canonical ID: P1-E03-S03 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/P1-E03-S03.md
 
@@ -18,15 +18,15 @@ so that a retried request never double-posts to the ledger.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement `wallet.post()` primitive (AC: #1, #2)
-  - [ ] Add `post()` to `packages/wallet` taking `{ walletId, amount, kind, idempotencyKey, source, postedBy }`, inserting one `wallet_ledger` row inside a DB transaction, relying on the `idempotency_key` UNIQUE index for atomicity.
-  - [ ] On duplicate key, fetch and return the existing row so the same key yields the same row with no second insert.
-- [ ] Task 2: Typed conflict error (AC: #3)
-  - [ ] Define `IdempotencyConflict` error; surface it (or return the prior row) when a true semantic conflict is detected (same key, different payload). Export from `packages/wallet`.
-- [ ] Task 3: Tests (AC: #2, #3, all)
-  - [ ] Unit test: same key twice → identical row, exactly one ledger insert.
-  - [ ] Concurrency test (per source Tests): fire 100 concurrent posts of the same key → exactly 1 row persists.
-  - [ ] Test that a conflicting payload on an existing key raises `IdempotencyConflict`.
+- [x] Task 1: Implement `wallet.post()` primitive (AC: #1, #2)
+  - [x] Add `post()` to `packages/wallet` taking `{ walletId, amount, kind, idempotencyKey, source, postedBy }`, inserting one `wallet_ledger` row inside a DB transaction, relying on the `idempotency_key` UNIQUE index for atomicity (`ON CONFLICT (idempotency_key) DO NOTHING`). `direction` is derived from the sign of `amount`.
+  - [x] On duplicate key, fetch and return the existing row so the same key yields the same row with no second insert.
+- [x] Task 2: Typed conflict error (AC: #3)
+  - [x] Define `IdempotencyConflict` error (carries `idempotencyKey` + `existing` row); surface it when a true semantic conflict is detected (same key, different payload), else return the prior row. Exported from `packages/wallet`.
+- [x] Task 3: Tests (AC: #2, #3, all)
+  - [x] Unit test: same key twice → identical row, exactly one ledger insert.
+  - [x] Concurrency test (per source Tests): fire 100 concurrent posts of the same key → exactly 1 row persists.
+  - [x] Test that a conflicting payload on an existing key raises `IdempotencyConflict`.
 
 ## Dev Notes
 
@@ -47,14 +47,27 @@ so that a retried request never double-posts to the ledger.
 
 ### Agent Model Used
 
+claude-opus-4-7
+
 ### Debug Log References
+
+Full gate green from repo root: `pnpm test && pnpm typecheck && pnpm lint && pnpm build` (test/typecheck/lint 15/15 packages, build 5/5). Wallet package: 15 tests pass including the 100-concurrent-posts race gate (exactly 1 row).
 
 ### Completion Notes List
 
+- `post(db, { walletId, amount, kind, idempotencyKey, source, postedBy })` inserts one `wallet_ledger` row inside a transaction using `onConflictDoNothing({ target: idempotencyKey })`; the DB UNIQUE index arbitrates concurrent races (no app-level locking).
+- `direction` is derived from the sign of `amount` (credit ≥ 0, debit < 0), so callers do not pass it.
+- On conflict: same payload → returns the pre-existing row (benign retry, no second insert); different payload → throws typed `IdempotencyConflict` (carries `idempotencyKey` + `existing` row).
+- Review: one pass, no blocker/high findings, none deferred.
+
 ### File List
+
+- packages/wallet/src/index.ts (modified — added `PostInput`, `IdempotencyConflict`, `post()`)
+- packages/wallet/src/post.test.ts (new)
 
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-24 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+| 2026-05-25 | 1.0 | Implemented idempotent `post()` + `IdempotencyConflict`, test-first incl. 100-concurrent race gate; full gate green | claude-opus-4-7 |

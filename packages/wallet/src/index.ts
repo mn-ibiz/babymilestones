@@ -26,6 +26,110 @@ export type LedgerKind = (typeof LEDGER_KINDS)[number];
 export type LedgerEntry = WalletLedgerRow;
 
 /**
+ * Input to {@link post}. `direction` is derived from the sign of `amount`
+ * (credits positive, debits negative), so callers never pass it explicitly.
+ */
+export interface PostInput {
+  walletId: string;
+  /** Signed integer cents. Positive = credit, negative = debit. */
+  amount: Cents;
+  kind: LedgerKind;
+  /** Caller-supplied dedup key; a retried post with this key is a no-op. */
+  idempotencyKey: string;
+  /** Origin of the movement (e.g. `mpesa`, `cash`, `paystack`, `admin`). */
+  source: string;
+  /** User id (or system actor) that posted the entry. */
+  postedBy: string;
+}
+
+/**
+ * Thrown when a post reuses an existing `idempotencyKey` but with a *different*
+ * payload — a genuine semantic conflict the caller must resolve (it is NOT a
+ * benign retry). Carries the offending key and the row that already exists so
+ * the caller can decide how to reconcile.
+ */
+export class IdempotencyConflict extends Error {
+  readonly idempotencyKey: string;
+  readonly existing: WalletLedgerRow;
+  constructor(idempotencyKey: string, existing: WalletLedgerRow) {
+    super(
+      `wallet.post: idempotency key "${idempotencyKey}" was already used with a different payload`,
+    );
+    this.name = "IdempotencyConflict";
+    this.idempotencyKey = idempotencyKey;
+    this.existing = existing;
+  }
+}
+
+/**
+ * Post a single money movement to the append-only `wallet_ledger` (P1-E03-S03).
+ *
+ * Idempotency is arbitrated by the `idempotency_key` UNIQUE index (P1-E03-S01),
+ * NOT by application-level locking. The insert runs inside a transaction with
+ * `ON CONFLICT (idempotency_key) DO NOTHING`; the database serialises racing
+ * inserts so at most one row is ever written for a given key. Behaviour:
+ *
+ * - **New key** → inserts one row and returns it.
+ * - **Same key, same payload** → returns the pre-existing row (no second insert),
+ *   making a retried post a safe no-op.
+ * - **Same key, different payload** → throws {@link IdempotencyConflict}.
+ *
+ * This is the safe entry point for retryable callers (M-Pesa/Paystack webhooks).
+ */
+export async function post(db: Database, input: PostInput): Promise<WalletLedgerRow> {
+  const direction: LedgerDirection = input.amount >= 0 ? "credit" : "debit";
+  const values = {
+    walletId: input.walletId,
+    amount: input.amount,
+    direction,
+    kind: input.kind,
+    idempotencyKey: input.idempotencyKey,
+    source: input.source,
+    postedBy: input.postedBy,
+  };
+
+  return db.transaction(async (tx) => {
+    // The UNIQUE index on idempotency_key arbitrates concurrent races: at most
+    // one INSERT wins; the rest hit the conflict and write nothing.
+    const inserted = await tx
+      .insert(walletLedger)
+      .values(values)
+      .onConflictDoNothing({ target: walletLedger.idempotencyKey })
+      .returning();
+
+    if (inserted[0]) return inserted[0];
+
+    // Conflict: a row already exists for this key. Fetch it and decide whether
+    // this is a benign retry (same payload → return it) or a true semantic
+    // conflict (different payload → surface a typed error).
+    const [existing] = await tx
+      .select()
+      .from(walletLedger)
+      .where(eq(walletLedger.idempotencyKey, input.idempotencyKey));
+
+    // Defensive: the row must exist (the conflict implies it), but guard anyway.
+    if (!existing) {
+      throw new Error(
+        `wallet.post: conflict on idempotency key "${input.idempotencyKey}" but no existing row found`,
+      );
+    }
+
+    if (
+      existing.walletId !== values.walletId ||
+      existing.amount !== values.amount ||
+      existing.direction !== values.direction ||
+      existing.kind !== values.kind ||
+      existing.source !== values.source ||
+      existing.postedBy !== values.postedBy
+    ) {
+      throw new IdempotencyConflict(input.idempotencyKey, existing);
+    }
+
+    return existing;
+  });
+}
+
+/**
  * Wallet balance is **computed, never stored** (P1-E03-S02). It is always the
  * `SUM(amount)` over `wallet_ledger` for the wallet — credits positive, debits
  * negative — so the balance can never drift from the postings. There is no
