@@ -134,6 +134,19 @@ export const receptionWalkInSchema = z.object({
 export type ReceptionWalkInInput = z.infer<typeof receptionWalkInSchema>;
 
 /**
+ * Check-in debit request (P1-E03-S05). Reception checks a child in against a
+ * pending invoice; the server debits the wallet and resolves the invoice. The
+ * client supplies the invoice; the server derives the wallet from the invoice's
+ * parent (never trust a client-supplied wallet id for a money movement).
+ */
+export const checkInSchema = z.object({
+  invoiceId: z.string().uuid("invoiceId must be a UUID"),
+  /** Optional caller dedup key; the server derives one from the invoice if absent. */
+  idempotencyKey: z.string().trim().min(1).optional(),
+});
+export type CheckInInput = z.infer<typeof checkInSchema>;
+
+/**
  * Phone-collision lookup result (AC2). When a normalised phone already maps to
  * a user, `existing` carries a minimal reference so the Reception form can offer
  * "Open existing" or set a "Merge intent" flag. Never leaks PIN/credential.

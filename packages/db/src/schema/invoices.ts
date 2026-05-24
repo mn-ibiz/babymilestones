@@ -19,7 +19,16 @@ export const invoices = pgTable(
       .references(() => parents.id),
     /** Remaining amount owed, integer cents (CHECK >= 0 in the migration). */
     amountDue: bigint("amount_due", { mode: "number" }).notNull(),
-    /** `pending` | `settled` — CHECK-constrained in the migration. */
+    /**
+     * Booked service this invoice charges for (P1-E03-S05 AC1). Nullable uuid —
+     * the services catalogue is a later epic (P1-E07); no FK yet.
+     */
+    serviceId: uuid("service_id"),
+    /**
+     * `pending` | `settled` | `settled_on_credit` | `outstanding` —
+     * CHECK-constrained in the migration. Check-in resolves the latter three
+     * (P1-E03-S05 AC3–AC5); `pending` is the booked-not-yet-checked-in state.
+     */
     status: text("status").notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

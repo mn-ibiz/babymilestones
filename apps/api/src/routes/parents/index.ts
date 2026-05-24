@@ -5,6 +5,7 @@ import type { ExportStorage } from "@bm/export";
 import { registerParentProfile } from "./profile.js";
 import { registerParentChildren } from "./children.js";
 import { registerReceptionWalkIn } from "./walkin.js";
+import { registerReceptionCheckIn } from "./checkin.js";
 import { registerParentExports } from "./exports.js";
 
 export interface ParentsDeps {
@@ -24,6 +25,7 @@ export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDep
   registerParentProfile(app, deps);
   registerParentChildren(app, deps);
   registerReceptionWalkIn(app, deps);
+  registerReceptionCheckIn(app, deps);
   registerParentExports(app, {
     db: deps.db,
     sessions: deps.sessions,

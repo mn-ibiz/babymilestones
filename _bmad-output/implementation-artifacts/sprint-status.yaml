@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 03:30
+last_updated: 2026-05-25 04:00
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -45,7 +45,7 @@ development_status:
   3-2-balance-is-computed-never-stored: done  # P1-E03-S02
   3-3-idempotent-posting-interface: done  # P1-E03-S03
   3-4-top-up-applies-fifo-to-outstanding-invoices: done  # P1-E03-S04
-  3-5-debit-at-check-in-pending-invoice-settled: ready-for-dev  # P1-E03-S05
+  3-5-debit-at-check-in-pending-invoice-settled: done  # P1-E03-S05
   3-6-refund-recording-admin-only-creates-a-reversing: ready-for-dev  # P1-E03-S06
   3-7-auto-credit-toggle-per-parent: ready-for-dev  # P1-E03-S07
   3-8-statement-export-csv-for-a-parent: ready-for-dev  # P1-E03-S08

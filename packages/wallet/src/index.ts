@@ -12,6 +12,10 @@ export const PACKAGE = "@bm/wallet" as const;
 export { applyTopup } from "./settle.js";
 export type { ApplyTopupInput, ApplyTopupResult } from "./settle.js";
 
+// Check-in debit + invoice settlement (P1-E03-S05).
+export { debit, DoubleCheckInError } from "./debit.js";
+export type { DebitInput, DebitResult, DebitOutcome } from "./debit.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
