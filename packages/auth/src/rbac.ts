@@ -64,12 +64,14 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "read", resource: "receipt" },
     { action: "create", resource: "payment" },
   ],
-  // Front desk: find parents, take top-ups, record visits.
+  // Front desk: find parents, take top-ups, record visits, register walk-ins.
   reception: [
     { action: "read", resource: "wallet" },
     { action: "create", resource: "payment" },
     { action: "read", resource: "receipt" },
     { action: "read", resource: "service" },
+    // P1-E02-S02: register a walk-in parent (staff-initiated account creation).
+    { action: "create", resource: "user" },
   ],
   // Cashier: handles money in/out + receipts at the till.
   cashier: [

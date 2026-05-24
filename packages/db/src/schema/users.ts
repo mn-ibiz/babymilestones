@@ -4,9 +4,15 @@ import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   phone: text("phone").notNull().unique(),
-  pinHash: text("pin_hash").notNull(),
+  // Nullable since P1-E02-S02: a Reception walk-in account has no PIN until the
+  // parent sets one (verify-via-OTP on first self-login). Self-signup/staff
+  // seeds still always set this.
+  pinHash: text("pin_hash"),
   // Role drives staff login + landing (P1-E01-S03); full RBAC lands in P1-E01-S06.
   role: text("role").notNull().default("parent"),
+  // NULL = no PIN chosen yet (must set/verify via OTP on first self-login);
+  // a timestamp records when the PIN was set (P1-E02-S02).
+  pinSetAt: timestamp("pin_set_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

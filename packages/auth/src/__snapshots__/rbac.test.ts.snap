@@ -123,6 +123,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
     "role": "reception",
   },
   {
+    "action": "create",
+    "resource": "user",
+    "role": "reception",
+  },
+  {
     "action": "read",
     "resource": "receipt",
     "role": "reception",

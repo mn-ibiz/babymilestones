@@ -12,7 +12,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 01:25
+last_updated: 2026-05-25 09:30
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -32,7 +32,7 @@ development_status:
   # Epic 2 — Parent & Child Registry  (source E02)
   epic-2: in-progress
   2-1-parent-self-registers-with-profile-details: done  # P1-E02-S01
-  2-2-reception-registers-walk-in-parent: ready-for-dev  # P1-E02-S02
+  2-2-reception-registers-walk-in-parent: done  # P1-E02-S02
   2-3-add-and-edit-children: ready-for-dev  # P1-E02-S03
   2-4-photo-and-sms-consent-flags: ready-for-dev  # P1-E02-S04
   2-5-data-export-for-a-parent-s-record: ready-for-dev  # P1-E02-S05

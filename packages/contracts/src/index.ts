@@ -89,6 +89,43 @@ export interface ParentProfile {
 }
 
 /**
+ * Reception walk-in registration (P1-E02-S02).
+ *
+ * One-screen form (AC1): phone (required), first/last name, optional email +
+ * residential area. PIN is intentionally NOT part of this schema (AC3) — a
+ * walk-in account is created with no credential and the parent verifies via OTP
+ * on first self-login. Phone is raw here; the API normalises it server-side
+ * (mirrors signup/login, which never trust a client-normalised phone).
+ */
+export const receptionWalkInSchema = z.object({
+  phone: z.string().trim().min(1, "Phone is required"),
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: z.string().trim().min(1, "Last name is required"),
+  email: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v === "" || emailLightRegex.test(v), { message: "Enter a valid email address" })
+    .transform((v) => (v === "" ? null : v)),
+  residentialArea: optionalText,
+});
+export type ReceptionWalkInInput = z.infer<typeof receptionWalkInSchema>;
+
+/**
+ * Phone-collision lookup result (AC2). When a normalised phone already maps to
+ * a user, `existing` carries a minimal reference so the Reception form can offer
+ * "Open existing" or set a "Merge intent" flag. Never leaks PIN/credential.
+ */
+export interface PhoneCheckResult {
+  available: boolean;
+  existing: {
+    userId: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+}
+
+/**
  * AC3: the profile-completion banner shows until the profile is "complete".
  * Complete = a profile row exists with both required names. Pure so it can be
  * unit-tested and shared by the API and the platform UI.

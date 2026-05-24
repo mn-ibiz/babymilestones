@@ -17,6 +17,7 @@ const EXPECTED: ReadonlyArray<{ role: string; action: string; resource: string }
   { role: "reception", action: "create", resource: "payment" },
   { role: "reception", action: "read", resource: "receipt" },
   { role: "reception", action: "read", resource: "service" },
+  { role: "reception", action: "create", resource: "user" },
   { role: "cashier", action: "read", resource: "wallet" },
   { role: "cashier", action: "create", resource: "payment" },
   { role: "cashier", action: "create", resource: "receipt" },
