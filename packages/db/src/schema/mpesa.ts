@@ -1,4 +1,4 @@
-import { bigint, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { wallets } from "./wallets.js";
 
@@ -55,3 +55,36 @@ export const mpesaStkRequests = pgTable(
 
 export type MpesaStkRequestRow = typeof mpesaStkRequests.$inferSelect;
 export type MpesaStkRequestInsert = typeof mpesaStkRequests.$inferInsert;
+
+/**
+ * M-Pesa C2B/STK callback (P1-E04-S02). One row per Daraja STK callback we
+ * receive. Provider table — prefixed `mpesa_*`.
+ *
+ * The handler is **idempotent on `checkoutRequestId`** (UNIQUE): the insert runs
+ * `ON CONFLICT DO NOTHING`, so a callback Daraja retries (it retries on any
+ * non-200) lands exactly once. The row `id` is reused as the `@bm/wallet`
+ * idempotency key when crediting the top-up, layering a second idempotency
+ * guarantee on top of the table UNIQUE so replays never double-credit.
+ *
+ * NOT FK-linked to `mpesa_stk_request`: an out-of-order callback can arrive
+ * before that row commits (AC5); the handler reconciles by `checkoutRequestId`.
+ * The raw payload is untrusted input, stored verbatim for forensics only.
+ */
+export const mpesaCallbacks = pgTable("mpesa_callback", {
+  /** PK — doubles as the wallet idempotency key for the eventual credit. */
+  id: uuid("id").defaultRandom().primaryKey(),
+  /** Daraja CheckoutRequestID echoed on the callback. UNIQUE → ON CONFLICT DO NOTHING. */
+  checkoutRequestId: text("checkout_request_id").notNull().unique(),
+  /** Daraja MerchantRequestID, when present. */
+  merchantRequestId: text("merchant_request_id"),
+  /** Daraja ResultCode: 0 = success, non-zero = failed/cancelled. */
+  resultCode: integer("result_code").notNull(),
+  /** Human-readable ResultDesc (untrusted; audit only). */
+  resultDesc: text("result_desc"),
+  /** Full raw callback body, stored verbatim for forensics. */
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type MpesaCallbackRow = typeof mpesaCallbacks.$inferSelect;
+export type MpesaCallbackInsert = typeof mpesaCallbacks.$inferInsert;

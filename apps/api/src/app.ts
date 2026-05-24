@@ -14,6 +14,7 @@ import { registerParentRoutes } from "./routes/parents/index.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
 import { registerMpesaRoutes } from "./routes/payments/mpesa/index.js";
 import type { MpesaRouteConfig } from "./routes/payments/mpesa/initiate.js";
+import type { MpesaCallbackConfig } from "./routes/payments/mpesa/callback.js";
 
 export interface AppDeps {
   db?: Database;
@@ -54,6 +55,12 @@ export interface AppDeps {
    * not registered (no real network is ever attempted from config defaults).
    */
   mpesa?: MpesaRouteConfig;
+  /**
+   * M-Pesa C2B/STK callback handler config (P1-E04-S02): the Daraja source-IP
+   * allowlist. Defaults to the published Safaricom ranges; tests pass `[]` to
+   * disable the check (app.inject has no real Daraja client IP).
+   */
+  mpesaCallback?: MpesaCallbackConfig;
 }
 
 /** Build Daraja config from env (production). Returns null if not fully set. */
@@ -113,7 +120,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // present (explicit dep in tests, or full env config in production).
     const mpesa = deps.mpesa ?? mpesaConfigFromEnv();
     if (mpesa) {
-      registerMpesaRoutes(app, { db, sessions: deps.sessions, mpesa });
+      registerMpesaRoutes(app, {
+        db,
+        sessions: deps.sessions,
+        mpesa,
+        callback: deps.mpesaCallback,
+      });
     }
   }
 
