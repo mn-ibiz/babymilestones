@@ -169,6 +169,18 @@ export const refundSchema = z.object({
 export type RefundRequestInput = z.infer<typeof refundSchema>;
 
 /**
+ * Per-parent auto-credit toggle (P1-E03-S07). An admin flips whether a parent's
+ * wallet may go negative at check-in without prepayment. The only field the
+ * endpoint accepts — a single boolean — so the toggle never rewrites anything
+ * else. The check-in debit path (P1-E03-S05) reads the resulting
+ * `wallets.auto_credit_enabled`.
+ */
+export const autoCreditToggleSchema = z.object({
+  autoCreditEnabled: z.boolean({ message: "autoCreditEnabled must be a boolean" }),
+});
+export type AutoCreditToggleInput = z.infer<typeof autoCreditToggleSchema>;
+
+/**
  * Phone-collision lookup result (AC2). When a normalised phone already maps to
  * a user, `existing` carries a minimal reference so the Reception form can offer
  * "Open existing" or set a "Merge intent" flag. Never leaks PIN/credential.

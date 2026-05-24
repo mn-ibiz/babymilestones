@@ -40,6 +40,7 @@ const EXPECTED: ReadonlyArray<{ role: string; action: string; resource: string }
   { role: "admin", action: "manage", resource: "service" },
   { role: "admin", action: "manage", resource: "receipt" },
   { role: "admin", action: "manage", resource: "refund" },
+  { role: "admin", action: "manage", resource: "wallet" },
   { role: "admin", action: "read", resource: "wallet" },
   { role: "admin", action: "read", resource: "audit" },
   { role: "admin", action: "read", resource: "report" },

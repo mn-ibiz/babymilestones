@@ -3,6 +3,7 @@ import type { Database } from "@bm/db";
 import type { SessionStore } from "@bm/auth";
 import type { SmsSender } from "@bm/sms";
 import { registerAdminRefund } from "./refund.js";
+import { registerAdminAutoCredit } from "./auto-credit.js";
 
 export interface AdminDeps {
   db: Database;
@@ -14,4 +15,5 @@ export interface AdminDeps {
 /** Admin-only API surface (P1-E03-S06+). All routes guard with the rbac matrix. */
 export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void {
   registerAdminRefund(app, deps);
+  registerAdminAutoCredit(app, deps);
 }

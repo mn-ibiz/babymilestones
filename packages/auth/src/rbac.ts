@@ -109,6 +109,9 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "manage", resource: "service" },
     { action: "manage", resource: "receipt" },
     { action: "manage", resource: "refund" },
+    // P1-E03-S07: managing the wallet covers the per-parent auto-credit toggle.
+    // Reception/cashier hold only `read wallet`, so they cannot flip it.
+    { action: "manage", resource: "wallet" },
     { action: "read", resource: "wallet" },
     { action: "read", resource: "audit" },
     { action: "read", resource: "report" },
