@@ -12,7 +12,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 01:54
+last_updated: 2026-05-25 02:20
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -39,8 +39,8 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3 — Wallet Ledger Core  (source E03)
-  epic-3: ready-for-dev
-  3-1-append-only-wallet-ledger-schema-enforced-at: ready-for-dev  # P1-E03-S01
+  epic-3: in-progress
+  3-1-append-only-wallet-ledger-schema-enforced-at: done  # P1-E03-S01
   3-2-balance-is-computed-never-stored: ready-for-dev  # P1-E03-S02
   3-3-idempotent-posting-interface: ready-for-dev  # P1-E03-S03
   3-4-top-up-applies-fifo-to-outstanding-invoices: ready-for-dev  # P1-E03-S04

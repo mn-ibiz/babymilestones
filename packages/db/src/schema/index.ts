@@ -5,6 +5,7 @@ export * from "./users.js";
 export * from "./parents.js";
 export * from "./children.js";
 export * from "./wallets.js";
+export * from "./wallet-ledger.js";
 export * from "./otp.js";
 export * from "./sms.js";
 export * from "./permissions.js";

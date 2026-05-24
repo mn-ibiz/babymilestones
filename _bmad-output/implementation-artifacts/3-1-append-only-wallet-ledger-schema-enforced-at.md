@@ -1,6 +1,6 @@
 # Story 3.1: Append-only `wallet_ledger` schema enforced at DB level
 
-Status: ready-for-dev
+Status: done
 
 > Canonical ID: P1-E03-S01 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/P1-E03-S01.md
 
@@ -19,15 +19,15 @@ so that the financial record is provably immutable and trustworthy.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define `wallet_ledger` Drizzle schema + migration (AC: #1, #4)
-  - [ ] Add `walletLedger` table to `packages/db/src/schema/` with all columns from AC1; `amount` as signed `integer` (cents), `direction`/`kind` as enum/check-constrained text, `idempotency_key` with UNIQUE constraint, `reverses_entry_id` nullable self-FK to `wallet_ledger.id`, `created_at` default now().
-  - [ ] Generate migration `packages/db/migrations/0003_wallet_ledger.sql`; keep it additive-only.
-- [ ] Task 2: Enforce append-only at the DB level (AC: #2)
-  - [ ] In the migration, `REVOKE UPDATE, DELETE ON wallet_ledger FROM bm_app;` (app connections use the `bm_app` role); leave INSERT/SELECT granted. Migrations run as the table owner only.
-- [ ] Task 3: Tests (AC: #3, all)
-  - [ ] Integration test (vitest) connecting as `bm_app`: `UPDATE wallet_ledger SET amount=0` and `DELETE FROM wallet_ledger` both reject with a privilege error.
-  - [ ] Test that INSERT succeeds and a duplicate `idempotency_key` insert violates the UNIQUE constraint.
-  - [ ] Assert all amounts are stored/read as integer cents (no float columns).
+- [x] Task 1: Define `wallet_ledger` Drizzle schema + migration (AC: #1, #4)
+  - [x] Added `walletLedger` to `packages/db/src/schema/wallet-ledger.ts` with all AC1 columns; `amount` as signed `bigint` (integer cents, headroom + no float drift), `direction`/`kind` as CHECK-constrained text, `idempotency_key` UNIQUE, `reverses_entry_id` nullable self-FK to `wallet_ledger.id`, `created_at` default now(). Exported from schema barrel.
+  - [x] Migration `packages/db/migrations/0011_wallet_ledger.sql` (next free number — 0003 was already taken by 0003_users_role); additive-only.
+- [x] Task 2: Enforce append-only at the DB level (AC: #2)
+  - [~] Enforced via a **trigger that RAISEs on UPDATE/DELETE** (portable, holds for owner/superuser AND under the single-superuser PGlite harness). The `REVOKE UPDATE, DELETE` / `GRANT SELECT, INSERT` on `bm_app` is also issued, guarded behind `IF EXISTS(role)` so it is a no-op where the role is not yet provisioned. Reason for `[~]`: the literal role-REVOKE in AC2 cannot be the *tested* enforcement under PGlite; the trigger is — see review-findings.md.
+- [x] Task 3: Tests (AC: #3, all)
+  - [x] vitest against PGlite (`createTestDb`): `UPDATE wallet_ledger SET amount=0` and `DELETE FROM wallet_ledger` both reject (`/append-only/i`), and the row is verified unchanged/present afterward.
+  - [x] INSERT (credit + signed-negative debit + reversal self-link) succeeds; duplicate `idempotency_key` rejected; unknown direction/kind rejected (CHECK); FK to a missing wallet rejected.
+  - [x] Asserted `amount` column data type is `bigint` via information_schema (no float/numeric columns).
 
 ## Dev Notes
 
@@ -48,14 +48,41 @@ so that the financial record is provably immutable and trustworthy.
 
 ### Agent Model Used
 
+claude-opus-4-7
+
 ### Debug Log References
+
+Full gate green from repo root: `pnpm test && pnpm typecheck && pnpm lint && pnpm build`.
+New suite `packages/db/src/schema/wallet-ledger.test.ts` — 9 tests pass (22 total in @bm/db).
 
 ### Completion Notes List
 
+- Append-only is enforced by a DB **trigger** (`wallet_ledger_block_mutation`) that
+  RAISEs on UPDATE/DELETE. Chosen over role REVOKE as the source-of-truth guarantee
+  because it holds for the table owner/superuser and works under PGlite (single
+  superuser), so AC3 is genuinely testable. The AC2 `bm_app` REVOKE/GRANT is also
+  applied, guarded by `IF EXISTS(role)` for production defence-in-depth.
+- Money is `bigint` signed integer cents (KES * 100); credits positive, debits
+  negative. No float/numeric columns anywhere.
+- Migration numbered 0011 (next free slot; the story text's "0003" predated later
+  migrations). Additive-only.
+- `@bm/wallet` now exports ledger primitive types/constants (`Cents`,
+  `LedgerDirection`, `LedgerKind`, `LedgerEntry`) for downstream S02–S08.
+- One low-severity follow-up deferred (bm_app role provisioning) — see
+  `3-1-append-only-wallet-ledger-schema-enforced-at-review-findings.md`.
+
 ### File List
+
+- packages/db/src/schema/wallet-ledger.ts (new)
+- packages/db/src/schema/wallet-ledger.test.ts (new)
+- packages/db/src/schema/index.ts (export barrel)
+- packages/db/migrations/0011_wallet_ledger.sql (new)
+- packages/wallet/src/index.ts (ledger primitive types/constants)
+- _bmad-output/implementation-artifacts/3-1-append-only-wallet-ledger-schema-enforced-at-review-findings.md (new)
 
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-24 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+| 2026-05-25 | 1.0 | Implemented append-only wallet_ledger (schema, trigger-enforced immutability, migration 0011, tests, @bm/wallet primitives); status done | claude-opus-4-7 |
