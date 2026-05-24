@@ -125,6 +125,85 @@ export interface PhoneCheckResult {
   } | null;
 }
 
+// ---------------------------------------------------------------------------
+// Children registry (P1-E02-S03)
+// ---------------------------------------------------------------------------
+
+/** Max length of the free-text allergies/notes field (AC1). */
+export const CHILD_NOTES_MAX = 500;
+
+/** ISO calendar date YYYY-MM-DD (DOB has no time component). */
+export const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/u;
+
+/** Trim then collapse empty optional text to null. */
+const optionalChildText = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v) => (v ?? "").trim())
+  .transform((v) => (v === "" ? null : v));
+
+/**
+ * Add/edit a child (P1-E02-S03 AC1, AC3). Required: first name + a valid
+ * calendar DOB. Optional (collapse to null): last name, gender, allergies/notes
+ * (≤500 chars). The same shape backs both create and edit so AC fields are
+ * always preserved. `parentId` is never accepted from the client — ownership is
+ * derived from the session.
+ */
+export const childSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: optionalChildText,
+  dateOfBirth: z
+    .string()
+    .trim()
+    .min(1, "Date of birth is required")
+    .regex(isoDateRegex, "Date of birth must be YYYY-MM-DD")
+    .refine((v) => {
+      const d = new Date(`${v}T00:00:00.000Z`);
+      // Reject impossible dates (e.g. 2025-02-30 rolls over) and future DOBs.
+      return !Number.isNaN(d.getTime()) && v === d.toISOString().slice(0, 10) && d.getTime() <= Date.now();
+    }, "Enter a valid past date of birth"),
+  gender: optionalChildText,
+  allergiesNotes: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v.length <= CHILD_NOTES_MAX, {
+      message: `Notes must be ${CHILD_NOTES_MAX} characters or fewer`,
+    })
+    .transform((v) => (v === "" ? null : v)),
+});
+export type ChildInput = z.infer<typeof childSchema>;
+
+/** A persisted child as returned by the API (read back for edit + selectors). */
+export interface Child {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  dateOfBirth: string;
+  gender: string | null;
+  allergiesNotes: string | null;
+  archivedAt: string | null;
+  /** Derived from DOB (AC2) — surfaced on every booking selector. */
+  ageInMonths: number;
+}
+
+/**
+ * Age in whole months from a DOB (AC2). Shared helper so booking selectors and
+ * the registry never duplicate the calculation. Counts completed months: the
+ * month boundary advances only once the day-of-month is reached. Clamps to 0
+ * for same-day / future dates so callers never see a negative age.
+ */
+export function ageInMonths(dateOfBirth: string | Date, asOf: Date = new Date()): number {
+  const dob = dateOfBirth instanceof Date ? dateOfBirth : new Date(`${dateOfBirth}T00:00:00.000Z`);
+  if (Number.isNaN(dob.getTime())) return 0;
+  let months =
+    (asOf.getUTCFullYear() - dob.getUTCFullYear()) * 12 +
+    (asOf.getUTCMonth() - dob.getUTCMonth());
+  // Not yet reached the day-of-month → the current month isn't complete.
+  if (asOf.getUTCDate() < dob.getUTCDate()) months -= 1;
+  return months < 0 ? 0 : months;
+}
+
 /**
  * AC3: the profile-completion banner shows until the profile is "complete".
  * Complete = a profile row exists with both required names. Pure so it can be

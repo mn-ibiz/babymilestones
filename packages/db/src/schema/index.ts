@@ -3,6 +3,7 @@
 export * from "./audit.js";
 export * from "./users.js";
 export * from "./parents.js";
+export * from "./children.js";
 export * from "./wallets.js";
 export * from "./otp.js";
 export * from "./sms.js";

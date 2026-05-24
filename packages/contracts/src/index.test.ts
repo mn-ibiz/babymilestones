@@ -5,6 +5,9 @@ import {
   parentProfileSchema,
   isProfileComplete,
   emailLightRegex,
+  childSchema,
+  ageInMonths,
+  CHILD_NOTES_MAX,
   type ParentProfile,
 } from "./index.js";
 
@@ -94,5 +97,61 @@ describe("isProfileComplete (P1-E02-S01 AC3)", () => {
   });
   it("is false when a required name is blank", () => {
     expect(isProfileComplete({ ...base, lastName: "  " })).toBe(false);
+  });
+});
+
+describe("childSchema (P1-E02-S03 AC1)", () => {
+  it("accepts a first name + valid DOB with optionals omitted", () => {
+    const r = childSchema.safeParse({ firstName: "Zola", dateOfBirth: "2024-01-15" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.lastName).toBeNull();
+      expect(r.data.gender).toBeNull();
+      expect(r.data.allergiesNotes).toBeNull();
+    }
+  });
+  it("requires a first name", () => {
+    expect(childSchema.safeParse({ firstName: "", dateOfBirth: "2024-01-15" }).success).toBe(false);
+  });
+  it("requires a date of birth", () => {
+    expect(childSchema.safeParse({ firstName: "Zola" }).success).toBe(false);
+  });
+  it("rejects a malformed or impossible DOB", () => {
+    expect(childSchema.safeParse({ firstName: "Z", dateOfBirth: "15/01/2024" }).success).toBe(false);
+    expect(childSchema.safeParse({ firstName: "Z", dateOfBirth: "2024-02-30" }).success).toBe(false);
+  });
+  it("rejects a future DOB", () => {
+    const future = new Date(Date.now() + 86400000 * 30).toISOString().slice(0, 10);
+    expect(childSchema.safeParse({ firstName: "Z", dateOfBirth: future }).success).toBe(false);
+  });
+  it("caps notes at 500 chars", () => {
+    const ok = childSchema.safeParse({
+      firstName: "Z",
+      dateOfBirth: "2024-01-15",
+      allergiesNotes: "a".repeat(CHILD_NOTES_MAX),
+    });
+    expect(ok.success).toBe(true);
+    const tooLong = childSchema.safeParse({
+      firstName: "Z",
+      dateOfBirth: "2024-01-15",
+      allergiesNotes: "a".repeat(CHILD_NOTES_MAX + 1),
+    });
+    expect(tooLong.success).toBe(false);
+  });
+});
+
+describe("ageInMonths (P1-E02-S03 AC2)", () => {
+  it("counts completed whole months", () => {
+    expect(ageInMonths("2024-01-15", new Date("2024-07-15T00:00:00Z"))).toBe(6);
+  });
+  it("does not advance until the day-of-month is reached", () => {
+    expect(ageInMonths("2024-01-15", new Date("2024-07-14T00:00:00Z"))).toBe(5);
+  });
+  it("spans year boundaries", () => {
+    expect(ageInMonths("2023-12-01", new Date("2025-01-01T00:00:00Z"))).toBe(13);
+  });
+  it("clamps to 0 for same-day or future DOB", () => {
+    expect(ageInMonths("2024-07-15", new Date("2024-07-15T00:00:00Z"))).toBe(0);
+    expect(ageInMonths("2025-01-01", new Date("2024-07-15T00:00:00Z"))).toBe(0);
   });
 });
