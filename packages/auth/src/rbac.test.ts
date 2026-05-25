@@ -10,6 +10,14 @@ import {
   invalidateSessionsOnRoleChange,
   permissionMatrixRows,
   PERMISSION_MATRIX,
+  CAPABILITIES,
+  CAPABILITY_MATRIX,
+  hasCapability,
+  requireCapability,
+  capabilityMatrixRows,
+  canApproveAdjustment,
+  canViewReconciliation,
+  RECONCILIATION_VIEW_ROLES,
 } from "./rbac.js";
 
 describe("permission matrix snapshot (P1-E01-S06 — drift gate)", () => {
@@ -90,6 +98,73 @@ describe("actAs impersonation (AC3 — super_admin only, both ids audited)", () 
     });
     // Visible banner signal.
     expect(res.banner).toEqual({ actingAs: "parent-9", by: "super-1" });
+  });
+});
+
+describe("named capabilities — treasury.approve_adjustment (P1-E06-S03)", () => {
+  it("declares treasury.approve_adjustment as a known capability (AC2)", () => {
+    expect(CAPABILITIES).toContain("treasury.approve_adjustment");
+  });
+
+  it("grants treasury.approve_adjustment to treasury and super_admin only (AC2)", () => {
+    expect(hasCapability("treasury", "treasury.approve_adjustment")).toBe(true);
+    expect(hasCapability("super_admin", "treasury.approve_adjustment")).toBe(true);
+    // Admin can post + view the screen but cannot approve (dual-approval, AC3).
+    expect(hasCapability("admin", "treasury.approve_adjustment")).toBe(false);
+    expect(hasCapability("accountant", "treasury.approve_adjustment")).toBe(false);
+    expect(hasCapability("reception", "treasury.approve_adjustment")).toBe(false);
+  });
+
+  it("an unknown role holds no capability", () => {
+    expect(hasCapability("hacker", "treasury.approve_adjustment")).toBe(false);
+  });
+
+  it("the capability matrix only lists declared capabilities for real roles", () => {
+    for (const [, caps] of Object.entries(CAPABILITY_MATRIX)) {
+      for (const cap of caps) {
+        expect(CAPABILITIES).toContain(cap);
+      }
+    }
+  });
+
+  it("canApproveAdjustment mirrors the capability grant (AC2/AC3)", () => {
+    expect(canApproveAdjustment("treasury")).toBe(true);
+    expect(canApproveAdjustment("super_admin")).toBe(true);
+    expect(canApproveAdjustment("admin")).toBe(false);
+  });
+
+  it("reconciliation screen access is broader than approval (AC3)", () => {
+    expect([...RECONCILIATION_VIEW_ROLES].sort()).toEqual(
+      ["admin", "super_admin", "treasury"].sort(),
+    );
+    expect(canViewReconciliation("admin")).toBe(true);
+    expect(canViewReconciliation("treasury")).toBe(true);
+    expect(canViewReconciliation("super_admin")).toBe(true);
+    // Accountant reads via the report export path, not the live screen here.
+    expect(canViewReconciliation("reception")).toBe(false);
+  });
+});
+
+describe("requireCapability guard (P1-E06-S03)", () => {
+  it("allows a principal holding the capability", () => {
+    const guard = requireCapability("treasury.approve_adjustment");
+    expect(guard({ id: "t1", role: "treasury" })).toEqual({ ok: true });
+    expect(guard({ id: "s1", role: "super_admin" })).toEqual({ ok: true });
+  });
+
+  it("rejects a principal lacking the capability with 403", () => {
+    const guard = requireCapability("treasury.approve_adjustment");
+    expect(guard({ id: "a1", role: "admin" })).toEqual({
+      ok: false,
+      status: 403,
+      error: "Forbidden: missing permission",
+    });
+  });
+});
+
+describe("capability matrix snapshot (P1-E06-S03 — drift gate)", () => {
+  it("matches the committed snapshot", () => {
+    expect(capabilityMatrixRows()).toMatchSnapshot();
   });
 });
 

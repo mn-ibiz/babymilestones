@@ -120,6 +120,88 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
   super_admin: [everything],
 };
 
+/* ----------------------------------------------- named capabilities (S03) */
+
+/**
+ * Named capabilities (P1-E06-S03). Where the `(action, resource)` matrix covers
+ * coarse CRUD, a *capability* names one specific, high-trust action that must be
+ * granted to an explicit allow-list of roles — independent of the resource it
+ * touches. `treasury.approve_adjustment` is the first: approving a reconciliation
+ * adjusting entry is reserved to `treasury` (and `super_admin`), even though
+ * `admin` may post the entry and view the reconciliation screen (dual-approval).
+ *
+ * Capabilities are mirrored into the `role_capabilities` seed table and pinned by
+ * the snapshot test, exactly like the permission matrix — code and db cannot
+ * drift apart silently.
+ */
+export const CAPABILITIES = ["treasury.approve_adjustment"] as const;
+export type Capability = (typeof CAPABILITIES)[number];
+
+/**
+ * Capability allow-lists. Keep entries stable/sorted so the snapshot is
+ * deterministic. Roles absent from a capability's list simply do not hold it.
+ * `super_admin` holds every capability via its wildcard (see `hasCapability`).
+ */
+export const CAPABILITY_MATRIX: Readonly<Partial<Record<Role, readonly Capability[]>>> = {
+  treasury: ["treasury.approve_adjustment"],
+  super_admin: ["treasury.approve_adjustment"],
+};
+
+/**
+ * Does `role` hold the named capability? `super_admin` holds all of them (it owns
+ * the `*`/`*` wildcard in the permission matrix). Server-side only.
+ */
+export function hasCapability(role: string, capability: Capability): boolean {
+  if (role === "super_admin") return true;
+  const caps = CAPABILITY_MATRIX[role as Role];
+  return caps?.includes(capability) ?? false;
+}
+
+/** Approving a reconciliation adjusting entry — AC2/AC3 (treasury + super_admin). */
+export function canApproveAdjustment(role: string): boolean {
+  return hasCapability(role, "treasury.approve_adjustment");
+}
+
+/**
+ * Roles that may open the reconciliation screen (AC3). Deliberately broader than
+ * the approval capability: `admin` can view + post adjustments but cannot approve.
+ */
+export const RECONCILIATION_VIEW_ROLES = ["admin", "treasury", "super_admin"] as const;
+const RECONCILIATION_VIEW_SET = new Set<string>(RECONCILIATION_VIEW_ROLES);
+
+/** True when `role` may open the reconciliation screen (AC3). */
+export function canViewReconciliation(role: string): boolean {
+  return RECONCILIATION_VIEW_SET.has(role);
+}
+
+/** Flattened capability grants for the seed mirror + snapshot drift gate. */
+export interface CapabilityRow {
+  role: Role;
+  capability: Capability;
+}
+
+export function capabilityMatrixRows(): CapabilityRow[] {
+  const rows: CapabilityRow[] = [];
+  for (const role of ALL_ROLES) {
+    for (const cap of CAPABILITY_MATRIX[role] ?? []) {
+      rows.push({ role, capability: cap });
+    }
+  }
+  return rows.sort(
+    (a, b) => a.role.localeCompare(b.role) || a.capability.localeCompare(b.capability),
+  );
+}
+
+/** Build a guard enforcing a named capability server-side (mirrors requirePermission). */
+export function requireCapability(capability: Capability) {
+  return function check(principal: PermissionPrincipal): PermissionOutcome {
+    if (hasCapability(principal.role, capability)) {
+      return { ok: true };
+    }
+    return { ok: false, status: 403, error: "Forbidden: missing permission" };
+  };
+}
+
 /** Pure authorization decision. Server-side only — never trust the client. */
 export function can(role: string, action: Action, resource: Resource): boolean {
   const grants = PERMISSION_MATRIX[role as Role];

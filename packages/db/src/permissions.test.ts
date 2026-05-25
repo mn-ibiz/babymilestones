@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb } from "./testing.js";
-import { roles, permissions } from "./schema/permissions.js";
+import { roles, permissions, roleCapabilities } from "./schema/permissions.js";
 
 /**
  * Independent mirror of the seeded matrix (migration 0005). Defined here — NOT
@@ -80,5 +80,44 @@ describe("roles + permissions seed (P1-E01-S06)", () => {
       })),
     );
     expect(dbRows).toEqual(sortRows([...EXPECTED]));
+  });
+});
+
+describe("role_capabilities seed (P1-E06-S03)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  // Independent mirror of migration 0027 (not imported from @bm/auth — keeps the
+  // db as the lower layer). Drift gate for the capability grants (AC2).
+  const EXPECTED_CAPS: ReadonlyArray<{ role: string; capability: string }> = [
+    { role: "treasury", capability: "treasury.approve_adjustment" },
+    { role: "super_admin", capability: "treasury.approve_adjustment" },
+  ];
+  const sortCaps = <T extends { role: string; capability: string }>(rows: T[]): T[] =>
+    [...rows].sort(
+      (a, b) => a.role.localeCompare(b.role) || a.capability.localeCompare(b.capability),
+    );
+
+  it("grants treasury.approve_adjustment to treasury + super_admin only (AC2)", async () => {
+    const dbRows = sortCaps(
+      (await dbh.db.select().from(roleCapabilities)).map((r) => ({
+        role: r.role,
+        capability: r.capability,
+      })),
+    );
+    expect(dbRows).toEqual(sortCaps([...EXPECTED_CAPS]));
+  });
+
+  it("every capability grant references a seeded role (FK integrity)", async () => {
+    const roleRows = (await dbh.db.select().from(roles)).map((r) => r.role);
+    const capRows = await dbh.db.select().from(roleCapabilities);
+    for (const c of capRows) {
+      expect(roleRows).toContain(c.role);
+    }
   });
 });

@@ -8,7 +8,14 @@ import {
   type ReconciliationAdjustmentRow,
 } from "@bm/db";
 import { floatLiabilities } from "@bm/wallet";
-import { validateSession, can, CSRF_HEADER_NAME, type PermissionPrincipal } from "@bm/auth";
+import {
+  validateSession,
+  can,
+  canViewReconciliation,
+  canApproveAdjustment as canApproveAdjustmentCap,
+  CSRF_HEADER_NAME,
+  type PermissionPrincipal,
+} from "@bm/auth";
 import {
   adjustingEntryCreateSchema,
   computeDrift,
@@ -40,17 +47,24 @@ function makeResolveUser(db: Database) {
   };
 }
 
-/** Treasury owns reconciliation (`manage reconciliation`). Admin can post adjustments. */
+/**
+ * Reconciliation screen access (P1-E06-S03 AC3): admin, treasury, super_admin.
+ * Deliberately broader than the approval capability — admin may view + post but
+ * not approve. Accountant retains its `read reconciliation` grant for exports.
+ */
 function canReadReconciliation(p: PermissionPrincipal): boolean {
-  return can(p.role, "manage", "reconciliation") || can(p.role, "read", "reconciliation");
+  return canViewReconciliation(p.role) || can(p.role, "read", "reconciliation");
 }
 /** Posting an adjusting entry: admin (`manage wallet`) or treasury (`manage reconciliation`). */
 function canPostAdjustment(p: PermissionPrincipal): boolean {
   return can(p.role, "manage", "wallet") || can(p.role, "manage", "reconciliation");
 }
-/** Approving an adjustment is reserved to treasury (`manage reconciliation`) — AC3. */
+/**
+ * Approving an adjustment is reserved to holders of the named capability
+ * `treasury.approve_adjustment` — treasury + super_admin only (P1-E06-S03 AC2/AC3).
+ */
 function canApproveAdjustment(p: PermissionPrincipal): boolean {
-  return can(p.role, "manage", "reconciliation");
+  return canApproveAdjustmentCap(p.role);
 }
 
 function serializeAdjustment(row: ReconciliationAdjustmentRow): ReconciliationAdjustment {

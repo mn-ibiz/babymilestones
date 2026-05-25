@@ -18,7 +18,13 @@ import { formatCentsKes } from "./parent-search";
 
 /** Roles that may POST an adjusting entry (admin `manage wallet`, treasury). */
 export const ADJUSTMENT_POST_ROLES = ["admin", "super_admin", "treasury"] as const;
-/** Roles that may APPROVE an adjustment — treasury only (dual-approval, AC3). */
+/**
+ * Roles that may APPROVE an adjustment — holders of the named capability
+ * `treasury.approve_adjustment` in `@bm/auth` (treasury + super_admin only;
+ * P1-E06-S03 AC2/AC3). Mirrored here (not imported) so the Next bundle never
+ * pulls the native argon2 binding from `@bm/auth`; the rbac snapshot test pins
+ * the canonical grant and the server re-checks the capability on every request.
+ */
 export const ADJUSTMENT_APPROVE_ROLES = ["treasury", "super_admin"] as const;
 
 /** True when the role may post an adjusting entry (drives the CTA — AC3). */
@@ -26,7 +32,7 @@ export function canPostAdjustment(role: string): boolean {
   return (ADJUSTMENT_POST_ROLES as readonly string[]).includes(role);
 }
 
-/** True when the role may approve a pending adjustment (AC3). */
+/** True when the role may approve a pending adjustment — capability-driven (AC3). */
 export function canApproveAdjustment(role: string): boolean {
   return (ADJUSTMENT_APPROVE_ROLES as readonly string[]).includes(role);
 }

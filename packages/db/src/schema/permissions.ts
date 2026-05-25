@@ -24,5 +24,26 @@ export const permissions = pgTable(
   }),
 );
 
+/**
+ * Named capabilities — fine-grained, high-trust actions granted to an explicit
+ * role allow-list, independent of the (action, resource) matrix (P1-E06-S03).
+ * Seeded by migration 0027 and mirrored by `@bm/auth` CAPABILITY_MATRIX; the
+ * capability snapshot test fails CI if the two drift. Server-side enforcement
+ * only, via `requireCapability(...)`.
+ */
+export const roleCapabilities = pgTable(
+  "role_capabilities",
+  {
+    role: text("role")
+      .notNull()
+      .references(() => roles.role),
+    capability: text("capability").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.role, t.capability] }),
+  }),
+);
+
 export type RoleRow = typeof roles.$inferSelect;
 export type PermissionRow = typeof permissions.$inferSelect;
+export type RoleCapabilityRow = typeof roleCapabilities.$inferSelect;

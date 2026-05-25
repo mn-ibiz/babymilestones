@@ -56,6 +56,7 @@ describe("Daily reconciliation (P1-E06-S02)", () => {
     await dbh.db.insert(users).values(await staffUserSeed("+254712000001", "7421", "admin"));
     await dbh.db.insert(users).values(await staffUserSeed("+254712000002", "7422", "treasury"));
     await dbh.db.insert(users).values(await staffUserSeed("+254712000003", "7423", "reception"));
+    await dbh.db.insert(users).values(await staffUserSeed("+254712000004", "7424", "super_admin"));
     walletId = await seedWallet();
   });
   afterEach(async () => {
@@ -227,6 +228,33 @@ describe("Daily reconciliation (P1-E06-S02)", () => {
       treasury,
     );
     expect(again.statusCode).toBe(409);
+  });
+
+  it("super_admin holds treasury.approve_adjustment and can approve (P1-E06-S03 AC2)", async () => {
+    const admin = await loginStaff("+254712000001", "7421");
+    const superAdmin = await loginStaff("+254712000004", "7424");
+    const tillId = await seedTill();
+    const adjId = (
+      await req("POST", "/treasury/reconciliation/adjustments", admin, {
+        floatAccountId: tillId,
+        amount: 750,
+        reason: "drift fix",
+      })
+    ).json().id;
+    const approve = await req(
+      "POST",
+      `/treasury/reconciliation/adjustments/${adjId}/approve`,
+      superAdmin,
+    );
+    expect(approve.statusCode).toBe(200);
+    expect(approve.json().status).toBe("approved");
+  });
+
+  it("super_admin may open the reconciliation screen (AC3)", async () => {
+    const superAdmin = await loginStaff("+254712000004", "7424");
+    await seedTill();
+    const res = await req("GET", "/treasury/reconciliation", superAdmin);
+    expect(res.statusCode).toBe(200);
   });
 
   it("validates the adjustment body (AC3)", async () => {

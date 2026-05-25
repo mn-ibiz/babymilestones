@@ -1,5 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`capability matrix snapshot (P1-E06-S03 — drift gate) > matches the committed snapshot 1`] = `
+[
+  {
+    "capability": "treasury.approve_adjustment",
+    "role": "super_admin",
+  },
+  {
+    "capability": "treasury.approve_adjustment",
+    "role": "treasury",
+  },
+]
+`;
+
 exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the committed snapshot 1`] = `
 [
   {
