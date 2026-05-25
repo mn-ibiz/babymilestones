@@ -19,6 +19,9 @@ import {
   SERVICE_RATE_MAX_CENTS,
   isOutstanding,
   receiptLineDescription,
+  floatAccountCreateSchema,
+  floatAccountUpdateSchema,
+  floatAccountKindForPaymentMethod,
   type ParentProfile,
 } from "./index.js";
 
@@ -274,5 +277,73 @@ describe("receiptLineDescription (P1-E05-S06)", () => {
   });
   it("falls back to the raw kind for anything unknown", () => {
     expect(receiptLineDescription("mystery")).toBe("mystery");
+  });
+});
+
+describe("float accounts (P1-E06-S01)", () => {
+  it("accepts a valid create payload and defaults openingBalance to 0", () => {
+    const parsed = floatAccountCreateSchema.safeParse({
+      name: "M-Pesa Till 1",
+      kind: "mpesa_till",
+      openingDate: "2026-05-25",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.openingBalance).toBe(0);
+  });
+
+  it("rejects an unknown kind", () => {
+    const parsed = floatAccountCreateSchema.safeParse({
+      name: "Bad",
+      kind: "crypto",
+      openingDate: "2026-05-25",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects a non-integer or negative opening balance", () => {
+    expect(
+      floatAccountCreateSchema.safeParse({
+        name: "x",
+        kind: "bank",
+        openingBalance: -1,
+        openingDate: "2026-05-25",
+      }).success,
+    ).toBe(false);
+    expect(
+      floatAccountCreateSchema.safeParse({
+        name: "x",
+        kind: "bank",
+        openingBalance: 1.5,
+        openingDate: "2026-05-25",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a malformed opening date", () => {
+    expect(
+      floatAccountCreateSchema.safeParse({ name: "x", kind: "bank", openingDate: "25-05-2026" })
+        .success,
+    ).toBe(false);
+    expect(
+      floatAccountCreateSchema.safeParse({ name: "x", kind: "bank", openingDate: "2026-13-40" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("update requires at least one field and forbids kind edits", () => {
+    expect(floatAccountUpdateSchema.safeParse({}).success).toBe(false);
+    expect(floatAccountUpdateSchema.safeParse({ active: false }).success).toBe(true);
+    // kind is not a recognised key — partial patch silently ignores it (strip),
+    // so a kind-only patch is treated as empty and rejected.
+    expect(floatAccountUpdateSchema.safeParse({ kind: "bank" }).success).toBe(false);
+  });
+
+  it("maps payment methods to float account kinds (AC3)", () => {
+    expect(floatAccountKindForPaymentMethod("cash")).toBe("cash_drawer");
+    expect(floatAccountKindForPaymentMethod("mpesa_stk")).toBe("mpesa_till");
+    expect(floatAccountKindForPaymentMethod("mpesa")).toBe("mpesa_till");
+    expect(floatAccountKindForPaymentMethod("bank_transfer")).toBe("bank");
+    expect(floatAccountKindForPaymentMethod("paystack_card")).toBe("bank");
+    expect(floatAccountKindForPaymentMethod("unknown")).toBeNull();
   });
 });

@@ -20,6 +20,7 @@ import type { PaystackRouteConfig } from "./routes/payments/paystack/init.js";
 import { registerCashRoutes } from "./routes/payments/cash/index.js";
 import { registerBankRoutes } from "./routes/payments/bank/index.js";
 import { registerReceptionRoutes } from "./routes/reception/index.js";
+import { registerTreasuryRoutes } from "./routes/treasury/index.js";
 
 export interface AppDeps {
   db?: Database;
@@ -164,6 +165,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // P1-E04-S07: admin-confirmed bank transfer top-up. Manual entry — no
     // provider wiring, so always on (guarded to admin/treasury internally).
     registerBankRoutes(app, { db, sessions: deps.sessions });
+
+    // P1-E06-S01: Treasury float-account CRUD. Manual admin/treasury config —
+    // no provider wiring, so always on (guarded internally).
+    registerTreasuryRoutes(app, { db, sessions: deps.sessions });
 
     // P1-E04-S01: M-Pesa STK push routes register only when Daraja wiring is
     // present (explicit dep in tests, or full env config in production).

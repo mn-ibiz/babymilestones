@@ -12,5 +12,5 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": { "@bm/db": "workspace:*", "drizzle-orm": "^0.38.2" }
+  "dependencies": { "@bm/db": "workspace:*", "@bm/contracts": "workspace:*", "drizzle-orm": "^0.38.2" }
 }

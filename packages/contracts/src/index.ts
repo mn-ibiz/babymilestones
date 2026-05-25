@@ -796,3 +796,91 @@ export interface ReceiptSmsResponse {
   /** When not sent, the reason ("no_consent"); null on a successful send. */
   reason: "no_consent" | null;
 }
+
+// ---------------------------------------------------------------------------
+// Float accounts (P1-E06-S01)
+// ---------------------------------------------------------------------------
+
+/**
+ * The kinds of account that can hold customer wallet float (P1-E06-S01 AC1):
+ * an M-Pesa till, a bank account, or a physical cash drawer. Reconciliation
+ * (P1-E06-S02) groups the float liability by these accounts.
+ */
+export const FLOAT_ACCOUNT_KINDS = ["mpesa_till", "bank", "cash_drawer"] as const;
+export type FloatAccountKind = (typeof FLOAT_ACCOUNT_KINDS)[number];
+
+/** Max length of a float-account display name. */
+export const FLOAT_ACCOUNT_NAME_MAX = 120;
+/** Min/max opening balance (integer cents). Non-negative; a fresh account is 0. */
+export const FLOAT_ACCOUNT_OPENING_MIN_CENTS = 0;
+export const FLOAT_ACCOUNT_OPENING_MAX_CENTS = 50_000_000_00; // KES 50,000,000.00
+
+/** A YYYY-MM-DD calendar date (opening date), validated to be a real date. */
+const isoDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/u, "openingDate must be YYYY-MM-DD")
+  .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), "openingDate is not a valid date");
+
+/**
+ * Create a float account (P1-E06-S01 AC1/AC2). Admin/treasury declares an
+ * account that holds wallet float: a name, its kind, an opening balance (cents)
+ * and the opening date. Opening balance defaults to 0 when omitted.
+ */
+export const floatAccountCreateSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(FLOAT_ACCOUNT_NAME_MAX),
+  kind: z.enum(FLOAT_ACCOUNT_KINDS, { message: "Choose a float account kind" }),
+  openingBalance: z
+    .number()
+    .int("openingBalance must be integer cents")
+    .min(FLOAT_ACCOUNT_OPENING_MIN_CENTS, "openingBalance cannot be negative")
+    .max(FLOAT_ACCOUNT_OPENING_MAX_CENTS, "openingBalance is too large")
+    .default(0),
+  openingDate: isoDateSchema,
+});
+export type FloatAccountCreateInput = z.infer<typeof floatAccountCreateSchema>;
+
+/**
+ * Update a float account (P1-E06-S01 AC2). All fields optional (partial patch);
+ * `kind` is intentionally NOT editable after creation (it changes reconciliation
+ * grouping semantics) — only the name, opening figures, and active flag. At
+ * least one field must be present.
+ */
+export const floatAccountUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1, "name is required").max(FLOAT_ACCOUNT_NAME_MAX).optional(),
+    openingBalance: z
+      .number()
+      .int("openingBalance must be integer cents")
+      .min(FLOAT_ACCOUNT_OPENING_MIN_CENTS, "openingBalance cannot be negative")
+      .max(FLOAT_ACCOUNT_OPENING_MAX_CENTS, "openingBalance is too large")
+      .optional(),
+    openingDate: isoDateSchema.optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, "at least one field is required");
+export type FloatAccountUpdateInput = z.infer<typeof floatAccountUpdateSchema>;
+
+/**
+ * Map a wallet top-up payment method to the float-account kind that holds the
+ * cash for it (P1-E06-S01 AC3): cash → cash_drawer, the M-Pesa rails → mpesa_till,
+ * card/bank → bank. Reconciliation tags each top-up's `float_account_id` from the
+ * active account of the returned kind. Returns null for unknown methods.
+ */
+export function floatAccountKindForPaymentMethod(method: string): FloatAccountKind | null {
+  switch (method) {
+    case "cash":
+      return "cash_drawer";
+    case "mpesa":
+    case "mpesa_stk":
+    case "mpesa_c2b":
+      return "mpesa_till";
+    case "bank":
+    case "bank_transfer":
+    case "paystack":
+    case "paystack_card":
+      return "bank";
+    default:
+      return null;
+  }
+}

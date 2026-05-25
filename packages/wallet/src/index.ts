@@ -3,8 +3,9 @@
  *  wallet_ledger table (P1-E03-S01). Downstream stories (S02..S08) add the
  *  posting/balance/settlement logic here. */
 import type { Database, Transaction, WalletLedgerRow } from "@bm/db";
-import { walletLedger } from "@bm/db";
-import { eq, inArray, sql } from "drizzle-orm";
+import { floatAccounts, walletLedger } from "@bm/db";
+import { floatAccountKindForPaymentMethod } from "@bm/contracts";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 export const PACKAGE = "@bm/wallet" as const;
 
@@ -71,6 +72,13 @@ export interface PostInput {
   source: string;
   /** User id (or system actor) that posted the entry. */
   postedBy: string;
+  /**
+   * Float account this movement's cash lands in (P1-E06-S01 AC3). Optional +
+   * additive — omit for movements with no float (e.g. debits) or where the
+   * account is not yet resolved. Tag top-ups from the payment method via
+   * {@link resolveFloatAccountId}.
+   */
+  floatAccountId?: string | null;
 }
 
 /**
@@ -117,6 +125,7 @@ export async function post(db: Database, input: PostInput): Promise<WalletLedger
     idempotencyKey: input.idempotencyKey,
     source: input.source,
     postedBy: input.postedBy,
+    floatAccountId: input.floatAccountId ?? null,
   };
 
   return db.transaction(async (tx) => {
@@ -200,4 +209,27 @@ export async function balances(
     .where(inArray(walletLedger.walletId, [...walletIds]))
     .groupBy(walletLedger.walletId);
   return new Map(rows.map((r) => [r.walletId, Number(r.total)]));
+}
+
+/**
+ * Resolve the float account a top-up's cash lands in from its payment method
+ * (P1-E06-S01 AC3). Maps the method → float-account kind (cash → cash_drawer,
+ * M-Pesa → mpesa_till, card/bank → bank) then picks the oldest *active* account
+ * of that kind. Returns null when the method is unknown or no active account of
+ * that kind exists yet (the ledger column is nullable, so an untagged top-up is
+ * still valid — it just will not group under an account until one is declared).
+ */
+export async function resolveFloatAccountId(
+  db: LedgerReader,
+  method: string,
+): Promise<string | null> {
+  const kind = floatAccountKindForPaymentMethod(method);
+  if (!kind) return null;
+  const [row] = await db
+    .select({ id: floatAccounts.id })
+    .from(floatAccounts)
+    .where(and(eq(floatAccounts.kind, kind), eq(floatAccounts.active, true)))
+    .orderBy(asc(floatAccounts.createdAt))
+    .limit(1);
+  return row?.id ?? null;
 }

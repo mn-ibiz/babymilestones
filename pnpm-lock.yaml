@@ -280,6 +280,9 @@ importers:
 
   packages/wallet:
     dependencies:
+      '@bm/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@bm/db':
         specifier: workspace:*
         version: link:../db

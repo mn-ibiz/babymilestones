@@ -16,3 +16,4 @@ export * from "./data-exports.js";
 export * from "./mpesa.js";
 export * from "./paystack.js";
 export * from "./bank-transfer.js";
+export * from "./float-accounts.js";

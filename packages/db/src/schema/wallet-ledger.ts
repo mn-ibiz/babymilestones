@@ -10,6 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { wallets } from "./wallets.js";
+import { floatAccounts } from "./float-accounts.js";
 
 /**
  * Append-only `wallet_ledger` (P1-E03-S01) — the immutable spine of the wallet
@@ -54,6 +55,12 @@ export const walletLedger = pgTable(
      * still owed. Defaults false for every other movement.
      */
     loyaltyClawbackPending: boolean("loyalty_clawback_pending").notNull().default(false),
+    /**
+     * Float account this movement's cash lands in (P1-E06-S01 AC3). Nullable +
+     * additive: historical entries are backfilled to a "default" account at
+     * deploy (empty in P1); new top-ups tag it from the payment method.
+     */
+    floatAccountId: uuid("float_account_id").references(() => floatAccounts.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
