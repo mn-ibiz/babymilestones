@@ -27,3 +27,4 @@ STORY 3-7-auto-credit-toggle-per-parent | RESULT done | fixed=0 | deferred=1 | r
 STORY 3-8-statement-export-csv-for-a-parent | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E03-S08)
 STORY 4-1-m-pesa-stk-push-initiated-from-parent | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E04-S01)
 STORY 4-2-m-pesa-c2b-callback-handler-idempotent | RESULT done | fixed=1 | deferred=3 | reason=none  (P1-E04-S02)
+STORY 4-3-stk-reconciliation-cron | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E04-S03)
