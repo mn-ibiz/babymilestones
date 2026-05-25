@@ -1090,6 +1090,91 @@ export const RECONCILIATION_EXPORT_COLUMNS = [
   "adjustments_kes",
 ] as const;
 
+// ---------------------------------------------------------------------------
+// Service catalogue + effective-dated prices (P1-E07-S01)
+// ---------------------------------------------------------------------------
+
+/** The service units admin can pick (AC1). CHECK-constrained in the migration too. */
+export const SERVICE_UNITS = ["play", "talent", "salon", "coaching", "event"] as const;
+export type ServiceUnit = (typeof SERVICE_UNITS)[number];
+
+/** Max length of a service display name + description. */
+export const SERVICE_NAME_MAX = 120;
+export const SERVICE_DESCRIPTION_MAX = 500;
+/** Min/max service price (integer cents). Non-negative — a free/promo service is allowed. */
+export const SERVICE_PRICE_MIN_CENTS = 0;
+export const SERVICE_PRICE_MAX_CENTS = 50_000_000; // KES 500,000.00
+
+/** Trim then collapse empty optional text to null. */
+const optionalServiceText = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v) => (v ?? "").trim())
+  .transform((v) => (v === "" ? null : v));
+
+/**
+ * Create a service (P1-E07-S01 AC1). Required: name + unit. Optional (collapse to
+ * null): description + the attribution role a booking must be attributed to. The
+ * service is always created active; prices are set separately (effective-dated).
+ */
+export const serviceCreateSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(SERVICE_NAME_MAX),
+  description: optionalServiceText.refine(
+    (v) => v === null || v.length <= SERVICE_DESCRIPTION_MAX,
+    `description must be ${SERVICE_DESCRIPTION_MAX} characters or fewer`,
+  ),
+  unit: z.enum(SERVICE_UNITS, { message: "Choose a service unit" }),
+  attributionRoleRequired: optionalServiceText,
+});
+export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
+
+/**
+ * Update a service (P1-E07-S01 AC1). All fields optional (partial patch); `unit`
+ * is intentionally NOT editable after creation. Soft-delete is `isActive=false`
+ * (no hard deletes). At least one field must be present.
+ */
+export const serviceUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1, "name is required").max(SERVICE_NAME_MAX).optional(),
+    description: optionalServiceText.refine(
+      (v) => v === null || v.length <= SERVICE_DESCRIPTION_MAX,
+      `description must be ${SERVICE_DESCRIPTION_MAX} characters or fewer`,
+    ),
+    isActive: z.boolean().optional(),
+    attributionRoleRequired: optionalServiceText,
+  })
+  .refine(
+    (v) =>
+      v.name !== undefined ||
+      v.isActive !== undefined ||
+      v.description !== null ||
+      v.attributionRoleRequired !== null,
+    "at least one field is required",
+  );
+export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;
+
+/** A YYYY-MM-DD calendar date for a price's effective-from (validated as real). */
+const serviceDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/u, "effectiveFrom must be YYYY-MM-DD")
+  .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), "effectiveFrom is not a valid date");
+
+/**
+ * Set a new effective-dated price (P1-E07-S01 AC2/AC3). A price change never
+ * mutates an amount in place: the API closes the current open row and inserts a
+ * new one starting at `effectiveFrom`. Amount is integer cents, non-negative.
+ */
+export const servicePriceCreateSchema = z.object({
+  amountCents: z
+    .number({ message: "Amount is required" })
+    .int("amountCents must be integer cents")
+    .min(SERVICE_PRICE_MIN_CENTS, "amountCents cannot be negative")
+    .max(SERVICE_PRICE_MAX_CENTS, "amountCents is too large"),
+  effectiveFrom: serviceDateSchema,
+});
+export type ServicePriceCreateInput = z.infer<typeof servicePriceCreateSchema>;
+
 /** RFC-4180 escape: quote a field if it has a comma, quote, CR or LF. */
 function csvField(value: string): string {
   return /[",\r\n]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;

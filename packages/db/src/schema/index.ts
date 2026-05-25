@@ -18,3 +18,4 @@ export * from "./paystack.js";
 export * from "./bank-transfer.js";
 export * from "./float-accounts.js";
 export * from "./reconciliation-adjustments.js";
+export * from "./services.js";

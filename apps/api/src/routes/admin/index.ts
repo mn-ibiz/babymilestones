@@ -4,6 +4,7 @@ import type { SessionStore } from "@bm/auth";
 import type { SmsSender } from "@bm/sms";
 import { registerAdminRefund } from "./refund.js";
 import { registerAdminAutoCredit } from "./auto-credit.js";
+import { registerAdminServices } from "./services.js";
 
 export interface AdminDeps {
   db: Database;
@@ -16,4 +17,5 @@ export interface AdminDeps {
 export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void {
   registerAdminRefund(app, deps);
   registerAdminAutoCredit(app, deps);
+  registerAdminServices(app, deps);
 }

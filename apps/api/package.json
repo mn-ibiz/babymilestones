@@ -15,6 +15,7 @@
     "fastify": "^5.2.0",
     "drizzle-orm": "^0.38.2",
     "@bm/contracts": "workspace:*",
+    "@bm/catalog": "workspace:*",
     "@bm/auth": "workspace:*",
     "@bm/db": "workspace:*",
     "@bm/export": "workspace:*",

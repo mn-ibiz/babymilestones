@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E06-S04 done; epic-6 done)
+last_updated: 2026-05-25 (P1-E07-S01 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -81,8 +81,8 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 7 — Service Catalogue & Pricing  (source E07)
-  epic-7: ready-for-dev
-  7-1-crud-services-with-effective-dated-price-history: ready-for-dev  # P1-E07-S01
+  epic-7: in-progress
+  7-1-crud-services-with-effective-dated-price-history: done  # P1-E07-S01
   7-2-attribution-role-per-service: ready-for-dev  # P1-E07-S02
   7-3-staff-data-records-no-logins: ready-for-dev  # P1-E07-S03
   7-4-vat-tax-flag-per-service: ready-for-dev  # P1-E07-S04
