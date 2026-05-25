@@ -224,6 +224,64 @@ export interface ParentSearchResponse {
   results: ParentSearchResult[];
 }
 
+/**
+ * Reception parent-profile header summary (P1-E05-S02 AC1). All the financial
+ * facts about a parent in one shot so the front desk never has to dig: full name,
+ * full phone (the header is the focused single-parent view, unlike the masked
+ * search list), computed wallet balance, outstanding owed, and the current
+ * auto-credit flag. Money is integer cents. `userId` is the stable id the toggle
+ * + invoice modal endpoints key on.
+ */
+export interface ParentProfileSummary {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  /** Full normalised phone (+2547XXXXXXXX) — the focused header view shows it whole. */
+  phone: string;
+  /** Computed wallet balance in integer cents (credits − debits). */
+  walletBalanceCents: number;
+  /** Outstanding amount owed in integer cents (sum of open invoices). */
+  outstandingCents: number;
+  /** Current value of `wallets.auto_credit_enabled` (admin-only to flip — AC1). */
+  autoCreditEnabled: boolean;
+}
+
+/** Profile-header response: the summary, or 404 when the parent is unknown. */
+export interface ParentProfileResponse {
+  profile: ParentProfileSummary;
+}
+
+/**
+ * One open (non-settled) invoice for the outstanding-amount modal (P1-E05-S02
+ * AC3). Carries the remaining amount owed (cents), the booking status, and when
+ * it was raised so the modal can list oldest-first (FIFO settlement order).
+ */
+export interface OpenInvoice {
+  id: string;
+  /** Remaining amount owed in integer cents. */
+  amountDueCents: number;
+  /** `pending` | `outstanding` | `settled_on_credit` — never `settled` here. */
+  status: string;
+  /** ISO timestamp the invoice was raised. */
+  createdAt: string;
+}
+
+/** Open-invoices response for the modal (AC3): the list + their summed total. */
+export interface OpenInvoicesResponse {
+  invoices: OpenInvoice[];
+  /** Sum of `amountDueCents` across the listed invoices (== header outstanding). */
+  totalCents: number;
+}
+
+/**
+ * AC1: the outstanding amount renders red when the parent owes money (> 0) and
+ * neutral otherwise. Pure rule shared by the API shaping and the header UI so
+ * the "red when > 0" threshold lives in exactly one place.
+ */
+export function isOutstanding(outstandingCents: number): boolean {
+  return outstandingCents > 0;
+}
+
 // ---------------------------------------------------------------------------
 // M-Pesa STK push top-up (P1-E04-S01)
 // ---------------------------------------------------------------------------

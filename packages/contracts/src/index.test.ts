@@ -13,6 +13,7 @@ import {
   PAYSTACK_MIN_KES,
   PAYSTACK_MAX_KES,
   parentSearchQuerySchema,
+  isOutstanding,
   type ParentProfile,
 } from "./index.js";
 
@@ -194,5 +195,16 @@ describe("parentSearchQuerySchema (P1-E05-S01 AC1)", () => {
   it("rejects a blank/whitespace-only query", () => {
     expect(parentSearchQuerySchema.safeParse({ q: "   " }).success).toBe(false);
     expect(parentSearchQuerySchema.safeParse({ q: "" }).success).toBe(false);
+  });
+});
+
+describe("isOutstanding (P1-E05-S02 AC1 — red when > 0)", () => {
+  it("is true only when the parent owes money (> 0)", () => {
+    expect(isOutstanding(1)).toBe(true);
+    expect(isOutstanding(7_500)).toBe(true);
+  });
+  it("is false at zero or below (no debt → neutral, not red)", () => {
+    expect(isOutstanding(0)).toBe(false);
+    expect(isOutstanding(-100)).toBe(false);
   });
 });

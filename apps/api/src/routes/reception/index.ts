@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Database } from "@bm/db";
 import type { SessionStore } from "@bm/auth";
 import { registerParentSearch } from "./parents-search.js";
+import { registerParentProfile } from "./parent-profile.js";
 
 /** Shared deps for the Reception operator-surface routes (P1-E05). */
 export interface ReceptionDeps {
@@ -11,4 +12,5 @@ export interface ReceptionDeps {
 
 export function registerReceptionRoutes(app: FastifyInstance, deps: ReceptionDeps): void {
   registerParentSearch(app, deps);
+  registerParentProfile(app, deps);
 }
