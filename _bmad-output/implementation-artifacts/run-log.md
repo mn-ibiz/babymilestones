@@ -46,3 +46,4 @@ STORY 7-1-crud-services-with-effective-dated-price-history | RESULT done | fixed
 STORY 7-2-attribution-role-per-service | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E07-S02)
 STORY 7-3-staff-data-records-no-logins | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E07-S03)
 STORY 7-4-vat-tax-flag-per-service | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E07-S04)
+STORY 8-1-receipt-schema-with-nullable-etims-fields | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E08-S01)
