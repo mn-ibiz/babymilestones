@@ -884,3 +884,118 @@ export function floatAccountKindForPaymentMethod(method: string): FloatAccountKi
       return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Daily reconciliation (P1-E06-S02)
+// ---------------------------------------------------------------------------
+
+/**
+ * Drift threshold (AC2): when a float account's `system − real` drift exceeds
+ * this magnitude (in integer cents) the reconciliation screen raises a red
+ * banner. KES 100.00 == 10_000 cents. The comparison is strictly greater-than
+ * on the absolute drift, so a drift of exactly KES 100 does NOT trip the banner.
+ */
+export const RECONCILIATION_DRIFT_THRESHOLD_CENTS = 100_00;
+
+/** Bounds for an adjusting-entry amount (magnitude), in integer cents (KES). */
+export const ADJUSTMENT_MIN_CENTS = 1; // a zero adjustment is meaningless
+export const ADJUSTMENT_MAX_CENTS = 50_000_000_00; // KES 50,000,000.00
+/** Max length of the free-text adjustment reason. */
+export const ADJUSTMENT_REASON_MAX = 280;
+
+/**
+ * Drift for one account = `system − real` (AC2). System is the float
+ * liability computed from the ledger; real is the manually-entered real-world
+ * balance. Positive drift = the system thinks we hold more than we really do.
+ * Pure so the API shaping and the UI share exactly one definition.
+ */
+export function computeDrift(systemCents: number, realCents: number): number {
+  return systemCents - realCents;
+}
+
+/**
+ * AC2: an account is "drifting" (red) when the magnitude of its drift exceeds
+ * {@link RECONCILIATION_DRIFT_THRESHOLD_CENTS}. Strict greater-than, so an
+ * exactly-on-threshold drift is still within tolerance. Pure rule shared by the
+ * API and the UI so the threshold lives in exactly one place.
+ */
+export function isDrifting(driftCents: number): boolean {
+  return Math.abs(driftCents) > RECONCILIATION_DRIFT_THRESHOLD_CENTS;
+}
+
+/**
+ * AC2: the screen shows a single red banner when ANY account is drifting beyond
+ * tolerance. Pure aggregate over the per-row drifts so the banner decision is
+ * testable without a DOM.
+ */
+export function hasReconciliationDrift(driftsCents: readonly number[]): boolean {
+  return driftsCents.some((d) => isDrifting(d));
+}
+
+/**
+ * One reconciliation row (AC1): a float account's name, its system-tracked
+ * balance (float liability from the ledger, cents), the manually-entered
+ * real-world balance (cents, null until entered), the drift (`system − real`,
+ * null while real is absent), and whether that drift trips the red banner.
+ */
+export interface ReconciliationRow {
+  floatAccountId: string;
+  name: string;
+  kind: string;
+  /** System-tracked balance in integer cents: float liability from the ledger. */
+  systemCents: number;
+  /** Manually-entered real-world balance in cents; null until the operator enters it. */
+  realCents: number | null;
+  /** `system − real` in cents; null while `realCents` is null (AC2). */
+  driftCents: number | null;
+  /** True when this row's drift exceeds tolerance (AC2). False while real is absent. */
+  isDrifting: boolean;
+}
+
+/** Reconciliation read-model response (AC1, AC2): the rows + the banner flag. */
+export interface ReconciliationResponse {
+  /** The reporting day (YYYY-MM-DD) the system balances are computed as of. */
+  asOf: string;
+  rows: ReconciliationRow[];
+  /** True when any row is drifting beyond tolerance → render the red banner (AC2). */
+  hasDrift: boolean;
+}
+
+/**
+ * Post an adjusting entry (P1-E06-S02 AC3). An admin records an adjustment
+ * against a float account: a signed amount (cents), the account, and a required
+ * reason. `posted_by` is the session admin — never accepted from the client; the
+ * approver is captured at the dual-approval step (a treasury user), never here.
+ * The amount must be a non-zero integer of cents within bounds.
+ */
+export const adjustingEntryCreateSchema = z.object({
+  floatAccountId: z.string().uuid("floatAccountId must be a UUID"),
+  amount: z
+    .number({ message: "Amount is required" })
+    .int("amount must be integer cents")
+    .refine((v) => v !== 0, "amount must be non-zero")
+    .refine(
+      (v) => Math.abs(v) >= ADJUSTMENT_MIN_CENTS && Math.abs(v) <= ADJUSTMENT_MAX_CENTS,
+      `amount magnitude must be between ${ADJUSTMENT_MIN_CENTS} and ${ADJUSTMENT_MAX_CENTS} cents`,
+    ),
+  reason: z.string().trim().min(1, "A reason is required").max(ADJUSTMENT_REASON_MAX),
+});
+export type AdjustingEntryCreateInput = z.infer<typeof adjustingEntryCreateSchema>;
+
+/** Lifecycle of a reconciliation adjustment surfaced to the screen (AC3). */
+export type AdjustmentStatus = "pending" | "approved" | "rejected";
+
+/** A persisted adjusting entry as returned by the API (read back for the screen). */
+export interface ReconciliationAdjustment {
+  id: string;
+  floatAccountId: string;
+  /** Signed integer cents. */
+  amount: number;
+  reason: string;
+  postedBy: string;
+  approvedBy: string | null;
+  status: AdjustmentStatus;
+  /** Reversing-entry pattern (AC4): the prior adjustment this one reverses, if any. */
+  reversesAdjustmentId: string | null;
+  createdAt: string;
+}

@@ -233,3 +233,58 @@ export async function resolveFloatAccountId(
     .limit(1);
   return row?.id ?? null;
 }
+
+/**
+ * System-tracked float liability per account (P1-E06-S02 AC2). For each float
+ * account the system balance is its `opening_balance` plus the `SUM(amount)` of
+ * every `wallet_ledger` movement tagged to it — credits positive, debits
+ * negative — so the figure is the exact customer-wallet liability the account
+ * holds, computed from the ledger (never stored).
+ *
+ * Returns one entry per float account (active and inactive — historical drift on
+ * a deactivated account must still surface), in stable opening order. Accounts
+ * with no tagged movements still appear with their opening balance. Money is
+ * integer cents; the bigint SUM is exact.
+ */
+export interface FloatLiability {
+  floatAccountId: string;
+  name: string;
+  kind: string;
+  active: boolean;
+  /** System-tracked balance in cents: opening_balance + SUM(ledger.amount). */
+  systemCents: Cents;
+}
+
+export async function floatLiabilities(db: LedgerReader): Promise<FloatLiability[]> {
+  const rows = await db
+    .select({
+      id: floatAccounts.id,
+      name: floatAccounts.name,
+      kind: floatAccounts.kind,
+      active: floatAccounts.active,
+      opening: floatAccounts.openingBalance,
+      // LEFT JOIN so an account with no tagged movements still returns a row;
+      // COALESCE the SUM so it is 0 (not NULL) in that case. bigint SUM comes
+      // back as a string from the driver.
+      ledgerTotal: sql<string>`COALESCE(SUM(${walletLedger.amount}), 0)`,
+    })
+    .from(floatAccounts)
+    .leftJoin(walletLedger, eq(walletLedger.floatAccountId, floatAccounts.id))
+    .groupBy(
+      floatAccounts.id,
+      floatAccounts.name,
+      floatAccounts.kind,
+      floatAccounts.active,
+      floatAccounts.openingBalance,
+      floatAccounts.createdAt,
+    )
+    .orderBy(asc(floatAccounts.createdAt));
+
+  return rows.map((r) => ({
+    floatAccountId: r.id,
+    name: r.name,
+    kind: r.kind,
+    active: r.active,
+    systemCents: Number(r.opening) + Number(r.ledgerTotal),
+  }));
+}
