@@ -151,9 +151,22 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       ),
   });
 
-  // Surface the correlation id back to the caller.
+  // Surface the correlation id back to the caller, and emit explicit structured
+  // request-lifecycle logs (X8-S01). We log explicitly rather than relying on
+  // Fastify's automatic request logging so delivery to the configured pino
+  // destination is deterministic. The child logger already carries correlationId.
   app.addHook("onRequest", async (req, reply) => {
     reply.header(CORRELATION_ID_HEADER, req.id);
+    req.log.info(
+      { correlationId: req.id, req: { method: req.method, url: req.url } },
+      "incoming request",
+    );
+  });
+  app.addHook("onResponse", async (req, reply) => {
+    req.log.info(
+      { correlationId: req.id, res: { statusCode: reply.statusCode } },
+      "request completed",
+    );
   });
 
   // X8-S01 (AC2): forward thrown errors to the error tracker, tagged with the
