@@ -65,3 +65,4 @@ STORY 11-4-profile-consent-management | RESULT done | fixed=0 | deferred=0 | rea
 STORY 11-5-bottom-nav-mobile-first-shell | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E11-S05)
 STORY 12-1-home-page | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E12-S01)
 STORY 12-2-per-unit-pages | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E12-S02)
+STORY 12-3-deep-link-from-whatsapp-ads | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E12-S03)
