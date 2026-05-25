@@ -13,6 +13,10 @@ import {
   PAYSTACK_MIN_KES,
   PAYSTACK_MAX_KES,
   parentSearchQuerySchema,
+  auditLogQuerySchema,
+  auditLogEventsToCsv,
+  AUDIT_LOG_DEFAULT_LIMIT,
+  AUDIT_LOG_EXPORT_COLUMNS,
   recordVisitSchema,
   isVisitOutstanding,
   STAFF_NAME_SNAPSHOT_MAX,
@@ -553,5 +557,80 @@ describe("VAT / tax treatment per service (P1-E07-S04)", () => {
     expect(serviceUpdateSchema.parse({ taxTreatment: "zero_rated" }).taxTreatment).toBe("zero_rated");
     expect(serviceUpdateSchema.safeParse({ name: "X" }).data?.taxTreatment).toBeUndefined();
     expect(serviceUpdateSchema.safeParse({ taxTreatment: "gst" }).success).toBe(false);
+  });
+});
+
+describe("audit log viewer contracts (P1-E10-S03)", () => {
+  it("defaults limit/offset and accepts an empty query", () => {
+    const parsed = auditLogQuerySchema.parse({});
+    expect(parsed.limit).toBe(AUDIT_LOG_DEFAULT_LIMIT);
+    expect(parsed.offset).toBe(0);
+    expect(parsed.actor).toBeUndefined();
+  });
+
+  it("coerces string limit/offset from the query string and clamps the max", () => {
+    expect(auditLogQuerySchema.parse({ limit: "25", offset: "10" })).toMatchObject({
+      limit: 25,
+      offset: 10,
+    });
+    expect(auditLogQuerySchema.safeParse({ limit: "999" }).success).toBe(false);
+    expect(auditLogQuerySchema.safeParse({ limit: "0" }).success).toBe(false);
+    expect(auditLogQuerySchema.safeParse({ offset: "-1" }).success).toBe(false);
+  });
+
+  it("treats blank/array filter values as absent", () => {
+    const parsed = auditLogQuerySchema.parse({ action: "  ", targetId: ["wallet-9"] });
+    expect(parsed.action).toBeUndefined();
+    expect(parsed.targetId).toBe("wallet-9");
+  });
+
+  it("requires actor to be a uuid and validates the date window", () => {
+    expect(auditLogQuerySchema.safeParse({ actor: "not-a-uuid" }).success).toBe(false);
+    expect(
+      auditLogQuerySchema.safeParse({ fromDate: "2026-05-10", toDate: "2026-05-01" }).success,
+    ).toBe(false);
+    expect(
+      auditLogQuerySchema.safeParse({ fromDate: "2026-05-01", toDate: "2026-05-10" }).success,
+    ).toBe(true);
+  });
+
+  it("renders events as RFC-4180 CSV with the header + CRLF endings", () => {
+    const csv = auditLogEventsToCsv([
+      {
+        id: "1",
+        actorUserId: "user-1",
+        action: "admin.user.create",
+        targetTable: "users",
+        targetId: "u-9",
+        createdAt: "2026-05-25T10:00:00.000Z",
+      },
+      {
+        id: "2",
+        actorUserId: null,
+        action: "auth.signup",
+        targetTable: null,
+        targetId: null,
+        createdAt: "2026-05-25T09:00:00.000Z",
+      },
+    ]);
+    const lines = csv.split("\r\n");
+    expect(lines[0]).toBe(AUDIT_LOG_EXPORT_COLUMNS.join(","));
+    expect(lines[1]).toBe("2026-05-25T10:00:00.000Z,user-1,admin.user.create,users,u-9");
+    expect(lines[2]).toBe("2026-05-25T09:00:00.000Z,,auth.signup,,");
+    expect(csv.endsWith("\r\n")).toBe(true);
+  });
+
+  it("escapes CSV fields containing commas or quotes", () => {
+    const csv = auditLogEventsToCsv([
+      {
+        id: "1",
+        actorUserId: "user-1",
+        action: 'weird,"action"',
+        targetTable: "t",
+        targetId: "x",
+        createdAt: "2026-05-25T10:00:00.000Z",
+      },
+    ]);
+    expect(csv).toContain('"weird,""action"""');
   });
 });

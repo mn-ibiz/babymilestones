@@ -40,15 +40,19 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(hrefs).toContain("/staff");
     expect(hrefs).toContain("/services");
     expect(hrefs).toContain("/sms-config");
+    // P1-E10-S03: admin holds read:audit, so the audit log viewer is visible.
+    expect(hrefs).toContain("/audit");
     // admin holds manage:user/service/config but not manage:float
     expect(hrefs).not.toContain("/treasury/float-accounts");
   });
 
-  it("accountant (read-only) sees reconciliation read view, not float management", () => {
+  it("accountant (read-only) sees reconciliation read view, not float management or audit", () => {
     const hrefs = visibleNavFor("accountant").map((i) => i.href);
     expect(hrefs).toContain("/treasury/reconciliation");
     expect(hrefs).not.toContain("/treasury/float-accounts");
     expect(hrefs).not.toContain("/staff");
+    // accountant does not hold read:audit.
+    expect(hrefs).not.toContain("/audit");
   });
 
   it("an unknown role sees nothing", () => {

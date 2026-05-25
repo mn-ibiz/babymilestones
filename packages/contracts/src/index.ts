@@ -1502,3 +1502,97 @@ export interface AdminUserPublic {
   deactivatedAt: string | null;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Audit log viewer (P1-E10-S03)
+// ---------------------------------------------------------------------------
+
+/** Default page size for the audit-log list endpoint. */
+export const AUDIT_LOG_DEFAULT_LIMIT = 50;
+/** Hard upper bound on a single audit-log page (protects the query + payload). */
+export const AUDIT_LOG_MAX_LIMIT = 200;
+
+/** Coerce a query-string scalar (string | string[] | undefined) to a trimmed string. */
+function firstQueryValue(raw: unknown): string | undefined {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
+const auditLimitSchema = z.coerce
+  .number()
+  .int("limit must be an integer")
+  .min(1, "limit must be at least 1")
+  .max(AUDIT_LOG_MAX_LIMIT, `limit may not exceed ${AUDIT_LOG_MAX_LIMIT}`)
+  .default(AUDIT_LOG_DEFAULT_LIMIT);
+
+const auditOffsetSchema = z.coerce
+  .number()
+  .int("offset must be an integer")
+  .min(0, "offset must be at least 0")
+  .default(0);
+
+/**
+ * Filters for the read-only audit-log query (AC1). Every field is optional — an
+ * empty query lists the most-recent events. `actor` is a user id; `action` is a
+ * dotted action name (exact match); `targetId` matches the audited record id;
+ * `fromDate`/`toDate` bound the event time (inclusive, by calendar day, UTC).
+ * Pagination (AC2) via `limit`/`offset`. Unknown keys are dropped.
+ */
+export const auditLogQuerySchema = z
+  .object({
+    actor: z.preprocess(firstQueryValue, z.string().uuid("actor must be a user id").optional()),
+    action: z.preprocess(firstQueryValue, z.string().max(200).optional()),
+    targetId: z.preprocess(firstQueryValue, z.string().max(200).optional()),
+    fromDate: z.preprocess(firstQueryValue, exportDateSchema.optional()),
+    toDate: z.preprocess(firstQueryValue, exportDateSchema.optional()),
+    limit: z.preprocess((v) => (firstQueryValue(v) ?? undefined), auditLimitSchema),
+    offset: z.preprocess((v) => (firstQueryValue(v) ?? undefined), auditOffsetSchema),
+  })
+  .refine((v) => v.fromDate === undefined || v.toDate === undefined || v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
+
+/** One audit event as returned to the viewer (read-only projection of the row). */
+export interface AuditLogEvent {
+  id: string;
+  actorUserId: string | null;
+  action: string;
+  targetTable: string | null;
+  targetId: string | null;
+  createdAt: string;
+}
+
+/** Header columns of the audit-log CSV export, in order (AC2). */
+export const AUDIT_LOG_EXPORT_COLUMNS = [
+  "time",
+  "actor",
+  "action",
+  "target_table",
+  "target_id",
+] as const;
+
+/**
+ * Render audit events as an RFC-4180 CSV (AC2): a header row of
+ * {@link AUDIT_LOG_EXPORT_COLUMNS} followed by one line per event. Rows are
+ * emitted in caller order (newest-first); lines are CRLF-joined and the file
+ * ends with a trailing CRLF, mirroring the reconciliation export.
+ */
+export function auditLogEventsToCsv(events: readonly AuditLogEvent[]): string {
+  const lines: string[] = [AUDIT_LOG_EXPORT_COLUMNS.join(",")];
+  for (const e of events) {
+    lines.push(
+      [
+        e.createdAt,
+        csvField(e.actorUserId ?? ""),
+        csvField(e.action),
+        csvField(e.targetTable ?? ""),
+        csvField(e.targetId ?? ""),
+      ].join(","),
+    );
+  }
+  return lines.join("\r\n") + "\r\n";
+}

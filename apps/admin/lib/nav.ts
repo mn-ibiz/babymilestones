@@ -125,6 +125,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "SMS templates",
     permission: { action: "manage", resource: "config" },
   },
+  // P1-E10-S03: read-only audit log viewer. Gates on `read audit` — admin +
+  // super_admin only (treasury/accountant do not hold it).
+  { href: "/audit", label: "Audit log", permission: { action: "read", resource: "audit" } },
 ];
 
 /**
