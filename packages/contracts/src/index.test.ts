@@ -8,8 +8,36 @@ import {
   childSchema,
   ageInMonths,
   CHILD_NOTES_MAX,
+  paystackInitSchema,
+  kesToMinorUnits,
+  PAYSTACK_MIN_KES,
+  PAYSTACK_MAX_KES,
   type ParentProfile,
 } from "./index.js";
+
+describe("paystackInitSchema (P1-E04-S04 AC1, AC4)", () => {
+  it("accepts a whole-KES amount within bounds, defaulting saveCard to false", () => {
+    const r = paystackInitSchema.safeParse({ amountKes: 500 });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.saveCard).toBe(false);
+  });
+  it("accepts an explicit saveCard opt-in (card-on-file)", () => {
+    const r = paystackInitSchema.parse({ amountKes: 500, saveCard: true });
+    expect(r.saveCard).toBe(true);
+  });
+  it("rejects a non-integer or out-of-bounds amount", () => {
+    expect(paystackInitSchema.safeParse({ amountKes: 12.5 }).success).toBe(false);
+    expect(paystackInitSchema.safeParse({ amountKes: PAYSTACK_MIN_KES - 1 }).success).toBe(false);
+    expect(paystackInitSchema.safeParse({ amountKes: PAYSTACK_MAX_KES + 1 }).success).toBe(false);
+  });
+});
+
+describe("kesToMinorUnits", () => {
+  it("converts whole KES to Paystack minor units (cents)", () => {
+    expect(kesToMinorUnits(500)).toBe(50_000);
+    expect(kesToMinorUnits(1)).toBe(100);
+  });
+});
 
 describe("phoneSchema", () => {
   it("accepts a normalised Kenyan phone", () => {

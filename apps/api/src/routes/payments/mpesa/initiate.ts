@@ -45,6 +45,7 @@ export function registerMpesaStkInitiate(
   app: FastifyInstance,
   { db, sessions, mpesa }: PaymentsDeps,
 ): void {
+  if (!mpesa) return;
   const resolveUser = makeResolveUser(db);
   const guard = requirePermission("create", "payment");
   const adapter = createMpesaAdapter({

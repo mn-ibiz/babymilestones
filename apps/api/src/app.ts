@@ -15,6 +15,8 @@ import { registerAdminRoutes } from "./routes/admin/index.js";
 import { registerMpesaRoutes } from "./routes/payments/mpesa/index.js";
 import type { MpesaRouteConfig } from "./routes/payments/mpesa/initiate.js";
 import type { MpesaCallbackConfig } from "./routes/payments/mpesa/callback.js";
+import { registerPaystackRoutes } from "./routes/payments/paystack/index.js";
+import type { PaystackRouteConfig } from "./routes/payments/paystack/init.js";
 
 export interface AppDeps {
   db?: Database;
@@ -61,6 +63,25 @@ export interface AppDeps {
    * disable the check (app.inject has no real Daraja client IP).
    */
   mpesaCallback?: MpesaCallbackConfig;
+  /**
+   * Paystack (card top-up) wiring for the init + verify routes (P1-E04-S04).
+   * Secret-key config + an injected/mockable transport (tests pass a fake;
+   * production passes `globalThis.fetch` + the env secret key). When omitted, the
+   * Paystack routes are not registered (no real network is ever attempted).
+   */
+  paystack?: PaystackRouteConfig;
+}
+
+/** Build Paystack config from env (production). Returns null if not fully set. */
+function paystackConfigFromEnv(): PaystackRouteConfig | null {
+  const e = process.env;
+  const config = {
+    baseUrl: e.PAYSTACK_BASE_URL ?? "https://api.paystack.co",
+    secretKey: e.PAYSTACK_SECRET_KEY ?? "",
+    callbackUrl: e.PAYSTACK_CALLBACK_URL ?? "",
+  };
+  if (config.secretKey.trim() === "" || config.callbackUrl.trim() === "") return null;
+  return { config, transport: (url, init) => fetch(url, init) };
 }
 
 /** Build Daraja config from env (production). Returns null if not fully set. */
@@ -126,6 +147,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         mpesa,
         callback: deps.mpesaCallback,
       });
+    }
+
+    // P1-E04-S04: Paystack card top-up routes register only when Paystack wiring
+    // is present (explicit dep in tests, or full env config in production).
+    const paystack = deps.paystack ?? paystackConfigFromEnv();
+    if (paystack) {
+      registerPaystackRoutes(app, { db, sessions: deps.sessions, paystack });
     }
   }
 

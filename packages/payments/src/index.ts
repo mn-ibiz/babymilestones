@@ -18,3 +18,21 @@ export type {
   Charge,
   CreateMpesaAdapterOptions,
 } from "./mpesa/stkPush.js";
+
+// Paystack card top-up adapter (P1-E04-S04).
+export {
+  createPaystackAdapter,
+  PaystackConfigError,
+  PaystackTransportError,
+} from "./paystack/paystack.js";
+export type {
+  PaystackAdapter,
+  PaystackConfig,
+  PaystackTransport,
+  PaystackInitInput,
+  PaystackCharge,
+  PaystackVerifyInput,
+  PaystackVerifyResult,
+  PaystackAuthorization,
+  CreatePaystackAdapterOptions,
+} from "./paystack/paystack.js";

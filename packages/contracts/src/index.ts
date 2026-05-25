@@ -239,6 +239,53 @@ export interface PhoneCheckResult {
 }
 
 // ---------------------------------------------------------------------------
+// Paystack card top-up (P1-E04-S04)
+// ---------------------------------------------------------------------------
+
+/** Min/max per Paystack card top-up, in whole KES (AC1). */
+export const PAYSTACK_MIN_KES = 50;
+export const PAYSTACK_MAX_KES = 1_000_000;
+
+/** KES → Paystack minor units (cents). Paystack transacts in the smallest unit. */
+export function kesToMinorUnits(amountKes: number): number {
+  return Math.round(amountKes * 100);
+}
+
+/**
+ * Parent card top-up via Paystack hosted checkout (P1-E04-S04 AC1). The form
+ * submits a whole KES amount; the API converts it to minor units before calling
+ * Paystack. The reference (UUID) and payer email are derived server-side — never
+ * accepted from the client. `saveCard` opts the parent into card-on-file (AC4),
+ * reusing Paystack's saved authorization for future repeat top-ups.
+ */
+export const paystackInitSchema = z.object({
+  amountKes: z
+    .number({ message: "Amount is required" })
+    .int("Amount must be a whole number of shillings")
+    .min(PAYSTACK_MIN_KES, `Minimum top-up is KES ${PAYSTACK_MIN_KES}`)
+    .max(PAYSTACK_MAX_KES, `Maximum per top-up is KES ${PAYSTACK_MAX_KES}`),
+  /** AC4: opt-in to card-on-file (save the authorization for repeat top-ups). */
+  saveCard: z.boolean().optional().default(false),
+});
+export type PaystackInitInputContract = z.infer<typeof paystackInitSchema>;
+
+/** Lifecycle state of a Paystack transaction as surfaced to the client. */
+export type PaystackTxState = "INITIALIZED" | "SUCCEEDED" | "FAILED" | "ABANDONED";
+
+/** Initiate response (AC1/AC2): the hosted-checkout URL + reference to poll on. */
+export interface PaystackInitResponse {
+  reference: string;
+  authorizationUrl: string;
+  state: PaystackTxState;
+}
+
+/** Verify/poll response (AC2/AC3): the current state of a Paystack transaction. */
+export interface PaystackStatusResponse {
+  reference: string;
+  state: PaystackTxState;
+}
+
+// ---------------------------------------------------------------------------
 // Children registry (P1-E02-S03)
 // ---------------------------------------------------------------------------
 
