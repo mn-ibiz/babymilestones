@@ -81,4 +81,16 @@ export class ConsentAwareSmsSender {
     await this.sender.send(msg);
     return true;
   }
+
+  /**
+   * Send a reception receipt copy (P1-E05-S06 AC3). Gated on the parent's SMS
+   * consent flag (P1-E02-S04): a parent who has not opted in does not get an
+   * unsolicited receipt text — the copy is dropped (the print path is
+   * unaffected). Returns true iff the stub actually recorded the message.
+   */
+  async sendReceipt(parentId: string, msg: SmsMessage): Promise<boolean> {
+    if (!(await isMarketingOptedIn(this.db, parentId))) return false;
+    await this.sender.send(msg);
+    return true;
+  }
 }

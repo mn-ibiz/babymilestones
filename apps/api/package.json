@@ -20,7 +20,8 @@
     "@bm/export": "workspace:*",
     "@bm/sms": "workspace:*",
     "@bm/wallet": "workspace:*",
-    "@bm/payments": "workspace:*"
+    "@bm/payments": "workspace:*",
+    "@bm/ui": "workspace:*"
   },
   "devDependencies": { "tsx": "^4.19.2" }
 }

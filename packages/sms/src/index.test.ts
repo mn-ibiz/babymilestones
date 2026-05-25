@@ -83,3 +83,33 @@ it("gates marketing sends by opt-in but always sends transactional (AC3)", async
     await close();
   }
 });
+
+it("gates the receipt copy on SMS consent (P1-E05-S06 AC3)", async () => {
+  const { db, close } = await createTestDb();
+  try {
+    const optedOut = await makeParent(db, "+254712345678", false);
+    const optedIn = await makeParent(db, "+254799999999", true);
+    const sender = new ConsentAwareSmsSender(db, new StubSmsSender(db));
+
+    expect(
+      await sender.sendReceipt(optedOut, {
+        phone: "+254712345678",
+        body: "receipt",
+        template: "reception.receipt",
+      }),
+    ).toBe(false);
+    expect(
+      await sender.sendReceipt(optedIn, {
+        phone: "+254799999999",
+        body: "receipt",
+        template: "reception.receipt",
+      }),
+    ).toBe(true);
+
+    const rows = await db.select().from(smsOutbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.template).toBe("reception.receipt");
+  } finally {
+    await close();
+  }
+});

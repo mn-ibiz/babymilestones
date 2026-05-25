@@ -87,6 +87,9 @@ importers:
       '@bm/sms':
         specifier: workspace:*
         version: link:../../packages/sms
+      '@bm/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@bm/wallet':
         specifier: workspace:*
         version: link:../../packages/wallet
@@ -271,6 +274,9 @@ importers:
       '@bm/config':
         specifier: workspace:*
         version: link:../config
+      '@bm/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/wallet:
     dependencies:

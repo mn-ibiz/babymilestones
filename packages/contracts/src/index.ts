@@ -717,3 +717,82 @@ export interface RecentTransaction {
 export interface RecentTransactionsResponse {
   transactions: RecentTransaction[];
 }
+
+// ---------------------------------------------------------------------------
+// Print + SMS-stub receipt from Reception (P1-E05-S06)
+// ---------------------------------------------------------------------------
+
+/**
+ * A reception receipt for one wallet-ledger posting (the "transaction").
+ *
+ * This is the lightweight, browser-printable reception receipt (Decision 13 —
+ * browser print, no native print server). It is intentionally NOT the full
+ * eTIMS/KRA receipt engine (that is epic P1-E08): no tax fields, control unit,
+ * or QR. The payload carries exactly what a parent needs as proof of payment:
+ * who, how much, by what method, and when. Amounts are integer cents.
+ */
+export interface ReceiptPayload {
+  /** The wallet-ledger entry id this receipt is for (the transaction id). */
+  transactionId: string;
+  /** Parent display name (first + last). */
+  parentName: string;
+  /** Parent's full normalised phone (+2547XXXXXXXX) — the SMS destination. */
+  parentPhone: string;
+  /** One receipt line per movement. For a single posting this has one row. */
+  lineItems: ReceiptLineItem[];
+  /** Net amount of the receipt in integer cents (sum of line item amounts). */
+  amountCents: number;
+  /** Payment/movement method, e.g. `topup`, `debit`, `refund`. */
+  method: string;
+  /** Origin label, e.g. `cash:reception`, `mpesa`, `checkin`. */
+  source: string;
+  /** ISO timestamp the posting was made (the receipt date). */
+  date: string;
+}
+
+/** One line on a reception receipt. Amount is signed integer cents. */
+export interface ReceiptLineItem {
+  /** Human description of the movement (e.g. "Wallet top-up"). */
+  description: string;
+  /** Signed integer cents (credits positive, debits negative). */
+  amountCents: number;
+}
+
+/** Receipt-by-transaction response (AC1, AC4): the payload, or 404 when unknown. */
+export interface ReceiptResponse {
+  receipt: ReceiptPayload;
+}
+
+/**
+ * Human description for a receipt line, derived from the ledger entry kind.
+ * Pure so the API shaping and any UI share one mapping.
+ */
+export function receiptLineDescription(kind: string): string {
+  switch (kind) {
+    case "topup":
+      return "Wallet top-up";
+    case "debit":
+      return "Service charge";
+    case "refund":
+      return "Refund";
+    case "reversal":
+      return "Reversal";
+    case "adjustment":
+      return "Adjustment";
+    default:
+      return kind;
+  }
+}
+
+/**
+ * SMS receipt-copy result (AC3). `sent` is false when the parent has not
+ * consented to SMS (P1-E02-S04) — the receipt copy is dropped rather than sent,
+ * but the print path is unaffected.
+ */
+export interface ReceiptSmsResponse {
+  transactionId: string;
+  /** True iff the stub actually recorded an outbox row (consent satisfied). */
+  sent: boolean;
+  /** When not sent, the reason ("no_consent"); null on a successful send. */
+  reason: "no_consent" | null;
+}

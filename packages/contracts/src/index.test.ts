@@ -18,6 +18,7 @@ import {
   STAFF_NAME_SNAPSHOT_MAX,
   SERVICE_RATE_MAX_CENTS,
   isOutstanding,
+  receiptLineDescription,
   type ParentProfile,
 } from "./index.js";
 
@@ -260,5 +261,18 @@ describe("isOutstanding (P1-E05-S02 AC1 — red when > 0)", () => {
   it("is false at zero or below (no debt → neutral, not red)", () => {
     expect(isOutstanding(0)).toBe(false);
     expect(isOutstanding(-100)).toBe(false);
+  });
+});
+
+describe("receiptLineDescription (P1-E05-S06)", () => {
+  it("maps known ledger kinds to human descriptions", () => {
+    expect(receiptLineDescription("topup")).toBe("Wallet top-up");
+    expect(receiptLineDescription("debit")).toBe("Service charge");
+    expect(receiptLineDescription("refund")).toBe("Refund");
+    expect(receiptLineDescription("reversal")).toBe("Reversal");
+    expect(receiptLineDescription("adjustment")).toBe("Adjustment");
+  });
+  it("falls back to the raw kind for anything unknown", () => {
+    expect(receiptLineDescription("mystery")).toBe("mystery");
   });
 });

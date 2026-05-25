@@ -12,5 +12,5 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": { "@bm/config": "workspace:*" }
+  "dependencies": { "@bm/config": "workspace:*", "@bm/contracts": "workspace:*" }
 }

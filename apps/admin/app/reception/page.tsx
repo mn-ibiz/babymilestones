@@ -29,6 +29,8 @@ import {
   topupStatusLabel,
   validateTopup,
 } from "../../lib/topup-form";
+import { printReceipt, receiptSmsUrl, smsResultLabel } from "../../lib/receipt";
+import type { ReceiptSmsResponse } from "@bm/contracts";
 
 /**
  * Reception parent-search surface (P1-E05-S01).
@@ -164,12 +166,75 @@ function TopUpSheet({ parentId, onClose }: { parentId: string; onClose: () => vo
               Open card checkout
             </a>
           )}
+          {/* AC1: after a settled payment, surface the Print + SMS receipt pair. */}
+          {result.status === "settled" && result.ledgerEntryId && (
+            <ReceiptActions transactionId={result.ledgerEntryId} />
+          )}
           <button type="button" onClick={onClose}>
             Done
           </button>
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Print + SMS receipt action pair (P1-E05-S06 AC1). Shown after a payment and on
+ * every transaction-history row (reprint, AC4). Print renders the `ReceiptPreview`
+ * HTML and uses the browser's default printer (Decision 13); SMS POSTs the
+ * consent-gated stub copy (AC3). Both key off the wallet-ledger transaction id.
+ */
+function ReceiptActions({ transactionId }: { transactionId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [smsMsg, setSmsMsg] = useState<string | null>(null);
+
+  const onPrint = useCallback(async () => {
+    setBusy(true);
+    setSmsMsg(null);
+    try {
+      await printReceipt(transactionId, {
+        fetchJson: ((url: string) =>
+          fetch(`/api${url}`, { credentials: "include" })) as unknown as typeof fetch,
+      });
+    } catch {
+      setSmsMsg("Could not load the receipt to print");
+    } finally {
+      setBusy(false);
+    }
+  }, [transactionId]);
+
+  const onSms = useCallback(async () => {
+    setBusy(true);
+    setSmsMsg(null);
+    try {
+      const res = await fetch(`/api${receiptSmsUrl(transactionId)}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const body = (await res.json()) as ReceiptSmsResponse & { error?: string };
+      if (!res.ok) {
+        setSmsMsg(body.error ?? "SMS not sent");
+        return;
+      }
+      setSmsMsg(smsResultLabel(body));
+    } catch {
+      setSmsMsg("Could not reach the server");
+    } finally {
+      setBusy(false);
+    }
+  }, [transactionId]);
+
+  return (
+    <span aria-label="Receipt actions">
+      <button type="button" disabled={busy} onClick={onPrint}>
+        Print
+      </button>
+      <button type="button" disabled={busy} onClick={onSms}>
+        SMS
+      </button>
+      {smsMsg && <span role="status">{smsMsg}</span>}
+    </span>
   );
 }
 
@@ -219,6 +284,8 @@ function RecentTransactionsPanel({ userId }: { userId: string }) {
               <span>{r.kind}</span>
               <span>{r.amountLabel}</span>
               <span>Balance {r.balanceAfterLabel}</span>
+              {/* AC4: reprint / re-send a receipt for any past transaction. */}
+              <ReceiptActions transactionId={r.id} />
             </li>
           ))}
         </ul>
