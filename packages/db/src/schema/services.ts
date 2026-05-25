@@ -7,12 +7,20 @@ import { bigint, boolean, date, index, pgTable, text, timestamp, uuid } from "dr
  *
  * No hard deletes — a retired service is soft-deleted via `isActive = false`
  * (AC: Technical Notes) so booking history that references it keeps its FK.
- * `attributionRoleRequired` is an optional staff role that a booking of this
- * service must be attributed to (nullable).
+ * `attributionRoleRequired` is an optional staff attribution role that a booking
+ * of this service must be attributed to (nullable ENUM — P1-E07-S02).
  *
  * Prices are NOT stored here — they live in effective-dated rows on
  * `service_prices` so a price change never overwrites history (see that table).
  */
+
+/**
+ * Staff attribution roles (P1-E07-S02 AC1). Mirrors `ATTRIBUTION_ROLES` in
+ * `@bm/contracts` and the `staff.role` taxonomy of P1-E07-S03; CHECK-constrained
+ * in migration 0029. db has no dependency on contracts, so the literal union is
+ * duplicated here — the migration CHECK is the runtime source of truth.
+ */
+export type AttributionRole = "stylist" | "instructor" | "attendant" | "coach" | "event_staff";
 export const services = pgTable("services", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -21,8 +29,13 @@ export const services = pgTable("services", {
   unit: text("unit").notNull(),
   /** Soft on/off — inactive services are not offered for new bookings. */
   isActive: boolean("is_active").notNull().default(true),
-  /** Optional staff role a booking of this service must be attributed to (nullable). */
-  attributionRoleRequired: text("attribution_role_required"),
+  /**
+   * Optional staff attribution role a booking of this service must be attributed
+   * to (nullable ENUM — P1-E07-S02 AC1). CHECK-constrained in migration 0029 to
+   * the `staff.role` taxonomy. Null = attribution optional (AC3); non-null =
+   * Reception must pick a `staff` member of that role (AC2).
+   */
+  attributionRoleRequired: text("attribution_role_required").$type<AttributionRole>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

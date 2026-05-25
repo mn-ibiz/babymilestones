@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  attributionRoleLabel,
+  attributionRoleOptions,
   canManageServices,
   formatPriceKes,
   priceHistoryRows,
@@ -59,5 +61,37 @@ describe("service catalogue form logic (P1-E07-S01)", () => {
     ]);
     expect(rows[0]).toMatchObject({ amountLabel: "500.00", effectiveTo: "2026-06-01", isCurrent: false });
     expect(rows[1]).toMatchObject({ amountLabel: "600.00", effectiveTo: "current", isCurrent: true });
+  });
+});
+
+describe("attribution role form logic (P1-E07-S02)", () => {
+  it("offers the constrained staff-role taxonomy (AC1)", () => {
+    expect(attributionRoleOptions.map((o) => o.value)).toEqual([
+      "stylist",
+      "instructor",
+      "attendant",
+      "coach",
+      "event_staff",
+    ]);
+    expect(attributionRoleLabel("event_staff")).toBe("Event staff");
+    expect(attributionRoleLabel("stylist")).toBe("Stylist");
+  });
+
+  it("accepts an empty role (attribution optional, AC3)", () => {
+    expect(validateServiceForm({ name: "Hall", unit: "event", attributionRoleRequired: "" })).toEqual({});
+    expect(validateServiceForm({ name: "Hall", unit: "event" })).toEqual({});
+  });
+
+  it("accepts a valid attribution role (AC1)", () => {
+    expect(
+      validateServiceForm({ name: "Haircut", unit: "salon", attributionRoleRequired: "stylist" }),
+    ).toEqual({});
+  });
+
+  it("rejects a role outside the taxonomy (AC1)", () => {
+    expect(
+      validateServiceForm({ name: "X", unit: "play", attributionRoleRequired: "reception" })
+        .attributionRoleRequired,
+    ).toBeDefined();
   });
 });

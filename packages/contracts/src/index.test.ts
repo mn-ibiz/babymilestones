@@ -29,6 +29,10 @@ import {
   centsToKes,
   RECONCILIATION_EXPORT_COLUMNS,
   RECONCILIATION_EXPORT_MAX_DAYS,
+  serviceCreateSchema,
+  serviceUpdateSchema,
+  ATTRIBUTION_ROLES,
+  isAttributionRole,
   type ReconciliationExportRow,
   type ParentProfile,
 } from "./index.js";
@@ -452,5 +456,62 @@ describe("float accounts (P1-E06-S01)", () => {
     expect(floatAccountKindForPaymentMethod("bank_transfer")).toBe("bank");
     expect(floatAccountKindForPaymentMethod("paystack_card")).toBe("bank");
     expect(floatAccountKindForPaymentMethod("unknown")).toBeNull();
+  });
+});
+
+describe("attribution role per service (P1-E07-S02)", () => {
+  it("ATTRIBUTION_ROLES mirrors the staff-role taxonomy (AC1)", () => {
+    expect(ATTRIBUTION_ROLES).toEqual([
+      "stylist",
+      "instructor",
+      "attendant",
+      "coach",
+      "event_staff",
+    ]);
+  });
+
+  it("isAttributionRole narrows allowed values only (AC1)", () => {
+    for (const r of ATTRIBUTION_ROLES) expect(isAttributionRole(r)).toBe(true);
+    expect(isAttributionRole("reception")).toBe(false); // RBAC role, not attribution
+    expect(isAttributionRole("admin")).toBe(false);
+    expect(isAttributionRole(null)).toBe(false);
+  });
+
+  it("serviceCreateSchema accepts a valid attribution role (AC1)", () => {
+    const parsed = serviceCreateSchema.parse({
+      name: "Baby Haircut",
+      unit: "salon",
+      attributionRoleRequired: "stylist",
+    });
+    expect(parsed.attributionRoleRequired).toBe("stylist");
+  });
+
+  it("serviceCreateSchema collapses absent/empty attribution to null (AC3)", () => {
+    expect(serviceCreateSchema.parse({ name: "Hall", unit: "event" }).attributionRoleRequired).toBeNull();
+    expect(
+      serviceCreateSchema.parse({ name: "Hall", unit: "event", attributionRoleRequired: "  " })
+        .attributionRoleRequired,
+    ).toBeNull();
+  });
+
+  it("serviceCreateSchema rejects a role outside the taxonomy (AC1)", () => {
+    const r = serviceCreateSchema.safeParse({
+      name: "X",
+      unit: "play",
+      attributionRoleRequired: "reception",
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues[0]?.path[0]).toBe("attributionRoleRequired");
+    }
+  });
+
+  it("serviceUpdateSchema validates the attribution role too (AC1)", () => {
+    expect(
+      serviceUpdateSchema.safeParse({ attributionRoleRequired: "coach" }).success,
+    ).toBe(true);
+    expect(
+      serviceUpdateSchema.safeParse({ attributionRoleRequired: "wizard" }).success,
+    ).toBe(false);
   });
 });

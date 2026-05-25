@@ -1098,6 +1098,29 @@ export const RECONCILIATION_EXPORT_COLUMNS = [
 export const SERVICE_UNITS = ["play", "talent", "salon", "coaching", "event"] as const;
 export type ServiceUnit = (typeof SERVICE_UNITS)[number];
 
+/**
+ * Attribution roles a service may require (P1-E07-S02 AC1). A nullable ENUM on
+ * `services`: when set, a booking of the service must be attributed to a `staff`
+ * member of that role; when null, attribution is optional. The allowed values
+ * MIRROR the `staff.role` taxonomy from P1-E07-S03 (stylist / instructor /
+ * attendant / coach / event_staff) — these are staff *attribution* roles, NOT
+ * the system RBAC roles (admin/reception/cashier/…). CHECK-constrained in the
+ * migration too; the snapshot keeps code + DB aligned.
+ */
+export const ATTRIBUTION_ROLES = [
+  "stylist",
+  "instructor",
+  "attendant",
+  "coach",
+  "event_staff",
+] as const;
+export type AttributionRole = (typeof ATTRIBUTION_ROLES)[number];
+
+/** True when `value` is one of the allowed attribution roles (narrowing guard). */
+export function isAttributionRole(value: unknown): value is AttributionRole {
+  return typeof value === "string" && (ATTRIBUTION_ROLES as readonly string[]).includes(value);
+}
+
 /** Max length of a service display name + description. */
 export const SERVICE_NAME_MAX = 120;
 export const SERVICE_DESCRIPTION_MAX = 500;
@@ -1113,6 +1136,20 @@ const optionalServiceText = z
   .transform((v) => (v === "" ? null : v));
 
 /**
+ * Optional attribution role (P1-E07-S02 AC1/AC3). Empty/absent collapses to null
+ * (attribution optional, AC3); a present value MUST be one of {@link ATTRIBUTION_ROLES}
+ * (validated against the staff-role taxonomy, AC1). Rejects free-text / RBAC roles.
+ */
+const optionalAttributionRole = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v) => (v ?? "").trim())
+  .transform((v) => (v === "" ? null : v))
+  .refine((v) => v === null || isAttributionRole(v), {
+    message: `attributionRoleRequired must be one of: ${ATTRIBUTION_ROLES.join(", ")}`,
+  });
+
+/**
  * Create a service (P1-E07-S01 AC1). Required: name + unit. Optional (collapse to
  * null): description + the attribution role a booking must be attributed to. The
  * service is always created active; prices are set separately (effective-dated).
@@ -1124,7 +1161,7 @@ export const serviceCreateSchema = z.object({
     `description must be ${SERVICE_DESCRIPTION_MAX} characters or fewer`,
   ),
   unit: z.enum(SERVICE_UNITS, { message: "Choose a service unit" }),
-  attributionRoleRequired: optionalServiceText,
+  attributionRoleRequired: optionalAttributionRole,
 });
 export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
 
@@ -1141,7 +1178,7 @@ export const serviceUpdateSchema = z
       `description must be ${SERVICE_DESCRIPTION_MAX} characters or fewer`,
     ),
     isActive: z.boolean().optional(),
-    attributionRoleRequired: optionalServiceText,
+    attributionRoleRequired: optionalAttributionRole,
   })
   .refine(
     (v) =>

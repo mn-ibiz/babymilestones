@@ -11,9 +11,12 @@
  */
 import {
   SERVICE_UNITS,
+  ATTRIBUTION_ROLES,
   SERVICE_PRICE_MIN_CENTS,
   SERVICE_PRICE_MAX_CENTS,
+  isAttributionRole,
   type ServiceUnit,
+  type AttributionRole,
 } from "@bm/contracts";
 
 /** Roles allowed to manage the service catalogue (mirrors `manage service`). */
@@ -53,19 +56,55 @@ export function unitLabel(unit: string): string {
 export const serviceUnitOptions: readonly { value: ServiceUnit; label: string }[] =
   SERVICE_UNITS.map((u) => ({ value: u, label: unitLabel(u) }));
 
+/** Human label for a staff attribution role (P1-E07-S02). */
+export function attributionRoleLabel(role: string): string {
+  switch (role) {
+    case "stylist":
+      return "Stylist";
+    case "instructor":
+      return "Instructor";
+    case "attendant":
+      return "Attendant";
+    case "coach":
+      return "Coach";
+    case "event_staff":
+      return "Event staff";
+    default:
+      return role;
+  }
+}
+
+/**
+ * The selectable attribution roles for the create/edit form (P1-E07-S02 AC1).
+ * Mirrors the constrained `ATTRIBUTION_ROLES` enum; the empty option means "none
+ * (optional attribution)" (AC3).
+ */
+export const attributionRoleOptions: readonly { value: AttributionRole; label: string }[] =
+  ATTRIBUTION_ROLES.map((r) => ({ value: r, label: attributionRoleLabel(r) }));
+
 export interface ServiceFormErrors {
   name?: string;
   unit?: string;
+  attributionRoleRequired?: string;
 }
 
-/** Validate the create-service form client-side (mirrors the contract). */
+/**
+ * Validate the create-service form client-side (mirrors the contract). The
+ * attribution role is optional (empty = none, AC3); when present it must be one
+ * of the constrained staff-role values (AC1). The server re-validates.
+ */
 export function validateServiceForm(input: {
   name: string;
   unit: string;
+  attributionRoleRequired?: string;
 }): ServiceFormErrors {
   const errors: ServiceFormErrors = {};
   if (input.name.trim().length === 0) errors.name = "Name is required";
   if (!(SERVICE_UNITS as readonly string[]).includes(input.unit)) errors.unit = "Choose a unit";
+  const role = (input.attributionRoleRequired ?? "").trim();
+  if (role !== "" && !isAttributionRole(role)) {
+    errors.attributionRoleRequired = "Choose a valid attribution role";
+  }
   return errors;
 }
 

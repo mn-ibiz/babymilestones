@@ -93,6 +93,62 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("creates a service with a valid attribution role and reads it back (P1-E07-S02 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Baby Haircut",
+      unit: "salon",
+      attributionRoleRequired: "stylist",
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().attributionRoleRequired).toBe("stylist");
+
+    const read = await req("GET", `/admin/services/${res.json().id}`, creds);
+    expect(read.json().attributionRoleRequired).toBe("stylist");
+  });
+
+  it("rejects an attribution role outside the staff-role taxonomy (P1-E07-S02 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      ...validService,
+      attributionRoleRequired: "reception", // RBAC role, not an attribution role
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("attributionRoleRequired");
+  });
+
+  it("creates with attribution optional when omitted (P1-E07-S02 AC3)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, validService);
+    expect(res.statusCode).toBe(201);
+    expect(res.json().attributionRoleRequired).toBeNull();
+  });
+
+  it("can set the attribution role via PATCH, audited (P1-E07-S02 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (await req("POST", "/admin/services", creds, { name: "Talent", unit: "talent" })).json();
+    const patched = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      attributionRoleRequired: "instructor",
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().attributionRoleRequired).toBe("instructor");
+
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "catalog.service.update"));
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("PATCH rejects an invalid attribution role (P1-E07-S02 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (await req("POST", "/admin/services", creds, validService)).json();
+    const res = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      attributionRoleRequired: "wizard",
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("creating a price change preserves the old row + inserts a new one (AC2/AC3), audited (AC5)", async () => {
     const creds = await loginStaff("+254712000001", "7421");
     const svc = (await req("POST", "/admin/services", creds, validService)).json();

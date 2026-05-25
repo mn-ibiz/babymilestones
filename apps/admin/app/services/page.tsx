@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ServiceUnit } from "@bm/contracts";
 import {
+  attributionRoleLabel,
+  attributionRoleOptions,
   formatPriceKes,
   priceHistoryRows,
   serviceUnitOptions,
@@ -39,13 +41,26 @@ function readCsrfToken(): string {
   return match ? decodeURIComponent(match[1]!) : "";
 }
 
-const EMPTY_SERVICE = { name: "", unit: "" as ServiceUnit | "", description: "" };
+const EMPTY_SERVICE = {
+  name: "",
+  unit: "" as ServiceUnit | "",
+  description: "",
+  attributionRoleRequired: "",
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [form, setForm] = useState(EMPTY_SERVICE);
-  const serviceErrors = useMemo(() => validateServiceForm({ name: form.name, unit: form.unit }), [form]);
+  const serviceErrors = useMemo(
+    () =>
+      validateServiceForm({
+        name: form.name,
+        unit: form.unit,
+        attributionRoleRequired: form.attributionRoleRequired,
+      }),
+    [form],
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Price[]>([]);
@@ -81,6 +96,7 @@ export default function ServicesPage() {
           name: form.name.trim(),
           unit: form.unit,
           description: form.description.trim() || null,
+          attributionRoleRequired: form.attributionRoleRequired || null,
         }),
       });
       if (res.ok) {
@@ -143,6 +159,7 @@ export default function ServicesPage() {
           <tr>
             <th>Name</th>
             <th>Unit</th>
+            <th>Attribution</th>
             <th>Status</th>
             <th />
           </tr>
@@ -156,6 +173,11 @@ export default function ServicesPage() {
                 </button>
               </td>
               <td>{unitLabel(s.unit)}</td>
+              <td>
+                {s.attributionRoleRequired
+                  ? attributionRoleLabel(s.attributionRoleRequired)
+                  : "—"}
+              </td>
               <td>{s.isActive ? "Active" : "Inactive"}</td>
               <td>
                 <button type="button" onClick={() => onToggleActive(s)}>
@@ -203,6 +225,24 @@ export default function ServicesPage() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
+        </label>
+        <label>
+          Attribution role
+          <select
+            name="attributionRoleRequired"
+            value={form.attributionRoleRequired}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, attributionRoleRequired: e.target.value }))
+            }
+            aria-invalid={Boolean(serviceErrors.attributionRoleRequired)}
+          >
+            <option value="">None (attribution optional)</option>
+            {attributionRoleOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </label>
         <button type="submit" disabled={Object.keys(serviceErrors).length > 0}>
           Create service

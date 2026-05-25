@@ -1,5 +1,12 @@
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
-import { services, servicePrices, type Database, type Transaction } from "@bm/db";
+import {
+  services,
+  servicePrices,
+  type AttributionRole,
+  type Database,
+  type ServiceRow,
+  type Transaction,
+} from "@bm/db";
 
 /** A drizzle executor — the top-level db or a transaction handle. */
 export type Executor = Database | Transaction;
@@ -25,11 +32,29 @@ export class ServicePriceOrderError extends Error {
 export const SERVICE_UNITS = ["play", "talent", "salon", "coaching", "event"] as const;
 export type ServiceUnit = (typeof SERVICE_UNITS)[number];
 
+/**
+ * Staff attribution roles a service may require (P1-E07-S02 AC1). Mirrors
+ * `ATTRIBUTION_ROLES` in `@bm/contracts` and the `staff.role` taxonomy from
+ * P1-E07-S03; CHECK-constrained in migration 0029.
+ */
+export const ATTRIBUTION_ROLES = [
+  "stylist",
+  "instructor",
+  "attendant",
+  "coach",
+  "event_staff",
+] as const satisfies readonly AttributionRole[];
+
+/** True when `value` is one of the allowed attribution roles (narrowing guard). */
+export function isAttributionRole(value: unknown): value is AttributionRole {
+  return typeof value === "string" && (ATTRIBUTION_ROLES as readonly string[]).includes(value);
+}
+
 export interface CreateServiceInput {
   name: string;
   description?: string | null;
   unit: ServiceUnit;
-  attributionRoleRequired?: string | null;
+  attributionRoleRequired?: AttributionRole | null;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -51,7 +76,7 @@ export interface UpdateServiceInput {
   description?: string | null;
   /** Soft-delete via `isActive = false` — there are NO hard deletes (Technical Notes). */
   isActive?: boolean;
-  attributionRoleRequired?: string | null;
+  attributionRoleRequired?: AttributionRole | null;
 }
 
 /**
@@ -170,4 +195,57 @@ export async function resolveServicePriceAt(
     if (fromOk && toOk) return row;
   }
   return null;
+}
+
+/**
+ * The attribution role a service requires, or null when attribution is optional
+ * (P1-E07-S02 AC2/AC3). A thin read over the service's `attributionRoleRequired`
+ * — the single primitive the Reception booking flow uses to decide whether a
+ * `staff` pick is mandatory (non-null role → must attribute to an active staff
+ * member of that role) or optional (null). Returns `undefined` when the service
+ * id is unknown so callers can distinguish "no such service" from "optional".
+ */
+export async function getServiceAttributionRole(
+  db: Executor,
+  serviceId: string,
+): Promise<AttributionRole | null | undefined> {
+  const [row] = await db
+    .select({ attributionRoleRequired: services.attributionRoleRequired })
+    .from(services)
+    .where(eq(services.id, serviceId));
+  if (!row) return undefined;
+  return row.attributionRoleRequired ?? null;
+}
+
+/**
+ * Booking-flow attribution gate (P1-E07-S02 AC2/AC3). Given a service's required
+ * attribution role and a chosen staff member (its role + active flag, loaded by
+ * the caller from the P1-E07-S03 `staff` records), decides whether the booking
+ * may proceed:
+ *  - role is null  → attribution optional; any pick (incl. none) is allowed (AC3).
+ *  - role non-null → a staff member MUST be supplied, MUST be active, and MUST
+ *    hold exactly that role (AC2). Otherwise the booking is rejected with a reason.
+ *
+ * Pure (no DB) so the Reception route can call it after loading the catalogue +
+ * staff rows. The actual `staff` table + the route wiring land with P1-E07-S03 /
+ * the Reception surface; this is the shared rule both will enforce.
+ */
+export type AttributionCheck =
+  | { ok: true }
+  | { ok: false; reason: "staff_required" | "staff_inactive" | "staff_role_mismatch" };
+
+export function checkBookingAttribution(
+  requiredRole: AttributionRole | null,
+  staff: { role: AttributionRole; isActive: boolean } | null,
+): AttributionCheck {
+  if (requiredRole === null) return { ok: true }; // AC3 — optional.
+  if (!staff) return { ok: false, reason: "staff_required" }; // AC2 — pick is forced.
+  if (!staff.isActive) return { ok: false, reason: "staff_inactive" }; // AC2 — active members only.
+  if (staff.role !== requiredRole) return { ok: false, reason: "staff_role_mismatch" }; // AC2 — that role.
+  return { ok: true };
+}
+
+/** Re-export for callers that take the full row but only need its attribution role. */
+export function serviceAttributionRole(row: Pick<ServiceRow, "attributionRoleRequired">) {
+  return row.attributionRoleRequired ?? null;
 }
