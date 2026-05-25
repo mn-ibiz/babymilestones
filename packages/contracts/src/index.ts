@@ -203,6 +203,32 @@ export const mpesaStkInitiateSchema = z.object({
 });
 export type MpesaStkInitiateInput = z.infer<typeof mpesaStkInitiateSchema>;
 
+// ---------------------------------------------------------------------------
+// Cash top-up by Reception (P1-E04-S06)
+// ---------------------------------------------------------------------------
+
+/** Bounds for a single counter cash top-up, in integer cents (KES). */
+export const CASH_TOPUP_MIN_CENTS = 100; // KES 1.00
+export const CASH_TOPUP_MAX_CENTS = 50_000_000; // KES 500,000.00
+
+/**
+ * Cash top-up recorded by Reception/Cashier (P1-E04-S06 AC1/AC2). The staff
+ * actor is the session user (`posted_by`), never accepted from the client; the
+ * body carries only the funded parent and the amount of cash taken at the
+ * counter. Amount is integer cents (the ledger never stores floats). An optional
+ * dedup key makes the recording idempotent; the server derives one if absent.
+ */
+export const cashTopupSchema = z.object({
+  parentId: z.string().uuid("parentId must be a UUID"),
+  amount: z
+    .number({ message: "Amount is required" })
+    .int("amount must be integer cents")
+    .min(CASH_TOPUP_MIN_CENTS, `Minimum cash top-up is ${CASH_TOPUP_MIN_CENTS} cents`)
+    .max(CASH_TOPUP_MAX_CENTS, `Maximum cash top-up is ${CASH_TOPUP_MAX_CENTS} cents`),
+  idempotencyKey: z.string().trim().min(1).optional(),
+});
+export type CashTopupRequestInput = z.infer<typeof cashTopupSchema>;
+
 /** Lifecycle state of an STK request as surfaced to the polling client (AC4). */
 export type MpesaStkState =
   | "INITIATED"

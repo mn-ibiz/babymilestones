@@ -39,3 +39,11 @@ export type {
 
 // Paystack webhook signature verification (P1-E04-S05).
 export { verifyPaystackSignature } from "./paystack/verify.js";
+
+// Cash top-up adapter recorded by Reception/Cashier (P1-E04-S06).
+export {
+  recordCashTopup,
+  CASH_RECEPTION_SOURCE,
+  CashTopupAmountError,
+} from "./cash/topup.js";
+export type { CashTopupInput, CashCharge } from "./cash/topup.js";

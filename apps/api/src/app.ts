@@ -17,6 +17,7 @@ import type { MpesaRouteConfig } from "./routes/payments/mpesa/initiate.js";
 import type { MpesaCallbackConfig } from "./routes/payments/mpesa/callback.js";
 import { registerPaystackRoutes } from "./routes/payments/paystack/index.js";
 import type { PaystackRouteConfig } from "./routes/payments/paystack/init.js";
+import { registerCashRoutes } from "./routes/payments/cash/index.js";
 
 export interface AppDeps {
   db?: Database;
@@ -136,6 +137,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       now,
     });
     registerAdminRoutes(app, { db, sessions: deps.sessions });
+
+    // P1-E04-S06: Reception/Cashier counter cash top-up. Needs only db +
+    // sessions (cash is a manual entry — no provider wiring), so always on.
+    registerCashRoutes(app, { db, sessions: deps.sessions });
 
     // P1-E04-S01: M-Pesa STK push routes register only when Daraja wiring is
     // present (explicit dep in tests, or full env config in production).

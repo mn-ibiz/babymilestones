@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E04-S05 done; epic-4 in-progress)
+last_updated: 2026-05-25 (P1-E04-S06 done; epic-4 in-progress)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   4-3-stk-reconciliation-cron: done  # P1-E04-S03
   4-4-paystack-card-top-up: done  # P1-E04-S04
   4-5-paystack-webhook-signature-replay-protection: done  # P1-E04-S05
-  4-6-cash-top-up-by-reception: ready-for-dev  # P1-E04-S06
+  4-6-cash-top-up-by-reception: done  # P1-E04-S06
   4-7-bank-transfer-top-up-admin-confirmed: ready-for-dev  # P1-E04-S07
   epic-4-retrospective: optional
 

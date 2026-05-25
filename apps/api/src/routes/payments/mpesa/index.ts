@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Database } from "@bm/db";
 import type { SessionStore } from "@bm/auth";
+import type { SmsSender } from "@bm/sms";
 import { registerMpesaStkInitiate, type MpesaRouteConfig } from "./initiate.js";
 import { registerMpesaCallback, type MpesaCallbackConfig } from "./callback.js";
 import type { PaystackRouteConfig } from "../paystack/init.js";
@@ -9,6 +10,8 @@ import type { PaystackRouteConfig } from "../paystack/init.js";
 export interface PaymentsDeps {
   db: Database;
   sessions: SessionStore;
+  /** SMS sender for parent notifications. Defaults to the DB-backed stub. */
+  sms?: SmsSender;
   /** Daraja config + injected/mockable transport (no real network in tests). */
   mpesa?: MpesaRouteConfig;
   /** C2B/STK callback handler config (Daraja IP allowlist) — P1-E04-S02. */

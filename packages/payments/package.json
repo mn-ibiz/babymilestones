@@ -12,5 +12,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": { "@bm/contracts": "workspace:*" }
+  "dependencies": {
+    "@bm/contracts": "workspace:*",
+    "@bm/db": "workspace:*",
+    "@bm/wallet": "workspace:*",
+    "drizzle-orm": "^0.38.2"
+  }
 }
