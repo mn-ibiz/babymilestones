@@ -5,6 +5,7 @@ import {
   type AttributionRole,
   type Database,
   type ServiceRow,
+  type TaxTreatment,
   type Transaction,
 } from "@bm/db";
 
@@ -50,11 +51,32 @@ export function isAttributionRole(value: unknown): value is AttributionRole {
   return typeof value === "string" && (ATTRIBUTION_ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * VAT / tax treatments a service may declare (P1-E07-S04 AC1). Mirrors
+ * `TAX_TREATMENTS` in `@bm/contracts`; CHECK-constrained in migration 0031.
+ */
+export const TAX_TREATMENTS = [
+  "vat_inclusive",
+  "vat_exclusive",
+  "vat_exempt",
+  "zero_rated",
+] as const satisfies readonly TaxTreatment[];
+
+/** The default treatment for a new service — KRA registration deferred (AC3). */
+export const DEFAULT_TAX_TREATMENT: TaxTreatment = "vat_exempt";
+
+/** True when `value` is one of the allowed tax treatments (narrowing guard). */
+export function isTaxTreatment(value: unknown): value is TaxTreatment {
+  return typeof value === "string" && (TAX_TREATMENTS as readonly string[]).includes(value);
+}
+
 export interface CreateServiceInput {
   name: string;
   description?: string | null;
   unit: ServiceUnit;
   attributionRoleRequired?: AttributionRole | null;
+  /** VAT / tax treatment (P1-E07-S04 AC1). Defaults to `vat_exempt` (AC3). */
+  taxTreatment?: TaxTreatment;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -66,6 +88,7 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       description: input.description ?? null,
       unit: input.unit,
       attributionRoleRequired: input.attributionRoleRequired ?? null,
+      taxTreatment: input.taxTreatment ?? DEFAULT_TAX_TREATMENT,
     })
     .returning();
   return row!;
@@ -77,6 +100,8 @@ export interface UpdateServiceInput {
   /** Soft-delete via `isActive = false` — there are NO hard deletes (Technical Notes). */
   isActive?: boolean;
   attributionRoleRequired?: AttributionRole | null;
+  /** VAT / tax treatment (P1-E07-S04 AC1). Non-null — only changed when present. */
+  taxTreatment?: TaxTreatment;
 }
 
 /**
@@ -92,6 +117,7 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
   if (patch.isActive !== undefined) set.isActive = patch.isActive;
   if (patch.attributionRoleRequired !== undefined)
     set.attributionRoleRequired = patch.attributionRoleRequired;
+  if (patch.taxTreatment !== undefined) set.taxTreatment = patch.taxTreatment;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;
 }
@@ -248,4 +274,76 @@ export function checkBookingAttribution(
 /** Re-export for callers that take the full row but only need its attribution role. */
 export function serviceAttributionRole(row: Pick<ServiceRow, "attributionRoleRequired">) {
   return row.attributionRoleRequired ?? null;
+}
+
+/**
+ * The tax treatment a service declares (P1-E07-S04 AC1). A thin read used by the
+ * receipt engine (P1-E08) + eTIMS (P5). Returns `undefined` when the service id
+ * is unknown so callers can distinguish "no such service" from a treatment.
+ */
+export async function getServiceTaxTreatment(
+  db: Executor,
+  serviceId: string,
+): Promise<TaxTreatment | undefined> {
+  const [row] = await db
+    .select({ taxTreatment: services.taxTreatment })
+    .from(services)
+    .where(eq(services.id, serviceId));
+  if (!row) return undefined;
+  return row.taxTreatment;
+}
+
+/** Re-export for callers that take the full row but only need its tax treatment. */
+export function serviceTaxTreatment(row: Pick<ServiceRow, "taxTreatment">): TaxTreatment {
+  return row.taxTreatment;
+}
+
+/**
+ * Kenyan standard VAT rate in basis points (16% = 1600 bps). Kept as an integer
+ * so line-tax math is exact (no float). When KRA registration lands (AC3 is
+ * deferred), the effective rate can become config-driven; for now the receipt
+ * engine passes it explicitly so this helper stays pure + rate-agnostic.
+ */
+export const KENYA_VAT_RATE_BPS = 1600;
+
+/** The computed tax split for a single receipt line (P1-E07-S04 AC2 input). */
+export interface LineTax {
+  /** The treatment this line was computed under. */
+  treatment: TaxTreatment;
+  /** Net (pre-VAT) amount in integer cents. */
+  netCents: number;
+  /** VAT amount in integer cents (0 for exempt / zero-rated). */
+  taxCents: number;
+  /** Gross (net + tax) amount in integer cents — equals the input for inclusive. */
+  grossCents: number;
+  /** The VAT rate applied, in basis points (0 for exempt / zero-rated). */
+  rateBps: number;
+}
+
+/**
+ * Compute the line-tax split for a service line given its tax treatment and a
+ * price in integer cents (P1-E07-S04 AC2). Pure + float-free so the receipt
+ * engine (P1-E08) and eTIMS (P5) compute identically. Rounding is half-up on
+ * the cent. `rateBps` defaults to the Kenyan standard rate.
+ *
+ *  - `vat_exclusive` → `amountCents` is net; tax is added on top.
+ *  - `vat_inclusive` → `amountCents` is gross; tax is backed out of it.
+ *  - `vat_exempt` / `zero_rated` → no tax (rate 0); net == gross.
+ */
+export function computeLineTax(
+  treatment: TaxTreatment,
+  amountCents: number,
+  rateBps: number = KENYA_VAT_RATE_BPS,
+): LineTax {
+  const amount = Math.round(amountCents);
+  if (treatment === "vat_exempt" || treatment === "zero_rated") {
+    return { treatment, netCents: amount, taxCents: 0, grossCents: amount, rateBps: 0 };
+  }
+  if (treatment === "vat_exclusive") {
+    const taxCents = Math.round((amount * rateBps) / 10_000);
+    return { treatment, netCents: amount, taxCents, grossCents: amount + taxCents, rateBps };
+  }
+  // vat_inclusive: back the tax portion out of the gross amount.
+  const netCents = Math.round((amount * 10_000) / (10_000 + rateBps));
+  return { treatment, netCents, taxCents: amount - netCents, grossCents: amount, rateBps };
 }

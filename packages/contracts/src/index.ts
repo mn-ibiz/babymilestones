@@ -1121,6 +1121,29 @@ export function isAttributionRole(value: unknown): value is AttributionRole {
   return typeof value === "string" && (ATTRIBUTION_ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * VAT / tax treatments a service may declare (P1-E07-S04 AC1). A non-null ENUM
+ * on `services` defaulting to `vat_exempt` (KRA registration deferred — AC3),
+ * consumed by the receipt engine (P1-E08) + eTIMS (P5) to compute / display
+ * line-tax. CHECK-constrained in migration 0031; the snapshot keeps code + DB
+ * aligned. NOT the system RBAC roles nor the attribution roles.
+ */
+export const TAX_TREATMENTS = [
+  "vat_inclusive",
+  "vat_exclusive",
+  "vat_exempt",
+  "zero_rated",
+] as const;
+export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
+
+/** The default treatment for a new service — KRA registration deferred (AC3). */
+export const DEFAULT_TAX_TREATMENT: TaxTreatment = "vat_exempt";
+
+/** True when `value` is one of the allowed tax treatments (narrowing guard). */
+export function isTaxTreatment(value: unknown): value is TaxTreatment {
+  return typeof value === "string" && (TAX_TREATMENTS as readonly string[]).includes(value);
+}
+
 /** Max length of a service display name + description. */
 export const SERVICE_NAME_MAX = 120;
 export const SERVICE_DESCRIPTION_MAX = 500;
@@ -1150,9 +1173,24 @@ const optionalAttributionRole = z
   });
 
 /**
+ * Optional tax treatment (P1-E07-S04 AC1/AC3). Absent/empty collapses to the
+ * default `vat_exempt` (AC3); a present value MUST be one of {@link TAX_TREATMENTS}.
+ * Used on create (defaults when omitted) and update (only changed when present).
+ */
+const optionalTaxTreatmentCreate = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v) => (v ?? "").trim())
+  .transform((v) => (v === "" ? DEFAULT_TAX_TREATMENT : v))
+  .refine((v) => isTaxTreatment(v), {
+    message: `taxTreatment must be one of: ${TAX_TREATMENTS.join(", ")}`,
+  });
+
+/**
  * Create a service (P1-E07-S01 AC1). Required: name + unit. Optional (collapse to
  * null): description + the attribution role a booking must be attributed to. The
  * service is always created active; prices are set separately (effective-dated).
+ * `taxTreatment` defaults to `vat_exempt` when omitted (P1-E07-S04 AC3).
  */
 export const serviceCreateSchema = z.object({
   name: z.string().trim().min(1, "name is required").max(SERVICE_NAME_MAX),
@@ -1162,6 +1200,7 @@ export const serviceCreateSchema = z.object({
   ),
   unit: z.enum(SERVICE_UNITS, { message: "Choose a service unit" }),
   attributionRoleRequired: optionalAttributionRole,
+  taxTreatment: optionalTaxTreatmentCreate,
 });
 export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
 
@@ -1179,13 +1218,19 @@ export const serviceUpdateSchema = z
     ),
     isActive: z.boolean().optional(),
     attributionRoleRequired: optionalAttributionRole,
+    taxTreatment: z
+      .enum(TAX_TREATMENTS, {
+        message: `taxTreatment must be one of: ${TAX_TREATMENTS.join(", ")}`,
+      })
+      .optional(),
   })
   .refine(
     (v) =>
       v.name !== undefined ||
       v.isActive !== undefined ||
       v.description !== null ||
-      v.attributionRoleRequired !== null,
+      v.attributionRoleRequired !== null ||
+      v.taxTreatment !== undefined,
     "at least one field is required",
   );
 export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;

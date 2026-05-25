@@ -12,11 +12,14 @@
 import {
   SERVICE_UNITS,
   ATTRIBUTION_ROLES,
+  TAX_TREATMENTS,
   SERVICE_PRICE_MIN_CENTS,
   SERVICE_PRICE_MAX_CENTS,
   isAttributionRole,
+  isTaxTreatment,
   type ServiceUnit,
   type AttributionRole,
+  type TaxTreatment,
 } from "@bm/contracts";
 
 /** Roles allowed to manage the service catalogue (mirrors `manage service`). */
@@ -82,10 +85,37 @@ export function attributionRoleLabel(role: string): string {
 export const attributionRoleOptions: readonly { value: AttributionRole; label: string }[] =
   ATTRIBUTION_ROLES.map((r) => ({ value: r, label: attributionRoleLabel(r) }));
 
+/** Re-export the default treatment so the form pre-selects it (P1-E07-S04 AC3). */
+export { DEFAULT_TAX_TREATMENT } from "@bm/contracts";
+
+/** Human label for a tax treatment (P1-E07-S04). */
+export function taxTreatmentLabel(treatment: string): string {
+  switch (treatment) {
+    case "vat_inclusive":
+      return "VAT inclusive";
+    case "vat_exclusive":
+      return "VAT exclusive";
+    case "vat_exempt":
+      return "VAT exempt";
+    case "zero_rated":
+      return "Zero rated";
+    default:
+      return treatment;
+  }
+}
+
+/**
+ * The selectable tax treatments for the create/edit form (P1-E07-S04 AC1). The
+ * form defaults to {@link DEFAULT_TAX_TREATMENT} (`vat_exempt`, AC3).
+ */
+export const taxTreatmentOptions: readonly { value: TaxTreatment; label: string }[] =
+  TAX_TREATMENTS.map((t) => ({ value: t, label: taxTreatmentLabel(t) }));
+
 export interface ServiceFormErrors {
   name?: string;
   unit?: string;
   attributionRoleRequired?: string;
+  taxTreatment?: string;
 }
 
 /**
@@ -97,6 +127,7 @@ export function validateServiceForm(input: {
   name: string;
   unit: string;
   attributionRoleRequired?: string;
+  taxTreatment?: string;
 }): ServiceFormErrors {
   const errors: ServiceFormErrors = {};
   if (input.name.trim().length === 0) errors.name = "Name is required";
@@ -104,6 +135,12 @@ export function validateServiceForm(input: {
   const role = (input.attributionRoleRequired ?? "").trim();
   if (role !== "" && !isAttributionRole(role)) {
     errors.attributionRoleRequired = "Choose a valid attribution role";
+  }
+  // Tax treatment is optional in the form (empty = default vat_exempt, AC3); a
+  // present value must be one of the constrained treatments (AC1).
+  const treatment = (input.taxTreatment ?? "").trim();
+  if (treatment !== "" && !isTaxTreatment(treatment)) {
+    errors.taxTreatment = "Choose a valid tax treatment";
   }
   return errors;
 }

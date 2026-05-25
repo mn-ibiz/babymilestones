@@ -33,6 +33,9 @@ import {
   serviceUpdateSchema,
   ATTRIBUTION_ROLES,
   isAttributionRole,
+  TAX_TREATMENTS,
+  DEFAULT_TAX_TREATMENT,
+  isTaxTreatment,
   type ReconciliationExportRow,
   type ParentProfile,
 } from "./index.js";
@@ -513,5 +516,42 @@ describe("attribution role per service (P1-E07-S02)", () => {
     expect(
       serviceUpdateSchema.safeParse({ attributionRoleRequired: "wizard" }).success,
     ).toBe(false);
+  });
+});
+
+describe("VAT / tax treatment per service (P1-E07-S04)", () => {
+  it("exposes the four treatments + vat_exempt default (AC1/AC3)", () => {
+    expect(TAX_TREATMENTS).toEqual([
+      "vat_inclusive",
+      "vat_exclusive",
+      "vat_exempt",
+      "zero_rated",
+    ]);
+    expect(DEFAULT_TAX_TREATMENT).toBe("vat_exempt");
+    expect(isTaxTreatment("zero_rated")).toBe(true);
+    expect(isTaxTreatment("gst")).toBe(false);
+  });
+
+  it("serviceCreateSchema defaults taxTreatment to vat_exempt when omitted (AC3)", () => {
+    expect(serviceCreateSchema.parse({ name: "Play", unit: "play" }).taxTreatment).toBe("vat_exempt");
+    expect(
+      serviceCreateSchema.parse({ name: "Play", unit: "play", taxTreatment: "  " }).taxTreatment,
+    ).toBe("vat_exempt");
+  });
+
+  it("serviceCreateSchema accepts a valid treatment + rejects an invalid one (AC1)", () => {
+    expect(
+      serviceCreateSchema.parse({ name: "Salon", unit: "salon", taxTreatment: "vat_inclusive" })
+        .taxTreatment,
+    ).toBe("vat_inclusive");
+    expect(
+      serviceCreateSchema.safeParse({ name: "X", unit: "play", taxTreatment: "gst" }).success,
+    ).toBe(false);
+  });
+
+  it("serviceUpdateSchema only changes taxTreatment when present + validates it (AC1)", () => {
+    expect(serviceUpdateSchema.parse({ taxTreatment: "zero_rated" }).taxTreatment).toBe("zero_rated");
+    expect(serviceUpdateSchema.safeParse({ name: "X" }).data?.taxTreatment).toBeUndefined();
+    expect(serviceUpdateSchema.safeParse({ taxTreatment: "gst" }).success).toBe(false);
   });
 });

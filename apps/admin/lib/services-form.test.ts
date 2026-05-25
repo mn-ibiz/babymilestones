@@ -3,9 +3,12 @@ import {
   attributionRoleLabel,
   attributionRoleOptions,
   canManageServices,
+  DEFAULT_TAX_TREATMENT,
   formatPriceKes,
   priceHistoryRows,
   serviceUnitOptions,
+  taxTreatmentLabel,
+  taxTreatmentOptions,
   unitLabel,
   validatePriceForm,
   validateServiceForm,
@@ -92,6 +95,33 @@ describe("attribution role form logic (P1-E07-S02)", () => {
     expect(
       validateServiceForm({ name: "X", unit: "play", attributionRoleRequired: "reception" })
         .attributionRoleRequired,
+    ).toBeDefined();
+  });
+});
+
+describe("tax treatment form logic (P1-E07-S04)", () => {
+  it("offers the four treatments with labels + a vat_exempt default (AC1/AC3)", () => {
+    expect(taxTreatmentOptions.map((o) => o.value)).toEqual([
+      "vat_inclusive",
+      "vat_exclusive",
+      "vat_exempt",
+      "zero_rated",
+    ]);
+    expect(taxTreatmentLabel("vat_inclusive")).toBe("VAT inclusive");
+    expect(taxTreatmentLabel("zero_rated")).toBe("Zero rated");
+    expect(DEFAULT_TAX_TREATMENT).toBe("vat_exempt");
+  });
+
+  it("accepts an empty treatment (defaults server-side, AC3) + a valid one (AC1)", () => {
+    expect(validateServiceForm({ name: "Play", unit: "play", taxTreatment: "" })).toEqual({});
+    expect(
+      validateServiceForm({ name: "Salon", unit: "salon", taxTreatment: "vat_exclusive" }),
+    ).toEqual({});
+  });
+
+  it("rejects a treatment outside the enum (AC1)", () => {
+    expect(
+      validateServiceForm({ name: "X", unit: "play", taxTreatment: "gst" }).taxTreatment,
     ).toBeDefined();
   });
 });

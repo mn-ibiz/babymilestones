@@ -149,6 +149,47 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("defaults a created service to vat_exempt + audits the treatment (P1-E07-S04 AC1/AC3/AC5)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, validService);
+    expect(res.statusCode).toBe(201);
+    expect(res.json().taxTreatment).toBe("vat_exempt");
+
+    const [a] = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "catalog.service.create"));
+    expect((a!.payload as { tax_treatment?: string }).tax_treatment).toBe("vat_exempt");
+  });
+
+  it("creates with an explicit tax treatment + reads it back (P1-E07-S04 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const created = await req("POST", "/admin/services", creds, {
+      ...validService,
+      taxTreatment: "vat_exclusive",
+    });
+    expect(created.json().taxTreatment).toBe("vat_exclusive");
+    const read = await req("GET", `/admin/services/${created.json().id}`, creds);
+    expect(read.json().taxTreatment).toBe("vat_exclusive");
+  });
+
+  it("can change the tax treatment via PATCH (P1-E07-S04 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (await req("POST", "/admin/services", creds, validService)).json();
+    const patched = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      taxTreatment: "zero_rated",
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().taxTreatment).toBe("zero_rated");
+  });
+
+  it("PATCH rejects an invalid tax treatment (P1-E07-S04 AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (await req("POST", "/admin/services", creds, validService)).json();
+    const res = await req("PATCH", `/admin/services/${svc.id}`, creds, { taxTreatment: "gst" });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("creating a price change preserves the old row + inserts a new one (AC2/AC3), audited (AC5)", async () => {
     const creds = await loginStaff("+254712000001", "7421");
     const svc = (await req("POST", "/admin/services", creds, validService)).json();

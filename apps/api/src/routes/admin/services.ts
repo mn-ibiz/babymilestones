@@ -42,6 +42,7 @@ function serializeService(row: Awaited<ReturnType<typeof getService>>) {
     unit: row.unit,
     isActive: row.isActive,
     attributionRoleRequired: row.attributionRoleRequired,
+    taxTreatment: row.taxTreatment,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -130,7 +131,12 @@ export function registerAdminServices(app: FastifyInstance, deps: AdminServicesD
       actor: actor.id,
       action: "catalog.service.create",
       target: { table: "services", id: row.id },
-      payload: { name: parsed.data.name, unit: parsed.data.unit, ip: req.ip },
+      payload: {
+        name: parsed.data.name,
+        unit: parsed.data.unit,
+        tax_treatment: parsed.data.taxTreatment,
+        ip: req.ip,
+      },
     });
     return reply.code(201).send(serializeService(row));
   });

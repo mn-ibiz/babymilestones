@@ -5,9 +5,12 @@ import type { ServiceUnit } from "@bm/contracts";
 import {
   attributionRoleLabel,
   attributionRoleOptions,
+  DEFAULT_TAX_TREATMENT,
   formatPriceKes,
   priceHistoryRows,
   serviceUnitOptions,
+  taxTreatmentLabel,
+  taxTreatmentOptions,
   unitLabel,
   validatePriceForm,
   validateServiceForm,
@@ -26,6 +29,7 @@ interface Service {
   unit: ServiceUnit;
   isActive: boolean;
   attributionRoleRequired: string | null;
+  taxTreatment: string;
 }
 
 interface Price {
@@ -46,6 +50,7 @@ const EMPTY_SERVICE = {
   unit: "" as ServiceUnit | "",
   description: "",
   attributionRoleRequired: "",
+  taxTreatment: DEFAULT_TAX_TREATMENT as string,
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -58,6 +63,7 @@ export default function ServicesPage() {
         name: form.name,
         unit: form.unit,
         attributionRoleRequired: form.attributionRoleRequired,
+        taxTreatment: form.taxTreatment,
       }),
     [form],
   );
@@ -97,6 +103,7 @@ export default function ServicesPage() {
           unit: form.unit,
           description: form.description.trim() || null,
           attributionRoleRequired: form.attributionRoleRequired || null,
+          taxTreatment: form.taxTreatment || DEFAULT_TAX_TREATMENT,
         }),
       });
       if (res.ok) {
@@ -160,6 +167,7 @@ export default function ServicesPage() {
             <th>Name</th>
             <th>Unit</th>
             <th>Attribution</th>
+            <th>Tax</th>
             <th>Status</th>
             <th />
           </tr>
@@ -178,6 +186,7 @@ export default function ServicesPage() {
                   ? attributionRoleLabel(s.attributionRoleRequired)
                   : "—"}
               </td>
+              <td>{taxTreatmentLabel(s.taxTreatment)}</td>
               <td>{s.isActive ? "Active" : "Inactive"}</td>
               <td>
                 <button type="button" onClick={() => onToggleActive(s)}>
@@ -238,6 +247,21 @@ export default function ServicesPage() {
           >
             <option value="">None (attribution optional)</option>
             {attributionRoleOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Tax treatment
+          <select
+            name="taxTreatment"
+            value={form.taxTreatment}
+            onChange={(e) => setForm((f) => ({ ...f, taxTreatment: e.target.value }))}
+            aria-invalid={Boolean(serviceErrors.taxTreatment)}
+          >
+            {taxTreatmentOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

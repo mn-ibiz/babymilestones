@@ -5,10 +5,16 @@ import { servicePrices } from "@bm/db";
 import {
   ATTRIBUTION_ROLES,
   checkBookingAttribution,
+  computeLineTax,
   createService,
+  DEFAULT_TAX_TREATMENT,
   getService,
   getServiceAttributionRole,
+  getServiceTaxTreatment,
   isAttributionRole,
+  isTaxTreatment,
+  serviceTaxTreatment,
+  TAX_TREATMENTS,
   listServicePrices,
   listServices,
   resolveServicePriceAt,
@@ -261,6 +267,79 @@ describe("attribution role per service (P1-E07-S02)", () => {
       expect(
         checkBookingAttribution("stylist", { role: "stylist", isActive: true }).ok,
       ).toBe(true);
+    });
+  });
+
+  describe("VAT / tax treatment per service (P1-E07-S04)", () => {
+    it("defaults a new service to vat_exempt (AC3)", async () => {
+      const svc = await createService(dbh.db, { name: "Soft Play", unit: "play" });
+      expect(svc.taxTreatment).toBe("vat_exempt");
+      expect(DEFAULT_TAX_TREATMENT).toBe("vat_exempt");
+    });
+
+    it("persists an explicit treatment on create (AC1)", async () => {
+      const svc = await createService(dbh.db, {
+        name: "Hall hire",
+        unit: "event",
+        taxTreatment: "vat_exclusive",
+      });
+      expect(svc.taxTreatment).toBe("vat_exclusive");
+      expect(serviceTaxTreatment(svc)).toBe("vat_exclusive");
+    });
+
+    it("updates the treatment (AC1) and reads it back for the receipt engine", async () => {
+      const svc = await createService(dbh.db, { name: "Salon", unit: "salon" });
+      const updated = await updateService(dbh.db, svc.id, { taxTreatment: "zero_rated" });
+      expect(updated?.taxTreatment).toBe("zero_rated");
+      expect(await getServiceTaxTreatment(dbh.db, svc.id)).toBe("zero_rated");
+      expect(await getServiceTaxTreatment(dbh.db, "00000000-0000-0000-0000-000000000000")).toBeUndefined();
+    });
+
+    it("rejects a treatment outside the enum at the DB CHECK (AC1)", async () => {
+      const svc = await createService(dbh.db, { name: "Coaching", unit: "coaching" });
+      await expect(
+        updateService(dbh.db, svc.id, { taxTreatment: "gst" as never }),
+      ).rejects.toThrow();
+    });
+
+    it("exposes the constrained treatment set + guard", () => {
+      expect(TAX_TREATMENTS).toEqual(["vat_inclusive", "vat_exclusive", "vat_exempt", "zero_rated"]);
+      expect(isTaxTreatment("vat_inclusive")).toBe(true);
+      expect(isTaxTreatment("vat")).toBe(false);
+    });
+
+    it("computeLineTax: exempt + zero_rated carry no tax (AC2)", () => {
+      expect(computeLineTax("vat_exempt", 60_000)).toEqual({
+        treatment: "vat_exempt",
+        netCents: 60_000,
+        taxCents: 0,
+        grossCents: 60_000,
+        rateBps: 0,
+      });
+      expect(computeLineTax("zero_rated", 60_000)).toMatchObject({ taxCents: 0, rateBps: 0 });
+    });
+
+    it("computeLineTax: exclusive adds 16% VAT on top (AC2)", () => {
+      expect(computeLineTax("vat_exclusive", 100_000)).toEqual({
+        treatment: "vat_exclusive",
+        netCents: 100_000,
+        taxCents: 16_000,
+        grossCents: 116_000,
+        rateBps: 1600,
+      });
+    });
+
+    it("computeLineTax: inclusive backs the VAT out of the gross (AC2)", () => {
+      const r = computeLineTax("vat_inclusive", 116_000);
+      expect(r.netCents).toBe(100_000);
+      expect(r.taxCents).toBe(16_000);
+      expect(r.grossCents).toBe(116_000);
+      // net + tax always reconstitutes the gross (no float drift).
+      expect(r.netCents + r.taxCents).toBe(r.grossCents);
+    });
+
+    it("computeLineTax: honours a custom rate", () => {
+      expect(computeLineTax("vat_exclusive", 100_000, 800)).toMatchObject({ taxCents: 8_000 });
     });
   });
 });

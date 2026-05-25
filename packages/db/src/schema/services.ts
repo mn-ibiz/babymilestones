@@ -21,6 +21,16 @@ import { bigint, boolean, date, index, pgTable, text, timestamp, uuid } from "dr
  * duplicated here — the migration CHECK is the runtime source of truth.
  */
 export type AttributionRole = "stylist" | "instructor" | "attendant" | "coach" | "event_staff";
+
+/**
+ * Tax treatment a service declares (P1-E07-S04 AC1). A non-null ENUM on
+ * `services` defaulting to `vat_exempt` (KRA registration deferred — AC3),
+ * consumed by the receipt engine (P1-E08) + eTIMS (P5). Mirrors `TAX_TREATMENTS`
+ * in `@bm/contracts`; CHECK-constrained in migration 0031. db has no dependency
+ * on contracts, so the literal union is duplicated here — the migration CHECK is
+ * the runtime source of truth.
+ */
+export type TaxTreatment = "vat_inclusive" | "vat_exclusive" | "vat_exempt" | "zero_rated";
 export const services = pgTable("services", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -36,6 +46,13 @@ export const services = pgTable("services", {
    * Reception must pick a `staff` member of that role (AC2).
    */
   attributionRoleRequired: text("attribution_role_required").$type<AttributionRole>(),
+  /**
+   * VAT / tax treatment this service declares (P1-E07-S04 AC1). Non-null,
+   * defaults to `vat_exempt` (AC3). CHECK-constrained in migration 0031 to
+   * {`vat_inclusive` | `vat_exclusive` | `vat_exempt` | `zero_rated`}. Consumed
+   * by the receipt engine (P1-E08) + eTIMS (P5) to compute / display line-tax.
+   */
+  taxTreatment: text("tax_treatment").$type<TaxTreatment>().notNull().default("vat_exempt"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
