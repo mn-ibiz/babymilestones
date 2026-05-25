@@ -19,6 +19,7 @@ import { registerPaystackRoutes } from "./routes/payments/paystack/index.js";
 import type { PaystackRouteConfig } from "./routes/payments/paystack/init.js";
 import { registerCashRoutes } from "./routes/payments/cash/index.js";
 import { registerBankRoutes } from "./routes/payments/bank/index.js";
+import { registerReceptionRoutes } from "./routes/reception/index.js";
 
 export interface AppDeps {
   db?: Database;
@@ -138,6 +139,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       now,
     });
     registerAdminRoutes(app, { db, sessions: deps.sessions });
+
+    // P1-E05-S01: Reception operator surface — parent search by phone/name.
+    // Read-only; needs only db + sessions, so always on (guarded internally to
+    // staff holding `read wallet`).
+    registerReceptionRoutes(app, { db, sessions: deps.sessions });
 
     // P1-E04-S06: Reception/Cashier counter cash top-up. Needs only db +
     // sessions (cash is a manual entry — no provider wiring), so always on.

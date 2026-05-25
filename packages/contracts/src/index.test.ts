@@ -12,6 +12,7 @@ import {
   kesToMinorUnits,
   PAYSTACK_MIN_KES,
   PAYSTACK_MAX_KES,
+  parentSearchQuerySchema,
   type ParentProfile,
 } from "./index.js";
 
@@ -182,5 +183,16 @@ describe("ageInMonths (P1-E02-S03 AC2)", () => {
   it("clamps to 0 for same-day or future DOB", () => {
     expect(ageInMonths("2024-07-15", new Date("2024-07-15T00:00:00Z"))).toBe(0);
     expect(ageInMonths("2025-01-01", new Date("2024-07-15T00:00:00Z"))).toBe(0);
+  });
+});
+
+describe("parentSearchQuerySchema (P1-E05-S01 AC1)", () => {
+  it("trims and accepts a non-empty query", () => {
+    const r = parentSearchQuerySchema.parse({ q: "  Asha  " });
+    expect(r.q).toBe("Asha");
+  });
+  it("rejects a blank/whitespace-only query", () => {
+    expect(parentSearchQuerySchema.safeParse({ q: "   " }).success).toBe(false);
+    expect(parentSearchQuerySchema.safeParse({ q: "" }).success).toBe(false);
   });
 });

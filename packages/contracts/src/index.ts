@@ -181,6 +181,50 @@ export const autoCreditToggleSchema = z.object({
 export type AutoCreditToggleInput = z.infer<typeof autoCreditToggleSchema>;
 
 // ---------------------------------------------------------------------------
+// Reception parent search (P1-E05-S01)
+// ---------------------------------------------------------------------------
+
+/** Min query length before the search runs (one char is too broad/expensive). */
+export const PARENT_SEARCH_MIN_QUERY = 2;
+/** Hard cap on rows returned — keeps the response (and render) bounded (AC2). */
+export const PARENT_SEARCH_LIMIT = 20;
+
+/**
+ * Reception parent search request (P1-E05-S01 AC1). A single free-text query
+ * matched against phone (any format → normalised, exact/prefix) OR partial name
+ * (case-insensitive substring). The query is trimmed; a query shorter than
+ * {@link PARENT_SEARCH_MIN_QUERY} returns no results (the route short-circuits).
+ */
+export const parentSearchQuerySchema = z.object({
+  q: z.string().trim().min(1, "A search query is required"),
+});
+export type ParentSearchQueryInput = z.infer<typeof parentSearchQuerySchema>;
+
+/**
+ * One parent search result (P1-E05-S01 AC3): name, phone last-4, wallet balance
+ * (cents), outstanding amount owed (cents), and the last visit date (ISO, or
+ * null if never checked in). `userId` is the stable id the UI navigates to.
+ */
+export interface ParentSearchResult {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  /** Last 4 digits of the parent's phone — never the full number in a list view. */
+  phoneLast4: string;
+  /** Computed wallet balance in integer cents (credits − debits). */
+  walletBalanceCents: number;
+  /** Outstanding amount owed in integer cents (sum of open invoices). */
+  outstandingCents: number;
+  /** ISO timestamp of the most recent service visit (check-in), or null. */
+  lastVisitAt: string | null;
+}
+
+/** Search response: the matched results (≤ {@link PARENT_SEARCH_LIMIT}). */
+export interface ParentSearchResponse {
+  results: ParentSearchResult[];
+}
+
+// ---------------------------------------------------------------------------
 // M-Pesa STK push top-up (P1-E04-S01)
 // ---------------------------------------------------------------------------
 
