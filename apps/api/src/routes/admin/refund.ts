@@ -126,8 +126,8 @@ async function notifyParent(
   const [user] = await db.select().from(users).where(eq(users.id, wallet.userId));
   if (!user) return;
   await sms.send({
-    phone: user.phone,
-    body: `A refund of KES ${(amount / 100).toFixed(2)} has been recorded to your wallet.`,
+    to: user.phone,
     template: "wallet.refund",
+    data: { amountKes: (amount / 100).toFixed(2) },
   });
 }

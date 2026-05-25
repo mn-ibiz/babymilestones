@@ -110,9 +110,9 @@ export function registerCashTopup(app: FastifyInstance, deps: PaymentsDeps): voi
       // the source of truth; an SMS failure must not undo it, so it is best-effort.
       await sms
         .send({
-          phone: parentUser.phone,
-          body: `A cash top-up of KES ${(amount / 100).toFixed(2)} was added to your wallet.`,
+          to: parentUser.phone,
           template: "wallet.topup.cash",
+          data: { amountKes: (amount / 100).toFixed(2) },
         })
         .catch(() => {});
     }

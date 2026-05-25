@@ -160,9 +160,9 @@ export function registerReceptionTopup(app: FastifyInstance, deps: ReceptionDeps
         });
         await sms
           .send({
-            phone: parent.phone,
-            body: `A cash top-up of KES ${(amount / 100).toFixed(2)} was added to your wallet.`,
+            to: parent.phone,
             template: "wallet.topup.cash",
+            data: { amountKes: (amount / 100).toFixed(2) },
           })
           .catch(() => {});
       }

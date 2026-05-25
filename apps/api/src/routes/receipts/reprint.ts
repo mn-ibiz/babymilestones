@@ -162,9 +162,9 @@ export function registerReceiptReprint(app: FastifyInstance, deps: ReceiptsDeps)
       // customer gets the same content they would have received originally.
       if (resend && found.customerPhone) {
         await new StubSmsSender(tx).send({
-          phone: found.customerPhone,
-          body: renderReceipt(document, "thermal"),
+          to: found.customerPhone,
           template: "receipt.reprint",
+          data: { body: renderReceipt(document, "thermal") },
         });
         smsResent = true;
       }

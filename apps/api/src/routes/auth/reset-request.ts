@@ -61,9 +61,9 @@ export function registerResetRequest(
         expiresAt: new Date(nowMs + OTP_TTL_MS),
       });
       await new StubSmsSender(db).send({
-        phone,
-        body: `Your Baby Milestones reset code is ${code}. It expires in 10 minutes.`,
+        to: phone,
         template: "auth.reset.code",
+        data: { code },
       });
       // AC5: audit the request — never the code itself.
       await audit(db, {

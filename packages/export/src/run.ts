@@ -68,9 +68,9 @@ export async function runExport(exportId: string, deps: RunExportDeps): Promise<
     if (user) {
       const link = `${baseUrl}/exports/download?token=${token}`;
       await new StubSmsSender(db).send({
-        phone: user.phone,
-        body: `Your Baby Milestones data export is ready. Download (valid 7 days, one-time): ${link}`,
+        to: user.phone,
         template: "parent.data.export.ready",
+        data: { link },
       });
     }
   } catch (err) {

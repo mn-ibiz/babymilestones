@@ -199,9 +199,9 @@ export function registerBankTransferRoutes(app: FastifyInstance, deps: PaymentsD
         // source of truth; an SMS failure must not undo it, so it is best-effort.
         await sms
           .send({
-            phone: parentUser.phone,
-            body: `A bank transfer of KES ${(pending.amount / 100).toFixed(2)} was added to your wallet.`,
+            to: parentUser.phone,
             template: "wallet.topup.bank",
+            data: { amountKes: (pending.amount / 100).toFixed(2) },
           })
           .catch(() => {});
       }

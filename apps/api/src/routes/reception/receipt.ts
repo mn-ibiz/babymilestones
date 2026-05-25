@@ -145,11 +145,12 @@ export function registerReceipt(app: FastifyInstance, deps: ReceptionDeps): void
       const found = await loadReceipt(db, transactionId);
       if (!found) return reply.code(404).send({ error: "Transaction not found" });
 
-      const sent = await consentSender.sendReceipt(found.parentId, {
-        phone: found.payload.parentPhone,
-        body: receiptSmsBody(found.payload),
-        template: "reception.receipt",
-      });
+      const sent =
+        (await consentSender.sendReceipt(found.parentId, {
+          to: found.payload.parentPhone,
+          template: "reception.receipt",
+          data: { body: receiptSmsBody(found.payload) },
+        })) !== null;
 
       await audit(db, {
         actor: actor.id,

@@ -171,9 +171,9 @@ async function reconcileFailure(
     .where(eq(mpesaStkRequests.id, request.id));
 
   await sms.send({
-    phone: request.phone,
-    body: `Your M-Pesa top-up of KES ${request.amount} could not be completed. No money was deducted. Please try again.`,
+    to: request.phone,
     template: "payment.mpesa.failed",
+    data: { amountKes: String(request.amount) },
   });
 
   await audit(db, {

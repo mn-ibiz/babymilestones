@@ -5,7 +5,9 @@ import {
   ConsentAwareSmsSender,
   PACKAGE,
   StubSmsSender,
+  createSmsSender,
   isMarketingOptedIn,
+  renderTemplate,
 } from "./index.js";
 
 /** Insert a parent with the given opt-in and return its id. */
@@ -26,19 +28,50 @@ it("identifies itself", () => {
   expect(PACKAGE).toBe("@bm/sms");
 });
 
-it("stub sender records the message in sms_outbox", async () => {
+it("renders a template body from data", () => {
+  expect(renderTemplate("auth.reset.code", { code: "123456" })).toBe(
+    "Your Baby Milestones reset code is 123456. It expires in 10 minutes.",
+  );
+  expect(renderTemplate("raw", { body: "hello" })).toBe("hello");
+});
+
+it("renderTemplate throws on an unknown template", () => {
+  expect(() => renderTemplate("nope.unknown", {})).toThrow(/unknown template/);
+});
+
+it("send() returns a queued id and writes a rendered sms_outbox row (AC1, AC2)", async () => {
   const { db, close } = await createTestDb();
   try {
-    await new StubSmsSender(db).send({
-      phone: "+254712345678",
-      body: "hello",
-      template: "test.template",
+    const result = await new StubSmsSender(db).send({
+      to: "+254712345678",
+      template: "auth.reset.code",
+      data: { code: "987654" },
     });
+    expect(result.id).toMatch(/[0-9a-f-]{36}/);
+
     const rows = await db.select().from(smsOutbox);
     expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(result.id);
     expect(rows[0]!.phone).toBe("+254712345678");
-    expect(rows[0]!.body).toBe("hello");
-    expect(rows[0]!.template).toBe("test.template");
+    expect(rows[0]!.template).toBe("auth.reset.code");
+    // Rendered body, captured template + data, queued status — no network call.
+    expect(rows[0]!.body).toBe(
+      "Your Baby Milestones reset code is 987654. It expires in 10 minutes.",
+    );
+    expect(rows[0]!.data).toEqual({ code: "987654" });
+    expect(rows[0]!.status).toBe("queued");
+  } finally {
+    await close();
+  }
+});
+
+it("createSmsSender selects the stub by default and on provider=stub (AC3)", async () => {
+  const { db, close } = await createTestDb();
+  try {
+    expect(createSmsSender(db)).toBeInstanceOf(StubSmsSender);
+    expect(createSmsSender(db, { provider: "stub" })).toBeInstanceOf(StubSmsSender);
+    // The live provider is the one-line swap reserved for P5-E03.
+    expect(() => createSmsSender(db, { provider: "live" })).toThrow(/P5-E03/);
   } finally {
     await close();
   }
@@ -66,13 +99,20 @@ it("gates marketing sends by opt-in but always sends transactional (AC3)", async
     const sender = new ConsentAwareSmsSender(db, new StubSmsSender(db));
 
     // Transactional always sends regardless of opt-in.
-    expect(await sender.sendTransactional({ phone: "+254712345678", body: "booking confirmed" })).toBe(
-      true,
-    );
+    const txn = await sender.sendTransactional({
+      to: "+254712345678",
+      template: "raw",
+      data: { body: "booking confirmed" },
+    });
+    expect(txn.id).toBeTruthy();
 
     // Marketing to an opted-out parent is dropped; to an opted-in parent it sends.
-    expect(await sender.sendMarketing(optedOut, { phone: "+254712345678", body: "promo" })).toBe(false);
-    expect(await sender.sendMarketing(optedIn, { phone: "+254799999999", body: "promo" })).toBe(true);
+    expect(
+      await sender.sendMarketing(optedOut, { to: "+254712345678", template: "raw", data: { body: "promo" } }),
+    ).toBeNull();
+    expect(
+      await sender.sendMarketing(optedIn, { to: "+254799999999", template: "raw", data: { body: "promo" } }),
+    ).not.toBeNull();
 
     const rows = await db.select().from(smsOutbox);
     // One transactional + one allowed marketing = 2 (the dropped one never hit the outbox).
@@ -93,18 +133,18 @@ it("gates the receipt copy on SMS consent (P1-E05-S06 AC3)", async () => {
 
     expect(
       await sender.sendReceipt(optedOut, {
-        phone: "+254712345678",
-        body: "receipt",
+        to: "+254712345678",
         template: "reception.receipt",
+        data: { body: "receipt" },
       }),
-    ).toBe(false);
+    ).toBeNull();
     expect(
       await sender.sendReceipt(optedIn, {
-        phone: "+254799999999",
-        body: "receipt",
+        to: "+254799999999",
         template: "reception.receipt",
+        data: { body: "receipt" },
       }),
-    ).toBe(true);
+    ).not.toBeNull();
 
     const rows = await db.select().from(smsOutbox);
     expect(rows).toHaveLength(1);
