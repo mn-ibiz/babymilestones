@@ -32,3 +32,4 @@ STORY 4-4-paystack-card-top-up | RESULT done | fixed=1 | deferred=3 | reason=non
 STORY 4-5-paystack-webhook-signature-replay-protection | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E04-S05)
 STORY 4-6-cash-top-up-by-reception | RESULT done | fixed=1 | deferred=2 | reason=none  (P1-E04-S06)
 STORY 4-7-bank-transfer-top-up-admin-confirmed | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E04-S07)
+STORY 5-1-search-parent-by-phone-or-name-in | RESULT done | fixed=2 | deferred=4 | reason=none  (P1-E05-S01)
