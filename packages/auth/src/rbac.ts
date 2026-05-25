@@ -38,6 +38,7 @@ export const RESOURCES = [
   "role",
   "audit",
   "report",
+  "config",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -115,6 +116,8 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "read", resource: "wallet" },
     { action: "read", resource: "audit" },
     { action: "read", resource: "report" },
+    // P1-E09-S02: managing `config` gates the SMS provider config CRUD surface.
+    { action: "manage", resource: "config" },
   ],
   // Super admin: everything, including role mutation + impersonation.
   super_admin: [everything],

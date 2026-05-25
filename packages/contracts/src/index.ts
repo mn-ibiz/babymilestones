@@ -1325,3 +1325,87 @@ export function reconciliationRowsToCsv(rows: readonly ReconciliationExportRow[]
   }
   return lines.join("\r\n") + "\r\n";
 }
+
+// ---------------------------------------------------------------------------
+// SMS provider config (P1-E09-S02)
+// ---------------------------------------------------------------------------
+
+/** Max length of a registered sender ID (alphanumeric IDs are ≤11; allow headroom). */
+export const SMS_SENDER_ID_MAX = 32;
+/** Max length of the api_key_ref env-var NAME. */
+export const SMS_API_KEY_REF_MAX = 128;
+
+/**
+ * Valid env-var / secret-reference NAME for the API key (AC1/AC2). This is the
+ * NAME of the variable that holds the key at runtime — never the key itself —
+ * so it is constrained to a conventional env-var token (letters, digits,
+ * underscore; not starting with a digit). This shape check also stops a caller
+ * accidentally pasting a literal secret into the ref field.
+ */
+const apiKeyRefSchema = z
+  .string()
+  .trim()
+  .min(1, "An API key reference (env var name) is required")
+  .max(SMS_API_KEY_REF_MAX)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/u, "API key reference must be an env var name (e.g. SMS_API_KEY)");
+
+/**
+ * Provider URL shape gate (AC3, part 1): a syntactically valid HTTPS URL. The
+ * SSRF host check (RFC1918 / loopback / link-local / metadata) lives in
+ * `@bm/sms` `checkProviderUrlSafety` and is applied by the API route as a second
+ * gate — kept out of `@bm/contracts` so this package stays dependency-light.
+ */
+const providerUrlSchema = z
+  .string()
+  .trim()
+  .min(1, "API URL is required")
+  .refine((v) => {
+    try {
+      return new URL(v).protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "API URL must be a valid HTTPS URL");
+
+/** Create an SMS provider config (AC1). Always created inactive unless `isActive`. */
+export const smsConfigCreateSchema = z.object({
+  senderId: z.string().trim().min(1, "Sender ID is required").max(SMS_SENDER_ID_MAX),
+  apiUrl: providerUrlSchema,
+  apiKeyRef: apiKeyRefSchema,
+  isActive: z.boolean().optional(),
+});
+export type SmsConfigCreateInput = z.infer<typeof smsConfigCreateSchema>;
+
+/**
+ * Update an SMS provider config (AC1). Partial patch; at least one field must be
+ * present. `isActive` toggles the single-active row (AC4). The raw API key is
+ * never accepted or returned — only the env-var reference.
+ */
+export const smsConfigUpdateSchema = z
+  .object({
+    senderId: z.string().trim().min(1, "Sender ID is required").max(SMS_SENDER_ID_MAX).optional(),
+    apiUrl: providerUrlSchema.optional(),
+    apiKeyRef: apiKeyRefSchema.optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine(
+    (v) =>
+      v.senderId !== undefined ||
+      v.apiUrl !== undefined ||
+      v.apiKeyRef !== undefined ||
+      v.isActive !== undefined,
+    "at least one field is required",
+  );
+export type SmsConfigUpdateInput = z.infer<typeof smsConfigUpdateSchema>;
+
+/** Public (secret-free) shape of an sms_config row returned by the API (AC2). */
+export interface SmsConfigPublic {
+  id: string;
+  senderId: string;
+  apiUrl: string;
+  /** Env-var NAME holding the key — never the key value. */
+  apiKeyRef: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

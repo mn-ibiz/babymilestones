@@ -52,6 +52,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
   },
   {
     "action": "manage",
+    "resource": "config",
+    "role": "admin",
+  },
+  {
+    "action": "manage",
     "resource": "receipt",
     "role": "admin",
   },

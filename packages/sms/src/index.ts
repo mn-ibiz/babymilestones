@@ -5,6 +5,23 @@ import { type SmsTemplateData, renderTemplate } from "./templates.js";
 
 export { renderTemplate } from "./templates.js";
 export type { SmsTemplateData, SmsTemplateKey } from "./templates.js";
+export { checkProviderUrlSafety, isSafeProviderUrl } from "./url-safety.js";
+export type { UrlSafetyResult, UrlSafetyReason } from "./url-safety.js";
+export {
+  createSmsConfig,
+  updateSmsConfig,
+  listSmsConfigs,
+  getSmsConfig,
+  getActiveSmsConfig,
+  deleteSmsConfig,
+  toPublicSmsConfig,
+} from "./config.js";
+export type {
+  PublicSmsConfig,
+  CreateSmsConfigInput,
+  UpdateSmsConfigInput,
+  ConfigExecutor,
+} from "./config.js";
 
 /** @bm/sms — provider-agnostic SMS sender. Launch ships a DB-backed stub. */
 export const PACKAGE = "@bm/sms" as const;
