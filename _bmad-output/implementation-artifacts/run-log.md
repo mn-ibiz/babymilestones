@@ -36,3 +36,4 @@ STORY 5-1-search-parent-by-phone-or-name-in | RESULT done | fixed=2 | deferred=4
 STORY 5-2-parent-profile-header-with-wallet-outstanding-auto | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E05-S02)
 STORY 5-3-reception-top-up-cash-m-pesa-paystack | RESULT done | fixed=1 | deferred=3 | reason=none  (P1-E05-S03)
 STORY 5-4-record-a-service-visit | RESULT done | fixed=0 | deferred=4 | reason=none  (P1-E05-S04)
+STORY 5-5-recent-transactions-panel | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E05-S05)
