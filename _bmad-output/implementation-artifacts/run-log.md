@@ -44,3 +44,4 @@ STORY 6-3-treasury-role-permissions | RESULT done | fixed=0 | deferred=3 | reaso
 STORY 6-4-export-float-reconciliation-for-the-accountant | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E06-S04)
 STORY 7-1-crud-services-with-effective-dated-price-history | RESULT done | fixed=1 | deferred=0 | reason=none  (P1-E07-S01)
 STORY 7-2-attribution-role-per-service | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E07-S02)
+STORY 7-3-staff-data-records-no-logins | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E07-S03)
