@@ -55,3 +55,4 @@ STORY 9-1-adapter-interface-stub-implementation | RESULT done | fixed=0 | deferr
 STORY 9-2-admin-config-table-for-sender-id-url | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E09-S02)
 STORY 9-3-templates-registered-versioned | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E09-S03)
 STORY 10-1-nav-shell-role-gated-routes | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E10-S01)
+STORY 10-2-user-management-staff-crud | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E10-S02)
