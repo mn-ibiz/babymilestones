@@ -1,0 +1,133 @@
+import { and, eq, isNull, lt } from "drizzle-orm";
+import { audit, backupRuns, type Database } from "@bm/db";
+import type { Job } from "../registry.js";
+
+/** Result of a successful off-host snapshot. */
+export interface BackupResult {
+  /** Off-host object key/path the snapshot was written to. */
+  location: string;
+  /** Snapshot size in bytes. */
+  sizeBytes: number;
+}
+
+/**
+ * The actual pg_dump + off-host upload, INJECTED so tests never shell out or
+ * touch cloud storage. Production wires a real implementation (pg_dump piped to
+ * the object store) when infra lands; tests pass a mock.
+ */
+export type BackupDump = () => Promise<BackupResult>;
+
+/** Off-host store slice the retention prune needs (delete by location). */
+export interface BackupStore {
+  remove(location: string): Promise<void>;
+}
+
+export interface DbBackupJobDeps {
+  db: Database;
+  /** Off-host object store (only `remove` is used here; the dump uploads). */
+  store: BackupStore;
+  /** Injected pg_dump + upload — mockable, never a real shell call in tests. */
+  dump: BackupDump;
+  /** Clock injection for deterministic retention windows in tests. */
+  now?: () => Date;
+}
+
+/** AC2 / Decision 35 — fixed 30-day retention for P1. */
+const RETENTION_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Daily DB backup + retention cron (X8-S03).
+ *
+ * Each run:
+ * 1. Inserts a `running` `backup_runs` row (AC3 — every run is recorded).
+ * 2. Invokes the INJECTED dump (pg_dump → off-host store, AC1) and stamps the
+ *    row `success` (location + size) or `failed` (error). A dump failure is
+ *    recorded, not thrown, so the cron keeps running tomorrow.
+ * 3. Prunes snapshots older than 30 days (AC2): for each un-pruned successful
+ *    run past the window, deletes the off-host object and stamps `prunedAt`.
+ *
+ * The actual dump/upload and the off-host store are injected; tests mock both.
+ * The restore drill (AC4) is a documented manual procedure under `infra/`.
+ */
+export function createDbBackupJob(deps: DbBackupJobDeps): Job {
+  const now = deps.now ?? (() => new Date());
+
+  return {
+    name: "db-backup",
+    intervalMs: DAY_MS,
+    run: async () => {
+      const at = now();
+
+      const [run] = await deps.db
+        .insert(backupRuns)
+        .values({ status: "running", startedAt: at })
+        .returning({ id: backupRuns.id });
+      const runId = run!.id;
+
+      try {
+        const result = await deps.dump();
+        await deps.db
+          .update(backupRuns)
+          .set({
+            status: "success",
+            finishedAt: now(),
+            location: result.location,
+            sizeBytes: result.sizeBytes,
+          })
+          .where(eq(backupRuns.id, runId));
+        await audit(deps.db, {
+          actor: null,
+          action: "backup.run.succeeded",
+          target: { table: "backup_runs", id: runId },
+          payload: { location: result.location, size_bytes: result.sizeBytes },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await deps.db
+          .update(backupRuns)
+          .set({ status: "failed", finishedAt: now(), error: message })
+          .where(eq(backupRuns.id, runId));
+        await audit(deps.db, {
+          actor: null,
+          action: "backup.run.failed",
+          target: { table: "backup_runs", id: runId },
+          payload: { error: message },
+        });
+      }
+
+      await prune(deps, at);
+    },
+  };
+}
+
+/** AC2 — delete off-host snapshots older than 30 days, stamp `prunedAt`. */
+async function prune(deps: DbBackupJobDeps, at: Date): Promise<void> {
+  const cutoff = new Date(at.getTime() - RETENTION_DAYS * DAY_MS);
+
+  const stale = await deps.db
+    .select({ id: backupRuns.id, location: backupRuns.location })
+    .from(backupRuns)
+    .where(
+      and(
+        eq(backupRuns.status, "success"),
+        isNull(backupRuns.prunedAt),
+        lt(backupRuns.startedAt, cutoff),
+      ),
+    );
+
+  for (const row of stale) {
+    if (!row.location) continue;
+    await deps.store.remove(row.location);
+    await deps.db
+      .update(backupRuns)
+      .set({ prunedAt: at })
+      .where(eq(backupRuns.id, row.id));
+    await audit(deps.db, {
+      actor: null,
+      action: "backup.run.pruned",
+      target: { table: "backup_runs", id: row.id },
+      payload: { location: row.location },
+    });
+  }
+}

@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (X8-S02 health/readiness endpoints done across api, jobs, and the three Next apps)
+last_updated: 2026-05-25 (X8-S03 daily DB backup + 30-day retention + backup_runs table done in apps/jobs and packages/db)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -150,7 +150,7 @@ development_status:
   epic-15: in-progress
   15-1-structured-logging-error-tracking: done  # X8-S01
   15-2-health-endpoints: done  # X8-S02
-  15-3-daily-db-backup-retention: ready-for-dev  # X8-S03
+  15-3-daily-db-backup-retention: done  # X8-S03
   15-4-ci-cd-pipelines-per-app: ready-for-dev  # X8-S04
   epic-15-retrospective: optional
 

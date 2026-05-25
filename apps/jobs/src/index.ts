@@ -4,6 +4,7 @@ import { createDataExportJob } from "./jobs/data-export.js";
 import { createWalletStatementJob } from "./jobs/wallet-statement.js";
 import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 import { createAuditDrainJob } from "./jobs/audit-drain.js";
+import { createDbBackupJob } from "./jobs/db-backup.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -12,6 +13,13 @@ export { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 export type { MpesaReconcileJobDeps, MpesaQuerier } from "./jobs/mpesa-reconcile.js";
 export { createAuditDrainJob } from "./jobs/audit-drain.js";
 export type { AuditDrainJobDeps, Projector } from "./jobs/audit-drain.js";
+export { createDbBackupJob } from "./jobs/db-backup.js";
+export type {
+  DbBackupJobDeps,
+  BackupDump,
+  BackupResult,
+  BackupStore,
+} from "./jobs/db-backup.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -41,6 +49,13 @@ export function registerAuditDrainJob(
   deps: Parameters<typeof createAuditDrainJob>[0],
 ): void {
   register(createAuditDrainJob(deps));
+}
+
+/** Wire the daily DB backup + 30-day retention cron (X8-S03). */
+export function registerDbBackupJob(
+  deps: Parameters<typeof createDbBackupJob>[0],
+): void {
+  register(createDbBackupJob(deps));
 }
 
 export { logger } from "./logger.js";

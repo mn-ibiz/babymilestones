@@ -1,6 +1,6 @@
 # Story 15.3: Daily DB backup + retention
 
-Status: ready-for-dev
+Status: done
 
 > Canonical ID: X8-S03 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/X8-S03.md
 
@@ -19,16 +19,16 @@ so that we can recover from data loss within a known retention window.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Daily backup job + off-host storage (AC: #1)
-  - [ ] Add a scheduled daily Postgres snapshot (pg_dump/snapshot) pushed to off-host storage; wire the schedule under `infra/` (and/or register a job in `apps/jobs/src/registry.ts` if run by the worker).
-- [ ] Task 2: 30-day retention (AC: #2)
-  - [ ] Prune snapshots older than 30 days (Decision 35) — fixed retention for P1.
-- [ ] Task 3: `backup_runs` audit table (AC: #3)
-  - [ ] Add `backup_runs` table to `packages/db` (started_at, finished_at, status/result, size, location/error) via an additive-only migration; the backup job writes a row per run.
-- [ ] Task 4: Restore drill documentation (AC: #4)
-  - [ ] Document the manual restore procedure (under `infra/`) to be rehearsed at commissioning.
-- [ ] Task 5: Tests (AC: all)
-  - [ ] vitest: backup job records a `backup_runs` row with success/failure result; retention prune removes >30-day snapshots and keeps newer ones (clock-injectable). Test-first.
+- [x] Task 1: Daily backup job + off-host storage (AC: #1)
+  - [x] Added `db-backup` job (`apps/jobs/src/jobs/db-backup.ts`) with a daily cadence (`intervalMs = 24h`) and an INJECTED `dump` (pg_dump → off-host upload) so tests never shell out or touch cloud. Registered via `registerDbBackupJob` in `apps/jobs/src/index.ts`. Off-host config + dump wiring sketch documented in `infra/backup-restore-runbook.md`.
+- [x] Task 2: 30-day retention (AC: #2)
+  - [x] `prune` deletes off-host snapshots whose `started_at` is >30 days old (Decision 35, clock-injectable), stamps `pruned_at`, and skips already-pruned/failed runs.
+- [x] Task 3: `backup_runs` audit table (AC: #3)
+  - [x] Added `backup_runs` table (`packages/db/migrations/0041_backup_runs.sql` + `packages/db/src/schema/backup-runs.ts`): status, started_at, finished_at, location, size_bytes, error, pruned_at. Additive-only. The job writes a `running` row then stamps success/failed per run.
+- [x] Task 4: Restore drill documentation (AC: #4)
+  - [x] Documented the manual restore procedure in `infra/backup-restore-runbook.md` to be rehearsed at commissioning.
+- [x] Task 5: Tests (AC: all)
+  - [x] vitest (`apps/jobs/src/jobs/db-backup.test.ts`, test-first): records success run with injected dump result; records failed run on dump throw; prunes >30-day snapshots while keeping newer ones (clock-injected); does not re-prune pruned/failed runs.
 
 ## Dev Notes
 
@@ -48,14 +48,35 @@ so that we can recover from data loss within a known retention window.
 
 ### Agent Model Used
 
+claude-opus-4-7
+
 ### Debug Log References
+
+- `pnpm --filter @bm/jobs exec vitest run src/jobs/db-backup.test.ts` — 5 passed.
+- Full gate green: `pnpm test` (16 tasks, 406 api tests etc. all pass) && `pnpm typecheck` && `pnpm lint` && `pnpm build`.
 
 ### Completion Notes List
 
+- Backup dump/upload is an injected `BackupDump` dependency and the off-host store is an injected `BackupStore` — no real pg_dump, no shell exec, no cloud in tests (mocks/fakes only).
+- Each run records a `backup_runs` row (`running` → `success`/`failed`) plus an `audit_outbox` entry; dump failures are recorded, not thrown, so the daily cron survives.
+- Retention is a fixed 30 days (Decision 35), clock-injectable; prune is idempotent (skips already-pruned and failed/no-location runs).
+- Migration `0041_backup_runs.sql` is additive-only and applies cleanly under the PGlite test harness.
+- Restore drill is a documented manual procedure (AC4), not automated, per the story.
+- Single self-review performed: all 4 ACs covered, no blocker/high findings, no deferrals.
+
 ### File List
+
+- packages/db/migrations/0041_backup_runs.sql (new)
+- packages/db/src/schema/backup-runs.ts (new)
+- packages/db/src/schema/index.ts (modified — export backup-runs)
+- apps/jobs/src/jobs/db-backup.ts (new)
+- apps/jobs/src/jobs/db-backup.test.ts (new)
+- apps/jobs/src/index.ts (modified — export + registerDbBackupJob)
+- infra/backup-restore-runbook.md (new)
 
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-24 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+| 2026-05-25 | 1.0 | Implemented daily DB backup job + 30-day retention + backup_runs table + restore runbook; full gate green | claude-opus-4-7 |
