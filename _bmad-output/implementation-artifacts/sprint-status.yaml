@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E09-S02 done)
+last_updated: 2026-05-25 (P1-E10-S01 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -105,8 +105,8 @@ development_status:
   epic-9-retrospective: optional
 
   # Epic 10 — Admin Console Shell & RBAC  (source E10)
-  epic-10: ready-for-dev
-  10-1-nav-shell-role-gated-routes: ready-for-dev  # P1-E10-S01
+  epic-10: in-progress
+  10-1-nav-shell-role-gated-routes: done  # P1-E10-S01
   10-2-user-management-staff-crud: ready-for-dev  # P1-E10-S02
   10-3-audit-log-viewer: ready-for-dev  # P1-E10-S03
   10-4-settings-sub-app: ready-for-dev  # P1-E10-S04
