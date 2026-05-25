@@ -44,6 +44,23 @@ export const resetCompleteSchema = z.object({
 export type ResetComplete = z.infer<typeof resetCompleteSchema>;
 
 /**
+ * Authenticated PIN change (P1-E11-S04 AC3). The parent must supply their
+ * CURRENT PIN (re-auth) plus a new 4-digit PIN. Format only here — weakness +
+ * current-PIN verification happen server-side (the API owns the hash and must
+ * run an argon2 verify regardless). `newPin` must differ from `currentPin`.
+ */
+export const pinChangeSchema = z
+  .object({
+    currentPin: z.string().regex(/^\d{4}$/u, "Enter your current 4-digit PIN"),
+    newPin: z.string().regex(/^\d{4}$/u, "New PIN must be 4 digits"),
+  })
+  .refine((v) => v.newPin !== v.currentPin, {
+    message: "New PIN must be different from your current PIN",
+    path: ["newPin"],
+  });
+export type PinChangeInput = z.infer<typeof pinChangeSchema>;
+
+/**
  * Permissive email (RFC 5322 light) for the parent profile (P1-E02-S01 AC2).
  * Intentionally forgiving: one `@`, a non-empty local part, a dotted domain
  * with a 2+ char TLD, no spaces. We do NOT enforce the full RFC grammar.

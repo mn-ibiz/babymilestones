@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { draftFromProfile, type ProfileDraft } from "../../lib/profile";
-import { fetchProfile, setSmsConsent } from "../../lib/profile-api";
-import { ProfileForm } from "../components/ProfileForm";
-import { ExportDataButton } from "../components/ExportDataButton";
+import { draftFromProfile, type ProfileDraft } from "../../../lib/profile";
+import { fetchProfile, setSmsConsent } from "../../../lib/profile-api";
+import { ProfileForm } from "../../components/ProfileForm";
+import { PinChangeForm } from "../../components/PinChangeForm";
+import { ExportDataButton } from "../../components/ExportDataButton";
 
 /**
- * Dashboard profile edit (P1-E02-S01 AC4). Reachable from the dashboard at any
- * time; seeds the form from the current profile when one exists. Also surfaces
- * the SMS marketing opt-in (P1-E02-S04 AC1) as a standalone toggle so a consent
- * change is never bundled into the profile upsert.
+ * Parent profile & consent management (P1-E11-S04). Mobile-first, inside the
+ * authed `(app)` route group. Lets a parent edit their details (AC1), toggle
+ * SMS marketing consent (AC2 — a standalone toggle, never bundled into the
+ * profile upsert), change their PIN (AC3), and request a full data export
+ * (AC4). All mutations carry the CSRF double-submit token; the server enforces
+ * ownership + CSRF.
  */
 export default function ProfilePage() {
   const router = useRouter();
@@ -47,7 +50,7 @@ export default function ProfilePage() {
   return (
     <main>
       <h1>Your profile</h1>
-      <ProfileForm initial={initial} onSaved={() => router.push("/dashboard")} />
+      <ProfileForm initial={initial} onSaved={() => router.refresh()} />
 
       {smsOptIn !== null && (
         <section aria-label="Communication preferences">
@@ -62,6 +65,11 @@ export default function ProfilePage() {
           </label>
         </section>
       )}
+
+      <section aria-label="Security">
+        {/* AC3: a successful PIN change invalidates every session — bounce to login. */}
+        <PinChangeForm onChanged={() => router.push("/login")} />
+      </section>
 
       <ExportDataButton />
     </main>

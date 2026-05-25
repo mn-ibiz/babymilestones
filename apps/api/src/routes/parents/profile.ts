@@ -1,10 +1,19 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { audit, parents, users, type Database, type ParentRow } from "@bm/db";
-import { validateSession, CSRF_HEADER_NAME } from "@bm/auth";
+import {
+  validateSession,
+  CSRF_HEADER_NAME,
+  hashPin,
+  verifyPin,
+  isWeakPin,
+  isValidPinFormat,
+  DUMMY_PIN_HASH,
+} from "@bm/auth";
 import {
   parentProfileSchema,
   smsConsentSchema,
+  pinChangeSchema,
   isProfileComplete,
   type ParentProfile,
 } from "@bm/contracts";
@@ -165,5 +174,63 @@ export function registerParentProfile(app: FastifyInstance, { db, sessions }: Pa
 
     if (!profile) return reply.code(404).send({ error: "Parent profile not found" });
     return reply.code(200).send({ profile, complete: isProfileComplete(profile) });
+  });
+
+  // PUT /parents/me/pin — change the authed parent's login PIN (P1-E11-S04 AC3).
+  // Requires the CURRENT PIN (re-auth), rejects malformed/weak/duplicate new
+  // PINs, rotates the argon2 hash, invalidates every existing session, and
+  // audits the change. The raw PIN is never logged or echoed.
+  app.put("/parents/me/pin", async (req: FastifyRequest, reply: FastifyReply) => {
+    const auth = await validateSession(
+      { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+      { sessions, resolveUser },
+    );
+    if (!auth.ok) return reply.code(auth.status).send({ error: auth.error });
+
+    const parsed = pinChangeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      return reply.code(400).send({ error: first?.message ?? "Invalid PIN change", field: first?.path[0] });
+    }
+    const { currentPin, newPin } = parsed.data;
+
+    // Defensive: format + weakness (the schema enforces format, but be explicit
+    // so a weak-but-well-formed new PIN is rejected like signup/reset).
+    if (!isValidPinFormat(newPin)) {
+      return reply.code(400).send({ field: "newPin", error: "New PIN must be 4 digits" });
+    }
+    if (isWeakPin(newPin)) {
+      return reply.code(400).send({ field: "newPin", error: "Choose a less predictable PIN" });
+    }
+
+    const userId = auth.user.id;
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return reply.code(404).send({ error: "User not found" });
+
+    // AC3: verify the CURRENT PIN before rotating. Argon2 verify always runs
+    // (against a dummy hash when no PIN is set) so the failure path keeps the
+    // same timing regardless of account state.
+    const matches = await verifyPin(user.pinHash ?? DUMMY_PIN_HASH, currentPin);
+    if (!matches) {
+      return reply.code(400).send({ field: "currentPin", error: "Current PIN is incorrect" });
+    }
+
+    const pinHash = await hashPin(newPin);
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ pinHash }).where(eq(users.id, userId));
+      // DoD#4: audited. Never store the raw PIN (only that a change happened).
+      await audit(tx, {
+        actor: userId,
+        action: "parent.pin.change",
+        target: { table: "users", id: userId },
+        payload: { ip: req.ip, user_agent: req.headers["user-agent"] ?? null },
+      });
+    });
+
+    // Invalidate every existing session so a leaked cookie can't survive the
+    // re-auth event (mirrors auth.reset.completed).
+    await sessions.destroyAllForUser(userId);
+
+    return reply.code(200).send({ ok: true });
   });
 }
