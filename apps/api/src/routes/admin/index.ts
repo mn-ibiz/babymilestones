@@ -7,6 +7,7 @@ import { registerAdminAutoCredit } from "./auto-credit.js";
 import { registerAdminServices } from "./services.js";
 import { registerAdminStaff } from "./staff.js";
 import { registerAdminSmsConfig } from "./sms-config.js";
+import { registerAdminSmsTemplates } from "./sms-templates.js";
 
 export interface AdminDeps {
   db: Database;
@@ -22,4 +23,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminServices(app, deps);
   registerAdminStaff(app, deps);
   registerAdminSmsConfig(app, deps);
+  registerAdminSmsTemplates(app, deps);
 }

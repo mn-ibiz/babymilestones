@@ -1,5 +1,5 @@
 # generated: 2026-05-24 23:30
-# last_updated: 2026-05-25 06:05
+# last_updated: 2026-05-25 07:00
 # project: Baby Milestones
 # project_key: BM
 # tracking_system: file-system
@@ -98,10 +98,10 @@ development_status:
   epic-8-retrospective: optional
 
   # Epic 9 — SMS Stub Adapter + Config  (source E09)
-  epic-9: in-progress
+  epic-9: done
   9-1-adapter-interface-stub-implementation: done  # P1-E09-S01
   9-2-admin-config-table-for-sender-id-url: done  # P1-E09-S02
-  9-3-templates-registered-versioned: ready-for-dev  # P1-E09-S03
+  9-3-templates-registered-versioned: done  # P1-E09-S03
   epic-9-retrospective: optional
 
   # Epic 10 — Admin Console Shell & RBAC  (source E10)

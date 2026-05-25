@@ -1409,3 +1409,19 @@ export interface SmsConfigPublic {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Public shape of a registered SMS template (P1-E09-S03). The admin read-only
+ * view (AC3) consumes this. `body` carries `{placeholder}` tokens; `version` +
+ * `isActive` expose the versioning so an operator can see what is live.
+ */
+export interface SmsTemplatePublic {
+  id: string;
+  key: string;
+  language: string;
+  version: number;
+  body: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -65,6 +65,47 @@ it("send() returns a queued id and writes a rendered sms_outbox row (AC1, AC2)",
   }
 });
 
+it("send() resolves the registered DB template by key and interpolates data (P1-E09-S03)", async () => {
+  const { db, close } = await createTestDb();
+  try {
+    const result = await new StubSmsSender(db).send({
+      to: "+254712345678",
+      template: "topup.success",
+      data: { amountKes: 1500 },
+    });
+    const rows = await db.select().from(smsOutbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(result.id);
+    // Body comes from the seeded sms_templates row, not an inline string.
+    expect(rows[0]!.body).toBe("A top-up of KES 1500 was added to your wallet.");
+    expect(rows[0]!.template).toBe("topup.success");
+  } finally {
+    await close();
+  }
+});
+
+it("send() falls back to the in-code renderer for unregistered keys (e.g. raw)", async () => {
+  const { db, close } = await createTestDb();
+  try {
+    await new StubSmsSender(db).send({ to: "+254712345678", template: "raw", data: { body: "hi" } });
+    const rows = await db.select().from(smsOutbox);
+    expect(rows[0]!.body).toBe("hi");
+  } finally {
+    await close();
+  }
+});
+
+it("send() throws on a template key that is neither registered nor in-code", async () => {
+  const { db, close } = await createTestDb();
+  try {
+    await expect(
+      new StubSmsSender(db).send({ to: "+254712345678", template: "nope.unknown", data: {} }),
+    ).rejects.toThrow(/unknown template/);
+  } finally {
+    await close();
+  }
+});
+
 it("createSmsSender selects the stub by default and on provider=stub (AC3)", async () => {
   const { db, close } = await createTestDb();
   try {

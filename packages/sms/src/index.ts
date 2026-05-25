@@ -2,9 +2,20 @@ import { eq } from "drizzle-orm";
 import { parents, smsOutbox } from "@bm/db";
 import type { Database, Transaction } from "@bm/db";
 import { type SmsTemplateData, renderTemplate } from "./templates.js";
+import { getActiveTemplate, interpolateTemplate } from "./template-store.js";
 
 export { renderTemplate } from "./templates.js";
 export type { SmsTemplateData, SmsTemplateKey } from "./templates.js";
+export {
+  resolveTemplate,
+  interpolateTemplate,
+  getActiveTemplate,
+  listTemplateVersions,
+  listActiveTemplates,
+  toPublicSmsTemplate,
+  DEFAULT_TEMPLATE_LANGUAGE,
+} from "./template-store.js";
+export type { PublicSmsTemplate, TemplateExecutor } from "./template-store.js";
 export { checkProviderUrlSafety, isSafeProviderUrl } from "./url-safety.js";
 export type { UrlSafetyResult, UrlSafetyReason } from "./url-safety.js";
 export {
@@ -59,6 +70,25 @@ export interface SmsSender {
 }
 
 /**
+ * Render the SMS body for a template key at send time (P1-E09-S03). The DB
+ * registry (`sms_templates`) is authoritative: if an active template is
+ * registered for the key, its versioned body is interpolated from `data` (AC2).
+ * Keys NOT in the registry fall back to the in-code renderer — this keeps the
+ * passthrough templates (`raw`, pre-rendered receipts) working without forcing
+ * a DB row, while all registered copy is DB-driven and versioned. An unknown
+ * key in neither place throws (unknown-key handled).
+ */
+async function resolveBody(
+  db: SmsExecutor,
+  template: string,
+  data: SmsTemplateData,
+): Promise<string> {
+  const registered = await getActiveTemplate(db, template);
+  if (registered) return interpolateTemplate(registered.body, data);
+  return renderTemplate(template, data);
+}
+
+/**
  * Stub sender (P1-E09-S01, consolidating P1-E01-S05). "Delivers" a message by
  * rendering the template body and recording it in `sms_outbox`; it never calls
  * an external API (AC2). Tests read the row back. The row `id` is the queued id.
@@ -68,7 +98,7 @@ export class StubSmsSender implements SmsSender {
 
   async send(payload: SmsPayload): Promise<SmsResult> {
     const data = payload.data ?? {};
-    const body = renderTemplate(payload.template, data);
+    const body = await resolveBody(this.db, payload.template, data);
     const [row] = await this.db
       .insert(smsOutbox)
       .values({

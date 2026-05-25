@@ -12,6 +12,7 @@ export * from "./bookings.js";
 export * from "./otp.js";
 export * from "./sms.js";
 export * from "./sms-config.js";
+export * from "./sms-templates.js";
 export * from "./permissions.js";
 export * from "./data-exports.js";
 export * from "./mpesa.js";
