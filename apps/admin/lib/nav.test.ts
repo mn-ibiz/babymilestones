@@ -42,6 +42,8 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(hrefs).toContain("/sms-config");
     // P1-E10-S03: admin holds read:audit, so the audit log viewer is visible.
     expect(hrefs).toContain("/audit");
+    // P1-E10-S04: admin holds manage:config, so Settings is visible.
+    expect(hrefs).toContain("/settings");
     // admin holds manage:user/service/config but not manage:float
     expect(hrefs).not.toContain("/treasury/float-accounts");
   });
@@ -53,6 +55,8 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(hrefs).not.toContain("/staff");
     // accountant does not hold read:audit.
     expect(hrefs).not.toContain("/audit");
+    // accountant lacks manage:config → no Settings.
+    expect(hrefs).not.toContain("/settings");
   });
 
   it("an unknown role sees nothing", () => {

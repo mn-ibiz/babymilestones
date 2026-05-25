@@ -10,6 +10,7 @@ import { registerAdminUsers } from "./users.js";
 import { registerAdminSmsConfig } from "./sms-config.js";
 import { registerAdminSmsTemplates } from "./sms-templates.js";
 import { registerAdminAudit } from "./audit.js";
+import { registerAdminSettings } from "./settings.js";
 
 export interface AdminDeps {
   db: Database;
@@ -28,4 +29,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminSmsConfig(app, deps);
   registerAdminSmsTemplates(app, deps);
   registerAdminAudit(app, deps);
+  registerAdminSettings(app, deps);
 }

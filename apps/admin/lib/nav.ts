@@ -128,6 +128,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // P1-E10-S03: read-only audit log viewer. Gates on `read audit` — admin +
   // super_admin only (treasury/accountant do not hold it).
   { href: "/audit", label: "Audit log", permission: { action: "read", resource: "audit" } },
+  // P1-E10-S04: system-wide Settings area. Gates on `manage config` — admin +
+  // super_admin. The treasury-gated float sub-section is enforced server-side.
+  { href: "/settings", label: "Settings", permission: { action: "manage", resource: "config" } },
 ];
 
 /**

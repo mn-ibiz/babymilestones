@@ -23,3 +23,4 @@ export * from "./reconciliation-adjustments.js";
 export * from "./services.js";
 export * from "./staff.js";
 export * from "./receipts.js";
+export * from "./settings.js";

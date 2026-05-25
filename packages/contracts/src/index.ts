@@ -1596,3 +1596,83 @@ export function auditLogEventsToCsv(events: readonly AuditLogEvent[]): string {
   }
   return lines.join("\r\n") + "\r\n";
 }
+
+/* ------------------------------------------------- settings sub-app (P1-E10-S04) */
+
+/**
+ * General app-setting section keys backed by the generic `settings` key/value
+ * table (P1-E10-S04). Sections with a dedicated table of their own — SMS
+ * provider config and float accounts — are NOT listed here; the Settings area
+ * links to those existing surfaces instead of storing them.
+ */
+export const SETTING_KEYS = ["loyalty", "branding", "receipt_branding"] as const;
+export type SettingKey = (typeof SETTING_KEYS)[number];
+
+/** Narrow an arbitrary string to a known general-settings section key. */
+export function isSettingKey(value: string): value is SettingKey {
+  return (SETTING_KEYS as readonly string[]).includes(value);
+}
+
+/** Hex colour (3- or 6-digit, leading #) used by branding sections. */
+export const hexColourSchema = z
+  .string()
+  .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/u, "Must be a hex colour like #1a2b3c");
+
+/**
+ * Loyalty rates (AC1). `earnRatePer100` = loyalty points earned per KES 100
+ * spent; `redeemValuePerPoint` = KES value of one point at redemption. Both
+ * non-negative; redemption capped at 100% so a point can never be worth more
+ * than face value here.
+ */
+export const loyaltySettingsSchema = z.object({
+  earnRatePer100: z.number().min(0, "Earn rate must be ≥ 0").max(1000),
+  redeemValuePerPoint: z.number().min(0, "Redeem value must be ≥ 0").max(100),
+});
+export type LoyaltySettings = z.infer<typeof loyaltySettingsSchema>;
+
+/** Branding: store name + logo URL + primary/secondary colours (AC1). */
+export const brandingSettingsSchema = z.object({
+  storeName: z.string().trim().min(1, "Store name is required").max(120),
+  logoUrl: z.string().trim().url("Logo must be a valid URL").max(2048).optional(),
+  primaryColour: hexColourSchema,
+  secondaryColour: hexColourSchema.optional(),
+});
+export type BrandingSettings = z.infer<typeof brandingSettingsSchema>;
+
+/** Receipt branding: header/footer lines + whether to show the logo (AC1). */
+export const receiptBrandingSettingsSchema = z.object({
+  headerLine: z.string().trim().max(120).optional(),
+  footerLine: z.string().trim().max(240).optional(),
+  showLogo: z.boolean(),
+});
+export type ReceiptBrandingSettings = z.infer<typeof receiptBrandingSettingsSchema>;
+
+/** Per-key validator map: each general settings section to its payload schema. */
+export const SETTING_SCHEMAS = {
+  loyalty: loyaltySettingsSchema,
+  branding: brandingSettingsSchema,
+  receipt_branding: receiptBrandingSettingsSchema,
+} as const satisfies Record<SettingKey, z.ZodTypeAny>;
+
+/** Default payload for a general settings section before an admin first saves it. */
+export const SETTING_DEFAULTS: { [K in SettingKey]: z.infer<(typeof SETTING_SCHEMAS)[K]> } = {
+  loyalty: { earnRatePer100: 0, redeemValuePerPoint: 0 },
+  branding: { storeName: "Baby Milestones", primaryColour: "#000000" },
+  receipt_branding: { showLogo: false },
+};
+
+/**
+ * Validate a setting payload against the schema for `key`. Returns the parsed
+ * (typed) value or the first issue's message — the API maps this onto a 400.
+ */
+export function parseSettingValue(
+  key: SettingKey,
+  value: unknown,
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: string; field?: string } {
+  const parsed = SETTING_SCHEMAS[key].safeParse(value ?? {});
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { ok: false, error: first?.message ?? "Invalid input", field: first?.path[0] as string };
+  }
+  return { ok: true, value: parsed.data as Record<string, unknown> };
+}
