@@ -52,3 +52,28 @@ export function ageLabel(child: Pick<Child, "dateOfBirth">): string {
   const months = ageInMonths(child.dateOfBirth);
   return months === 1 ? "1 month" : `${months} months`;
 }
+
+/** Max characters of the allergies note shown on a card before truncating. */
+const ALLERGIES_SUMMARY_MAX = 60;
+
+/**
+ * Short allergies summary for a child card (AC1). Empty/whitespace notes show a
+ * friendly "No known allergies"; long notes are truncated with an ellipsis.
+ */
+export function allergiesSummary(child: Pick<Child, "allergiesNotes">): string {
+  const notes = (child.allergiesNotes ?? "").trim();
+  if (notes.length === 0) return "No known allergies";
+  if (notes.length <= ALLERGIES_SUMMARY_MAX) return notes;
+  return `${notes.slice(0, ALLERGIES_SUMMARY_MAX - 1).trimEnd()}…`;
+}
+
+/**
+ * Split children into active and archived buckets (AC1 lists active cards; AC3
+ * lists archived ones under their own section). Archived === archivedAt set.
+ */
+export function partitionChildren(all: Child[]): { active: Child[]; archived: Child[] } {
+  const active: Child[] = [];
+  const archived: Child[] = [];
+  for (const c of all) (c.archivedAt === null ? active : archived).push(c);
+  return { active, archived };
+}

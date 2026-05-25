@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Child } from "@bm/contracts";
-import { draftFromChild, validateChildDraft, ageLabel, emptyChildDraft } from "./children.js";
+import {
+  draftFromChild,
+  validateChildDraft,
+  ageLabel,
+  emptyChildDraft,
+  allergiesSummary,
+  partitionChildren,
+} from "./children.js";
 
 const child: Child = {
   id: "c1",
@@ -62,5 +69,35 @@ describe("validateChildDraft (AC1)", () => {
 describe("ageLabel (AC2)", () => {
   it("singularises one month", () => {
     expect(ageLabel({ dateOfBirth: new Date().toISOString().slice(0, 10) })).toBe("0 months");
+  });
+});
+
+describe("allergiesSummary (AC1 — allergies summary on the card)", () => {
+  it("shows a friendly fallback when there are no notes", () => {
+    expect(allergiesSummary({ allergiesNotes: null })).toBe("No known allergies");
+    expect(allergiesSummary({ allergiesNotes: "" })).toBe("No known allergies");
+    expect(allergiesSummary({ allergiesNotes: "   " })).toBe("No known allergies");
+  });
+  it("returns the trimmed note verbatim when short", () => {
+    expect(allergiesSummary({ allergiesNotes: "  Peanuts " })).toBe("Peanuts");
+  });
+  it("truncates a long note with an ellipsis", () => {
+    const long = "a".repeat(80);
+    const summary = allergiesSummary({ allergiesNotes: long });
+    expect(summary.endsWith("…")).toBe(true);
+    expect(summary.length).toBeLessThan(long.length);
+  });
+});
+
+describe("partitionChildren (AC1/AC3 — active vs archived)", () => {
+  const active: Child = { ...child, id: "a", archivedAt: null };
+  const archived: Child = { ...child, id: "b", archivedAt: "2026-01-01T00:00:00.000Z" };
+  it("splits a list into active and archived buckets", () => {
+    const { active: a, archived: ar } = partitionChildren([active, archived]);
+    expect(a.map((c) => c.id)).toEqual(["a"]);
+    expect(ar.map((c) => c.id)).toEqual(["b"]);
+  });
+  it("handles an empty list", () => {
+    expect(partitionChildren([])).toEqual({ active: [], archived: [] });
   });
 });

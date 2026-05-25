@@ -2,34 +2,45 @@
 
 import { useEffect, useState } from "react";
 import type { Child } from "@bm/contracts";
-import { ageLabel, draftFromChild, type ChildDraft } from "../../lib/children";
+import {
+  ageLabel,
+  allergiesSummary,
+  draftFromChild,
+  partitionChildren,
+  type ChildDraft,
+} from "../../../lib/children";
 import {
   addChild,
   archiveChild,
   fetchChildren,
+  restoreChild,
   setPhotoConsent,
   updateChild,
-} from "../../lib/children-api";
-import { ChildForm } from "../components/ChildForm";
+} from "../../../lib/children-api";
+import { ChildForm } from "../../components/ChildForm";
 
 /**
- * Parent children registry (P1-E02-S03 AC1, AC3, AC4). Lists active children
- * with their derived age (AC2), and supports add / edit / archive. Archived
- * children are hidden from the list but never hard-deleted server-side.
+ * Parent children registry (P1-E11-S02). Mobile-first. Lists active children as
+ * cards showing name, derived age in months and an allergies summary (AC1).
+ * Supports add / edit / archive (AC2). Archived children live under their own
+ * "Archived" section with a restore action (AC3). All data flows through the
+ * ownership-scoped epic-2-3 endpoints — the server enforces ownership.
  */
 export default function ChildrenPage() {
   const [kids, setKids] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Child | null>(null);
   const [adding, setAdding] = useState(false);
 
   async function reload() {
-    const all = await fetchChildren();
-    setKids(all.filter((c) => c.archivedAt === null));
+    setKids(await fetchChildren());
   }
 
   useEffect(() => {
-    reload().finally(() => setLoading(false));
+    reload()
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load children"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleAdd(draft: ChildDraft) {
@@ -50,24 +61,36 @@ export default function ChildrenPage() {
     await reload();
   }
 
+  async function handleRestore(child: Child) {
+    await restoreChild(child.id);
+    await reload();
+  }
+
   async function handlePhotoConsent(child: Child, photoConsent: boolean) {
     await setPhotoConsent(child.id, photoConsent);
     await reload();
   }
 
   if (loading) return <main>Loading…</main>;
+  if (error) return <main role="alert">{error}</main>;
+
+  const { active, archived } = partitionChildren(kids);
 
   return (
     <main>
       <h1>Your children</h1>
 
-      {kids.length === 0 && <p>No children added yet.</p>}
-      <ul>
-        {kids.map((child) => (
+      {active.length === 0 && <p>No children added yet.</p>}
+      <ul aria-label="Active children">
+        {active.map((child) => (
           <li key={child.id}>
-            <span>
-              {child.firstName} {child.lastName ?? ""} — {ageLabel(child)}
-            </span>
+            <p>
+              <strong>
+                {child.firstName} {child.lastName ?? ""}
+              </strong>{" "}
+              — {ageLabel(child)}
+            </p>
+            <p>{allergiesSummary(child)}</p>
             <label>
               <input
                 type="checkbox"
@@ -105,6 +128,24 @@ export default function ChildrenPage() {
         <button type="button" onClick={() => setAdding(true)}>
           Add a child
         </button>
+      )}
+
+      {archived.length > 0 && (
+        <section aria-label="Archived children">
+          <h2>Archived</h2>
+          <ul>
+            {archived.map((child) => (
+              <li key={child.id}>
+                <span>
+                  {child.firstName} {child.lastName ?? ""} — {ageLabel(child)}
+                </span>
+                <button type="button" onClick={() => handleRestore(child)}>
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );

@@ -65,6 +65,16 @@ export async function archiveChild(id: string): Promise<Child> {
   return unwrapChild(res);
 }
 
+/** POST to restore a soft-deleted child — clears archived_at (AC3). */
+export async function restoreChild(id: string): Promise<Child> {
+  const res = await fetch(`/parents/me/children/${id}/restore`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "x-csrf-token": readCsrfToken() },
+  });
+  return unwrapChild(res);
+}
+
 /** PUT a child's photo consent flag (P1-E02-S04 AC1, AC2). */
 export async function setPhotoConsent(id: string, photoConsent: boolean): Promise<Child> {
   const res = await fetch(`/parents/me/children/${id}/consent/photo`, {

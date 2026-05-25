@@ -213,6 +213,59 @@ describe("children registry routes (P1-E02-S03)", () => {
     expect(row!.archivedAt).toBeNull();
   });
 
+  // --- Restore archived child (P1-E11-S02 AC3) ---
+
+  it("restores a soft-deleted child, clears archived_at, audits child.restored (AC3)", async () => {
+    const created = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+    await app.inject({ method: "DELETE", url: `/parents/me/children/${created.id}`, headers: authed() });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/parents/me/children/${created.id}/restore`,
+      headers: authed(),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().child.archivedAt).toBeNull();
+
+    const [row] = await dbh.db.select().from(children).where(eq(children.id, created.id));
+    expect(row!.archivedAt).toBeNull();
+
+    const events = await dbh.db.select().from(auditOutbox);
+    expect(events.some((e) => e.action === "child.restored")).toBe(true);
+  });
+
+  it("rejects an unauthenticated / CSRF-less restore", async () => {
+    const created = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+    await app.inject({ method: "DELETE", url: `/parents/me/children/${created.id}`, headers: authed() });
+
+    const noAuth = await app.inject({
+      method: "POST",
+      url: `/parents/me/children/${created.id}/restore`,
+    });
+    expect(noAuth.statusCode).toBe(401);
+    const noCsrf = await app.inject({
+      method: "POST",
+      url: `/parents/me/children/${created.id}/restore`,
+      headers: { cookie: parent.sessionCookie },
+    });
+    expect(noCsrf.statusCode).toBe(403);
+  });
+
+  it("enforces ownership on restore — 404 for another parent's child (AC3)", async () => {
+    const other = await makeParent(app, dbh.db, "+254799999999", "0799999999");
+    const mine = (await addChild({ firstName: "Zola", dateOfBirth: "2024-01-15" })).json().child;
+    await app.inject({ method: "DELETE", url: `/parents/me/children/${mine.id}`, headers: authed() });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/parents/me/children/${mine.id}/restore`,
+      headers: authed(other),
+    });
+    expect(res.statusCode).toBe(404);
+    const [row] = await dbh.db.select().from(children).where(eq(children.id, mine.id));
+    expect(row!.archivedAt).toBeInstanceOf(Date);
+  });
+
   // --- Photo consent (P1-E02-S04) ---
 
   const setPhotoConsent = (id: string, body: Record<string, unknown>, p = parent) =>

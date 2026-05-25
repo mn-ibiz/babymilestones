@@ -198,6 +198,38 @@ export function registerParentChildren(app: FastifyInstance, { db, sessions }: P
     return reply.code(200).send({ child: result });
   });
 
+  // POST /parents/me/children/:id/restore — undo a soft-delete by clearing
+  // archived_at (P1-E11-S02 AC3). Ownership-scoped; audited child.restored.
+  app.post<{ Params: { id: string } }>("/parents/me/children/:id/restore", async (req, reply) => {
+    const ctx = await requireParent(req, reply);
+    if (!ctx) return;
+    const childId = req.params.id;
+
+    const result = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(children)
+        .where(and(eq(children.id, childId), eq(children.parentId, ctx.parentId)));
+      if (!existing) return null;
+
+      const [updated] = await tx
+        .update(children)
+        .set({ archivedAt: null, updatedAt: new Date() })
+        .where(and(eq(children.id, childId), eq(children.parentId, ctx.parentId)))
+        .returning();
+      await audit(tx, {
+        actor: ctx.userId,
+        action: "child.restored",
+        target: { table: "children", id: childId },
+        payload: { ip: req.ip, user_agent: req.headers["user-agent"] ?? null },
+      });
+      return toChild(updated!);
+    });
+
+    if (!result) return reply.code(404).send({ error: "Child not found" });
+    return reply.code(200).send({ child: result });
+  });
+
   // PUT /parents/me/children/:id/consent/photo — toggle a child's photo consent
   // (P1-E02-S04 AC1, AC2). Ownership-scoped like every other child verb; the
   // change is audited with a timestamp (AC2).
