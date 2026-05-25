@@ -51,3 +51,4 @@ STORY 8-2-receipt-writer-interface | RESULT done | fixed=0 | deferred=2 | reason
 STORY 8-3-receipt-pdf-render | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E08-S03)
 STORY 8-4-receipt-reprint | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E08-S04)
 STORY 8-5-receipt-void-reversing-entry | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E08-S05)
+STORY 9-1-adapter-interface-stub-implementation | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E09-S01)
