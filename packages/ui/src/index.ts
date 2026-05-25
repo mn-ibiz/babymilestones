@@ -45,6 +45,36 @@ export {
   RECEIPT_BUSINESS_NAME,
 } from "./receipt-preview.js";
 
+// ── X7-S03 compound components for P1 surfaces ──────────────────────────────
+export {
+  WalletBalanceCard,
+  type WalletBalanceCardProps,
+} from "./wallet-balance-card.js";
+export {
+  ChildCard,
+  formatChildAge,
+  type ChildCardProps,
+} from "./child-card.js";
+export {
+  MpesaPushPrompt,
+  type MpesaPushPromptProps,
+} from "./mpesa-push-prompt.js";
+export {
+  ReceiptPreview,
+  type ReceiptPreviewProps,
+} from "./receipt-preview-card.js";
+export {
+  ParentShellLayout,
+  type ParentShellLayoutProps,
+  type LinkRenderProps,
+} from "./parent-shell-layout.js";
+export {
+  StaffShellLayout,
+  isStaffNavActive,
+  type StaffShellLayoutProps,
+  type StaffNavItem,
+} from "./staff-shell-layout.js";
+
 // Full KRA-shaped receipt render (P1-E08-S03) — A4 HTML + 80mm thermal.
 export {
   toReceiptDocument,

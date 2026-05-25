@@ -1,0 +1,264 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChildCard > matches the visual snapshot 1`] = `
+<div
+  class="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
+>
+  <div
+    class="flex items-baseline justify-between gap-2"
+  >
+    <span
+      class="text-base font-semibold text-neutral-900"
+    >
+      Amara Otieno
+    </span>
+    <span
+      class="text-sm text-neutral-500"
+    >
+      2 yrs 4 mo
+    </span>
+  </div>
+  <p
+    class="mt-2 text-sm text-danger"
+  >
+    ⚠ 
+    Peanuts
+  </p>
+</div>
+`;
+
+exports[`MpesaPushPrompt > matches the visual snapshot 1`] = `
+<div
+  aria-live="polite"
+  class="rounded-lg border p-4 border-neutral-200 bg-white text-neutral-900"
+  role="status"
+>
+  <div
+    class="text-sm font-medium text-neutral-500"
+  >
+    M-Pesa top-up · KES 
+    500
+  </div>
+  <p
+    class="mt-1 text-base"
+  >
+    Check your phone and enter your M-Pesa PIN to confirm.
+  </p>
+  <p
+    class="mt-1 text-xs text-neutral-500"
+  >
+    Sent to 
+    +254712345678
+  </p>
+</div>
+`;
+
+exports[`ParentShellLayout > matches the visual snapshot 1`] = `
+<div
+  class="flex min-h-dvh flex-col bg-neutral-50"
+>
+  <main
+    class="flex-1 p-4"
+  >
+    <p>
+      body
+    </p>
+  </main>
+  <nav
+    aria-label="Parent navigation"
+    class="sticky bottom-0 grid grid-cols-4 border-t border-neutral-200 bg-white"
+  >
+    <a
+      aria-current="page"
+      class="flex flex-col items-center gap-1 py-2 text-xs text-primary-600 font-medium"
+      href="/home"
+    >
+      Home
+    </a>
+    <a
+      class="flex flex-col items-center gap-1 py-2 text-xs text-neutral-500"
+      href="/wallet"
+    >
+      Wallet
+    </a>
+    <a
+      class="flex flex-col items-center gap-1 py-2 text-xs text-neutral-500"
+      href="/children"
+    >
+      Children
+    </a>
+    <a
+      class="flex flex-col items-center gap-1 py-2 text-xs text-neutral-500"
+      href="/profile"
+    >
+      Profile
+    </a>
+  </nav>
+</div>
+`;
+
+exports[`ReceiptPreview > matches the visual snapshot 1`] = `
+<div
+  class="rounded-lg border border-neutral-200 bg-white p-4 text-neutral-900 shadow-sm"
+>
+  <header
+    class="border-b border-neutral-200 pb-2 text-center"
+  >
+    <div
+      class="text-base font-semibold"
+    >
+      Baby Milestones
+    </div>
+    <div
+      class="text-xs text-neutral-500"
+    >
+      BM-2026-000123
+    </div>
+  </header>
+  <table
+    class="mt-3 w-full text-sm"
+  >
+    <tbody>
+      <tr>
+        <td
+          class="py-1"
+        >
+          Soft play — 2h
+        </td>
+        <td
+          class="py-1 text-right tabular-nums"
+        >
+          KES 500.00
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr
+        class="border-t border-neutral-200 font-semibold"
+      >
+        <td
+          class="pt-2"
+        >
+          Total
+        </td>
+        <td
+          class="pt-2 text-right tabular-nums"
+        >
+          KES 500.00
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+  <footer
+    class="mt-3 space-y-0.5 text-xs text-neutral-500"
+  >
+    <div>
+      Paid by 
+      M-Pesa
+    </div>
+    <div>
+      Amara Otieno
+    </div>
+    <div>
+      ••••5678
+    </div>
+  </footer>
+</div>
+`;
+
+exports[`StaffShellLayout > matches the visual snapshot 1`] = `
+<div
+  class="flex min-h-dvh bg-neutral-50"
+>
+  <nav
+    aria-label="Staff navigation"
+    class="flex w-48 flex-col gap-1 border-r border-neutral-200 bg-white p-3"
+  >
+    <a
+      class="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
+      href="/reception"
+    >
+      Reception
+    </a>
+    <a
+      aria-current="page"
+      class="rounded-md px-3 py-2 text-sm bg-primary-50 font-medium text-primary-700"
+      href="/receipts"
+    >
+      Receipts
+    </a>
+  </nav>
+  <div
+    class="flex flex-1 flex-col"
+  >
+    <header
+      class="border-b border-neutral-200 bg-white px-4 py-3"
+    >
+      <h1
+        class="text-lg font-semibold text-neutral-900"
+      >
+        Receipts
+      </h1>
+    </header>
+    <main
+      class="flex-1 p-4"
+    >
+      <p>
+        body
+      </p>
+    </main>
+  </div>
+</div>
+`;
+
+exports[`WalletBalanceCard > matches the visual snapshot 1`] = `
+<div
+  class="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
+>
+  <div
+    class="text-sm font-medium text-neutral-500"
+  >
+    Wallet balance
+  </div>
+  <div
+    class="mt-1 text-3xl font-semibold text-neutral-900"
+  >
+    KES 500.00
+  </div>
+  <dl
+    class="mt-4 grid grid-cols-2 gap-4"
+  >
+    <div>
+      <dt
+        class="text-xs text-neutral-500"
+      >
+        Outstanding
+      </dt>
+      <dd
+        class="text-lg font-medium text-danger"
+        data-testid="wallet-outstanding"
+      >
+        KES 120.00
+      </dd>
+    </div>
+    <div>
+      <dt
+        class="text-xs text-neutral-500"
+      >
+        Loyalty points
+      </dt>
+      <dd
+        class="text-lg font-medium text-neutral-900"
+      >
+        30
+      </dd>
+    </div>
+  </dl>
+  <p
+    class="mt-3 text-xs text-neutral-500"
+  >
+    Auto top-up 
+    off
+  </p>
+</div>
+`;
