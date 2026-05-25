@@ -1212,6 +1212,48 @@ export const servicePriceCreateSchema = z.object({
 });
 export type ServicePriceCreateInput = z.infer<typeof servicePriceCreateSchema>;
 
+/* --- Staff data records (P1-E07-S03) ------------------------------------- */
+
+/** Max length of a staff display name. */
+export const STAFF_NAME_MAX = 120;
+
+/**
+ * Staff role enum (P1-E07-S03 AC1). REUSES the {@link ATTRIBUTION_ROLES}
+ * taxonomy so a staff member's role aligns 1:1 with the attribution role a
+ * service may require (P1-E07-S02). These are NOT system RBAC roles.
+ */
+export const STAFF_ROLES = ATTRIBUTION_ROLES;
+export type StaffRole = AttributionRole;
+
+/**
+ * Create a staff member (P1-E07-S03 AC1/AC2). Required: a non-empty display name
+ * and a role from the constrained taxonomy. Staff are created active; there is NO
+ * auth association (no PIN, no phone). Commission rate is out of scope (P3-E01).
+ */
+export const staffCreateSchema = z.object({
+  displayName: z.string().trim().min(1, "Name is required").max(STAFF_NAME_MAX),
+  role: z.enum(STAFF_ROLES, { message: `role must be one of: ${STAFF_ROLES.join(", ")}` }),
+});
+export type StaffCreateInput = z.infer<typeof staffCreateSchema>;
+
+/**
+ * Update a staff member (P1-E07-S03 AC2/AC4). All fields optional (partial
+ * patch). `active` toggles soft-retirement (the API stamps/clears
+ * `terminatedAt`). A rename mutates only the live row — past attributions keep
+ * their name-at-time snapshot (AC4). At least one field must be present.
+ */
+export const staffUpdateSchema = z
+  .object({
+    displayName: z.string().trim().min(1, "Name is required").max(STAFF_NAME_MAX).optional(),
+    role: z.enum(STAFF_ROLES, { message: `role must be one of: ${STAFF_ROLES.join(", ")}` }).optional(),
+    active: z.boolean().optional(),
+  })
+  .refine(
+    (v) => v.displayName !== undefined || v.role !== undefined || v.active !== undefined,
+    "at least one field is required",
+  );
+export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;
+
 /** RFC-4180 escape: quote a field if it has a comma, quote, CR or LF. */
 function csvField(value: string): string {
   return /[",\r\n]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
