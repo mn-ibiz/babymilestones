@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (X7-S04 brand assets pipeline done; epic-14 done)
+last_updated: 2026-05-25 (X8-S01 structured logging + error tracking done; @bm/observability added)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -147,8 +147,8 @@ development_status:
   epic-14-retrospective: optional
 
   # Epic 15 — X8 — Observability, Backups, CI/CD  (source X8)
-  epic-15: ready-for-dev
-  15-1-structured-logging-error-tracking: ready-for-dev  # X8-S01
+  epic-15: in-progress
+  15-1-structured-logging-error-tracking: done  # X8-S01
   15-2-health-endpoints: ready-for-dev  # X8-S02
   15-3-daily-db-backup-retention: ready-for-dev  # X8-S03
   15-4-ci-cd-pipelines-per-app: ready-for-dev  # X8-S04

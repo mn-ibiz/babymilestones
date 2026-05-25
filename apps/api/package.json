@@ -19,6 +19,7 @@
     "@bm/auth": "workspace:*",
     "@bm/db": "workspace:*",
     "@bm/export": "workspace:*",
+    "@bm/observability": "workspace:*",
     "@bm/sms": "workspace:*",
     "@bm/wallet": "workspace:*",
     "@bm/payments": "workspace:*",

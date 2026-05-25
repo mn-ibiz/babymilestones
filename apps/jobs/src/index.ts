@@ -1,4 +1,5 @@
 import { register, registered } from "./registry.js";
+import { logger } from "./logger.js";
 import { createDataExportJob } from "./jobs/data-export.js";
 import { createWalletStatementJob } from "./jobs/wallet-statement.js";
 import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
@@ -42,4 +43,6 @@ export function registerAuditDrainJob(
   register(createAuditDrainJob(deps));
 }
 
-console.log(`jobs worker booted; registered: ${registered().join(", ") || "none"}`);
+export { logger } from "./logger.js";
+
+logger.info({ event: "jobs.boot", registered: registered() }, "jobs worker booted");

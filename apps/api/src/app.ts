@@ -1,5 +1,17 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyBaseLogger,
+  type FastifyError,
+} from "fastify";
 import { randomBytes } from "node:crypto";
+import {
+  createLogger,
+  resolveCorrelationId,
+  CORRELATION_ID_HEADER,
+  NoopErrorTracker,
+  type ErrorTracker,
+  type LogDestination,
+} from "@bm/observability";
 import type { Database } from "@bm/db";
 import {
   InMemoryConsumedTokenStore,
@@ -75,6 +87,15 @@ export interface AppDeps {
    * Paystack routes are not registered (no real network is ever attempted).
    */
   paystack?: PaystackRouteConfig;
+  /**
+   * Structured-logging + error-tracking wiring (X8-S01). Defaults to a pino JSON
+   * logger writing to stdout, a generated correlation id per request, and a
+   * no-op error tracker (the real Sentry-style provider is deferred). Tests
+   * inject a capture stream / in-memory tracker.
+   */
+  logStream?: LogDestination;
+  logLevel?: string;
+  errorTracker?: ErrorTracker;
 }
 
 /** Build Paystack config from env (production). Returns null if not fully set. */
@@ -106,7 +127,49 @@ function mpesaConfigFromEnv(): MpesaRouteConfig | null {
 
 /** Build the single API surface that serves all front-end apps. */
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
-  const app = Fastify({ logger: false });
+  // X8-S01: canonical pino JSON logger with secret/PII redaction. The
+  // correlation id becomes Fastify's request id (`req.id`), so it is stamped on
+  // every request-scoped log line and propagated downstream.
+  const logger = createLogger(
+    { service: "api", level: deps.logLevel ?? process.env.LOG_LEVEL ?? "info" },
+    deps.logStream,
+  );
+  const errorTracker = deps.errorTracker ?? new NoopErrorTracker();
+
+  const app: FastifyInstance = Fastify({
+    // pino satisfies Fastify's logger contract at runtime; the cast keeps the
+    // public buildApp return type the default FastifyBaseLogger.
+    loggerInstance: logger as unknown as FastifyBaseLogger,
+    genReqId: (req) =>
+      resolveCorrelationId(req.headers[CORRELATION_ID_HEADER] as string | string[] | undefined),
+    // Stamp the correlation id on every request-scoped log line. Fastify sets
+    // `id` on the raw request before building the child logger.
+    childLoggerFactory: (root, bindings, opts, req) =>
+      root.child(
+        { ...bindings, correlationId: (req as { id?: string }).id },
+        opts,
+      ),
+  });
+
+  // Surface the correlation id back to the caller.
+  app.addHook("onRequest", async (req, reply) => {
+    reply.header(CORRELATION_ID_HEADER, req.id);
+  });
+
+  // X8-S01 (AC2): forward thrown errors to the error tracker, tagged with the
+  // correlation id, before Fastify's default reply handling.
+  app.setErrorHandler((error: FastifyError, req, reply) => {
+    errorTracker.captureException(error, {
+      correlationId: req.id,
+      tags: { method: req.method, url: req.url },
+    });
+    req.log.error({ err: error }, "request errored");
+    const statusCode = error.statusCode ?? 500;
+    reply.status(statusCode).send({
+      error: statusCode >= 500 ? "Internal Server Error" : error.message,
+    });
+  });
+
   app.get("/healthz", async () => ({ status: "ok" }));
 
   if (deps.db && deps.sessions) {
