@@ -6,7 +6,12 @@ import type {
   ParentSearchResult,
   ReceptionTopupMethod,
   ReceptionTopupResponse,
+  RecentTransactionsResponse,
 } from "@bm/contracts";
+import {
+  recentTransactionsViewModel,
+  fullStatementHref,
+} from "../../lib/recent-transactions";
 import {
   SEARCH_DEBOUNCE_MS,
   shouldSearch,
@@ -168,6 +173,60 @@ function TopUpSheet({ parentId, onClose }: { parentId: string; onClose: () => vo
   );
 }
 
+/**
+ * Recent-transactions panel (P1-E05-S05). Rendered below the parent header, it
+ * fetches the latest 10 ledger postings for the parent and lists each with date,
+ * kind, amount, and running balance-after (AC1), newest-first. A "View full
+ * statement" link opens the P1-E03-S08 export rather than re-implementing it
+ * (AC2). All display formatting lives in the pure `recent-transactions` lib.
+ */
+function RecentTransactionsPanel({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<ReturnType<typeof recentTransactionsViewModel>>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoaded(false);
+    (async () => {
+      try {
+        const res = await fetch(`/api/reception/parents/${userId}/recent-transactions`, {
+          credentials: "include",
+        });
+        if (!res.ok || !active) return;
+        const body = (await res.json()) as RecentTransactionsResponse;
+        if (active) setRows(recentTransactionsViewModel(body.transactions));
+      } catch {
+        if (active) setRows([]);
+      } finally {
+        if (active) setLoaded(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  return (
+    <section aria-label="Recent transactions">
+      <h3>Recent transactions</h3>
+      <a href={fullStatementHref(userId)}>View full statement</a>
+      {loaded && rows.length === 0 && <p role="status">No transactions yet.</p>}
+      {rows.length > 0 && (
+        <ul aria-label="Recent transactions list">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <span>{r.dateLabel}</span>
+              <span>{r.kind}</span>
+              <span>{r.amountLabel}</span>
+              <span>Balance {r.balanceAfterLabel}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function ReceptionSearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ParentSearchResult[]>([]);
@@ -286,6 +345,8 @@ export default function ReceptionSearchPage() {
             <dt>Last visit</dt>
             <dd>{formatLastVisit(selected.lastVisitAt)}</dd>
           </dl>
+          {/* AC1/AC2: latest 10 ledger postings + "View full statement" link. */}
+          <RecentTransactionsPanel userId={selected.userId} />
         </section>
       )}
     </main>

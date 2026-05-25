@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E05-S04 done; epic-5 in-progress)
+last_updated: 2026-05-25 (P1-E05-S05 done; epic-5 in-progress)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -68,7 +68,7 @@ development_status:
   5-2-parent-profile-header-with-wallet-outstanding-auto: done  # P1-E05-S02
   5-3-reception-top-up-cash-m-pesa-paystack: done  # P1-E05-S03
   5-4-record-a-service-visit: done  # P1-E05-S04
-  5-5-recent-transactions-panel: ready-for-dev  # P1-E05-S05
+  5-5-recent-transactions-panel: done  # P1-E05-S05
   5-6-print-sms-stub-receipt-from-reception: ready-for-dev  # P1-E05-S06
   epic-5-retrospective: optional
 

@@ -683,3 +683,37 @@ export function isProfileComplete(profile: ParentProfile | null | undefined): bo
   if (!profile) return false;
   return profile.firstName.trim().length > 0 && profile.lastName.trim().length > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Recent transactions panel (P1-E05-S05)
+// ---------------------------------------------------------------------------
+
+/** Default cap on Reception's recent-transactions panel (AC1: "last 10"). */
+export const RECENT_TRANSACTIONS_LIMIT = 10;
+
+/**
+ * One recent wallet-ledger posting for the Reception panel (AC1), newest-first.
+ * Carries the running balance *after* the posting (computed, never stored) so
+ * staff can answer "did this go through?". Amounts are integer cents — format
+ * to KES at the edge.
+ */
+export interface RecentTransaction {
+  id: string;
+  /** ISO timestamp the posting was made. */
+  createdAt: string;
+  /** `topup` | `debit` | `refund` | `adjustment` | `reversal`. */
+  kind: string;
+  /** `credit` | `debit`. */
+  direction: string;
+  /** Signed integer cents (credits positive, debits negative). */
+  amountCents: number;
+  /** Origin of the movement (e.g. `mpesa`, `cash:reception`, `checkin`, `admin`). */
+  source: string;
+  /** Running wallet balance (cents) after this posting. */
+  balanceAfterCents: number;
+}
+
+/** Recent-transactions response: the windowed list, newest-first (AC1). */
+export interface RecentTransactionsResponse {
+  transactions: RecentTransaction[];
+}

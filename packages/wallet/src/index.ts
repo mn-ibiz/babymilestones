@@ -35,6 +35,10 @@ export {
 } from "./statement.js";
 export type { StatementInput, StatementRange } from "./statement.js";
 
+// Recent-transactions panel read helper (P1-E05-S05).
+export { recentTransactions, RECENT_TRANSACTIONS_LIMIT } from "./recent.js";
+export type { RecentTransaction, RecentTransactionsOptions } from "./recent.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
