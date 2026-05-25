@@ -42,3 +42,4 @@ STORY 6-1-configure-float-accounts-per-till-per-bank | RESULT done | fixed=1 | d
 STORY 6-2-daily-reconciliation-screen | RESULT done | fixed=0 | deferred=4 | reason=none  (P1-E06-S02)
 STORY 6-3-treasury-role-permissions | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E06-S03)
 STORY 6-4-export-float-reconciliation-for-the-accountant | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E06-S04)
+STORY 7-1-crud-services-with-effective-dated-price-history | RESULT done | fixed=1 | deferred=0 | reason=none  (P1-E07-S01)
