@@ -53,3 +53,4 @@ STORY 8-4-receipt-reprint | RESULT done | fixed=0 | deferred=1 | reason=none  (P
 STORY 8-5-receipt-void-reversing-entry | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E08-S05)
 STORY 9-1-adapter-interface-stub-implementation | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E09-S01)
 STORY 9-2-admin-config-table-for-sender-id-url | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E09-S02)
+STORY 9-3-templates-registered-versioned | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E09-S03)
