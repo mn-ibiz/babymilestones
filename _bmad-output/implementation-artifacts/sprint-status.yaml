@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (X5-S02 async drain worker → audit_log projection done)
+last_updated: 2026-05-25 (X5-S03 audit catalogue done; epic-13 X5 complete)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -132,10 +132,10 @@ development_status:
   epic-12-retrospective: optional
 
   # Epic 13 — X5 — Audit Log (outbox)  (source X5)
-  epic-13: in-progress
+  epic-13: done
   13-1-audit-outbox-table-write-helper: done  # X5-S01
   13-2-async-drain-worker-audit-log-projection: done  # X5-S02
-  13-3-audit-catalogue-what-gets-audited: ready-for-dev  # X5-S03
+  13-3-audit-catalogue-what-gets-audited: done  # X5-S03
   epic-13-retrospective: optional
 
   # Epic 14 — X7 — Design System Foundation  (source X7)

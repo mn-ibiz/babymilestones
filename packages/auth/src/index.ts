@@ -51,6 +51,14 @@ export {
   type Role,
 } from "./staff.js";
 export {
+  AUDIT_ACTION_CATALOGUE,
+  AUDIT_ACTIONS,
+  auditAction,
+  isAuditAction,
+  type AuditAction,
+  type AuditActionCategory,
+} from "./audit-actions.js";
+export {
   ACTIONS,
   RESOURCES,
   ALL,
