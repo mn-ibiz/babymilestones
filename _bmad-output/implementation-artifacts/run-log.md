@@ -50,3 +50,4 @@ STORY 8-1-receipt-schema-with-nullable-etims-fields | RESULT done | fixed=0 | de
 STORY 8-2-receipt-writer-interface | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E08-S02)
 STORY 8-3-receipt-pdf-render | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E08-S03)
 STORY 8-4-receipt-reprint | RESULT done | fixed=0 | deferred=1 | reason=none  (P1-E08-S04)
+STORY 8-5-receipt-void-reversing-entry | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E08-S05)
