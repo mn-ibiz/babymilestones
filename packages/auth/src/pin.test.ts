@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashPin, isValidPinFormat, isWeakPin, verifyPin } from "./pin.js";
+import { generatePin, hashPin, isValidPinFormat, isWeakPin, verifyPin } from "./pin.js";
 
 describe("pin format + weak list (P1-E01-S01)", () => {
   it("requires exactly 4 digits", () => {
@@ -26,5 +26,15 @@ describe("argon2id hashing (AC5)", () => {
     const h = await hashPin("1357");
     expect(await verifyPin(h, "1357")).toBe(true);
     expect(await verifyPin(h, "1358")).toBe(false);
+  });
+});
+
+describe("generatePin (P1-E10-S02 — admin-issued initial/reset PIN)", () => {
+  it("always returns a valid, non-weak 4-digit PIN", () => {
+    for (let i = 0; i < 500; i += 1) {
+      const pin = generatePin();
+      expect(isValidPinFormat(pin)).toBe(true);
+      expect(isWeakPin(pin)).toBe(false);
+    }
   });
 });

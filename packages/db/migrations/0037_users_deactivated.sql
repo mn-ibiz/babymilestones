@@ -1,0 +1,11 @@
+-- P1-E10-S02: staff login-user management (CRUD). Additive-only.
+--
+-- A staff login user (a `users` row with a non-parent role) may be DEACTIVATED
+-- by a super-admin/admin without a hard delete (auth + audit history must keep
+-- referencing the row). Soft deactivation stamps `deactivated_at`; reactivation
+-- clears it. NULL = active (every existing row stays valid).
+--
+-- The staff-login flow rejects a user whose `deactivated_at` is set, and a
+-- deactivation also destroys the user's live sessions (handled in @bm/auth at
+-- the route layer) so access is revoked immediately.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at timestamptz;

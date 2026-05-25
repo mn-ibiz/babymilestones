@@ -1,4 +1,5 @@
 import { hash, verify } from "@node-rs/argon2";
+import { randomInt } from "node:crypto";
 
 // Predictable PINs rejected at signup (P1-E01-S01 AC4).
 const WEAK_PINS = new Set(["0000", "1234", "1111", "2580", "9999"]);
@@ -9,6 +10,19 @@ export function isValidPinFormat(pin: string): boolean {
 
 export function isWeakPin(pin: string): boolean {
   return WEAK_PINS.has(pin);
+}
+
+/**
+ * Cryptographically-random 4-digit PIN that is never weak (P1-E10-S02). Used to
+ * auto-generate an initial/reset PIN for a staff login user the super-admin then
+ * relays once. Uses `crypto.randomInt` (not `Math.random`) and re-rolls past the
+ * weak list so the generated value is always acceptable to the login flow.
+ */
+export function generatePin(): string {
+  for (;;) {
+    const pin = String(randomInt(0, 10_000)).padStart(4, "0");
+    if (!isWeakPin(pin)) return pin;
+  }
 }
 
 /** argon2id hash. The raw PIN is never logged or echoed (AC5). */

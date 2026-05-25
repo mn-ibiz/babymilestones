@@ -1425,3 +1425,80 @@ export interface SmsTemplatePublic {
   createdAt: string;
   updatedAt: string;
 }
+
+/* --- Staff login users (P1-E10-S02) -------------------------------------- */
+
+/**
+ * System staff login roles (P1-E10-S02). These are the RBAC roles a staff
+ * LOGIN user may hold — every role in the `@bm/auth` taxonomy EXCEPT `parent`
+ * (parents are not created from the admin console). Mirrored here (rather than
+ * imported from `@bm/auth`, which pulls the native argon2 binding into the Next
+ * bundle) — kept in lockstep with `@bm/auth.STAFF_ROLES` by the contracts test.
+ *
+ * NOTE: distinct from {@link STAFF_ROLES} (the attribution-role taxonomy for
+ * booking *data records*, P1-E07-S03). These are auth/RBAC roles for *logins*.
+ */
+export const SYSTEM_STAFF_ROLES = [
+  "reception",
+  "cashier",
+  "packer",
+  "accountant",
+  "treasury",
+  "admin",
+  "super_admin",
+] as const;
+export type SystemStaffRole = (typeof SYSTEM_STAFF_ROLES)[number];
+
+/** True when `value` is a creatable staff login role. */
+export function isSystemStaffRole(value: unknown): value is SystemStaffRole {
+  return typeof value === "string" && (SYSTEM_STAFF_ROLES as readonly string[]).includes(value);
+}
+
+const systemStaffRoleSchema = z.enum(SYSTEM_STAFF_ROLES, {
+  message: `role must be one of: ${SYSTEM_STAFF_ROLES.join(", ")}`,
+});
+
+/** Optional 4-digit initial/reset PIN. When omitted the API auto-generates one. */
+const optionalPinSchema = z
+  .string()
+  .regex(/^\d{4}$/u, "PIN must be 4 digits")
+  .optional();
+
+/**
+ * Create a staff login user (P1-E10-S02 AC1). Phone (a valid KE mobile — the API
+ * normalises it), a system staff role, and an optional initial PIN (auto-
+ * generated + returned once for the super-admin when omitted). No `parent` role.
+ */
+export const adminUserCreateSchema = z.object({
+  phone: z.string().min(1, "Phone is required"),
+  role: systemStaffRoleSchema,
+  pin: optionalPinSchema,
+});
+export type AdminUserCreateInput = z.infer<typeof adminUserCreateSchema>;
+
+/**
+ * Edit a staff login user (P1-E10-S02 AC2). All fields optional (partial patch):
+ * change `role` (which invalidates the user's sessions, 1-6 AC4) and/or toggle
+ * `active` (soft deactivate/reactivate; deactivation also invalidates sessions).
+ * At least one field must be present.
+ */
+export const adminUserUpdateSchema = z
+  .object({
+    role: systemStaffRoleSchema.optional(),
+    active: z.boolean().optional(),
+  })
+  .refine(
+    (v) => v.role !== undefined || v.active !== undefined,
+    "at least one field is required",
+  );
+export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateSchema>;
+
+/** Public shape of a staff login user — never includes the PIN hash (AC: no leakage). */
+export interface AdminUserPublic {
+  id: string;
+  phone: string;
+  role: SystemStaffRole;
+  active: boolean;
+  deactivatedAt: string | null;
+  createdAt: string;
+}

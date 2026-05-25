@@ -22,6 +22,7 @@ interface StaffLoginBody {
 // whether the phone exists (anti-enumeration, parity with parent login).
 const INVALID = { error: "Invalid credentials" };
 const NOT_STAFF = { error: "Not a staff account" };
+const DEACTIVATED = { error: "Account deactivated" };
 
 /**
  * POST /auth/staff/login — admin/reception/cashier (and other staff roles) log
@@ -82,6 +83,18 @@ export function registerStaffLogin(
         payload: { ip, user_agent: req.headers["user-agent"] ?? null, reason: "not_staff" },
       });
       return reply.code(403).send(NOT_STAFF);
+    }
+
+    // P1-E10-S02: a soft-deactivated staff login is rejected even with correct
+    // credentials (authn ok, account disabled) — a 403, audited as a failure.
+    if (user.deactivatedAt) {
+      await audit(db, {
+        actor: user.id,
+        action: "auth.staff.login.failure",
+        target: { table: "users", id: user.id },
+        payload: { ip, user_agent: req.headers["user-agent"] ?? null, reason: "deactivated" },
+      });
+      return reply.code(403).send(DEACTIVATED);
     }
 
     rateLimiter.reset(phone, ip);

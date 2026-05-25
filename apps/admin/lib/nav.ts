@@ -101,6 +101,9 @@ export interface NavItem {
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/staff", label: "Staff", permission: { action: "manage", resource: "user" } },
+  // P1-E10-S02: staff LOGIN users (phone/role/PIN) — distinct from the `/staff`
+  // attribution data records (P1-E07-S03). Both gate on `manage user`.
+  { href: "/users", label: "Staff logins", permission: { action: "manage", resource: "user" } },
   { href: "/services", label: "Services", permission: { action: "manage", resource: "service" } },
   {
     href: "/treasury/float-accounts",
