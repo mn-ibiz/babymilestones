@@ -1,6 +1,6 @@
 # Story 16.4: Reception books on behalf of a walk-in
 
-Status: backlog
+Status: ready-for-dev
 
 > Canonical ID: P2-E01-S04 · Phase: P2 · Source: _bmad-output/planning-artifacts/stories/p2/P2-E01-S04.md
 

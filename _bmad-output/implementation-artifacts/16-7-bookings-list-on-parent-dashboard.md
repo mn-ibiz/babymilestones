@@ -1,6 +1,6 @@
 # Story 16.7: Bookings list on parent dashboard
 
-Status: backlog
+Status: ready-for-dev
 
 > Canonical ID: P2-E01-S07 · Phase: P2 · Source: _bmad-output/planning-artifacts/stories/p2/P2-E01-S07.md
 

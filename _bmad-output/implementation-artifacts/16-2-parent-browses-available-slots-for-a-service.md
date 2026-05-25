@@ -1,6 +1,6 @@
 # Story 16.2: Parent browses available slots for a service
 
-Status: backlog
+Status: ready-for-dev
 
 > Canonical ID: P2-E01-S02 · Phase: P2 · Source: _bmad-output/planning-artifacts/stories/p2/P2-E01-S02.md
 

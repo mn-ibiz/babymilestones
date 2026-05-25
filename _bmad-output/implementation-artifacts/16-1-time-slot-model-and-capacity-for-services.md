@@ -1,6 +1,6 @@
 # Story 16.1: Time-slot model and capacity for services
 
-Status: backlog
+Status: ready-for-dev
 
 > Canonical ID: P2-E01-S01 · Phase: P2 · Source: _bmad-output/planning-artifacts/stories/p2/P2-E01-S01.md
 

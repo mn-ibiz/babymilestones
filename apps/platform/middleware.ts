@@ -21,13 +21,28 @@ const SESSION_COOKIE_NAME = "bm_session";
 const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/_next", "/favicon.ico"];
 
 /**
- * The marketing home (P1-E12-S01) lives at the exact root `/` in the public
- * route group and must render for first-time, unauthenticated visitors. The
- * authed dashboard now lives at `/home`, so `/` is matched exactly (not as a
- * prefix, which would expose every path).
+ * Exact public marketing routes in the `(public)` route group: the home page
+ * (P1-E12-S01) at `/` plus one per-unit page (P1-E12-S02) at `/play`,
+ * `/talent`, `/salon`, `/events`, `/coaching`. All must render for first-time,
+ * unauthenticated visitors. There is deliberately no `/shop` route — the Toy
+ * Shop is the external WooCommerce site.
+ */
+const PUBLIC_EXACT_PATHS = new Set([
+  "/",
+  "/play",
+  "/talent",
+  "/salon",
+  "/events",
+  "/coaching",
+]);
+
+/**
+ * The marketing pages live at exact paths in the public route group. The authed
+ * dashboard lives under `/home`, so these are matched exactly (not as prefixes,
+ * which would expose every nested path).
  */
 function isPublicPath(pathname: string): boolean {
-  if (pathname === "/") return true;
+  if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 
