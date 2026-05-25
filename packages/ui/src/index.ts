@@ -1,5 +1,14 @@
 export { tokens, tailwindPreset } from "@bm/config";
 
+// Parent dashboard shell nav model (P1-E11-S05) — pure, framework-free.
+export {
+  PARENT_NAV_ITEMS,
+  activeNavHref,
+  isNavItemActive,
+  type ParentNavItem,
+  type ParentNavKey,
+} from "./parent-shell.js";
+
 // Reception receipt template (P1-E05-S06) — browser-printable HTML + SMS copy.
 export {
   renderReceiptHtml,

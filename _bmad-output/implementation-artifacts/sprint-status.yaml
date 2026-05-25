@@ -1,5 +1,5 @@
 # generated: 2026-05-24 23:30
-# last_updated: 2026-05-25 09:00
+# last_updated: 2026-05-25 (P1-E11-S05 bottom nav + mobile-first shell done)
 # project: Baby Milestones
 # project_key: BM
 # tracking_system: file-system
@@ -115,12 +115,12 @@ development_status:
   epic-10-retrospective: optional
 
   # Epic 11 — Parent Dashboard MVP  (source E11)
-  epic-11: in-progress
+  epic-11: done
   11-1-wallet-page-balance-outstanding-statement: done  # P1-E11-S01
   11-2-children-list-and-profile-management: done  # P1-E11-S02
   11-3-top-up-flow-from-dashboard: done  # P1-E11-S03
   11-4-profile-consent-management: done  # P1-E11-S04
-  11-5-bottom-nav-mobile-first-shell: ready-for-dev  # P1-E11-S05
+  11-5-bottom-nav-mobile-first-shell: done  # P1-E11-S05
   epic-11-retrospective: optional
 
   # Epic 12 — Marketing & Landing  (source E12)
@@ -155,14 +155,14 @@ development_status:
   epic-15-retrospective: optional
 
   # Epic 16 — Booking Engine  (P2-E01)
-  epic-16: backlog
-  16-1-time-slot-model-and-capacity-for-services: backlog  # P2-E01-S01
-  16-2-parent-browses-available-slots-for-a-service: backlog  # P2-E01-S02
-  16-3-parent-books-a-slot-creates-pending-invoice: backlog  # P2-E01-S03
-  16-4-reception-books-on-behalf-of-a-walk-in: backlog  # P2-E01-S04
-  16-5-parent-reschedules-a-booking: backlog  # P2-E01-S05
-  16-6-parent-or-reception-cancels-a-booking: backlog  # P2-E01-S06
-  16-7-bookings-list-on-parent-dashboard: backlog  # P2-E01-S07
+  epic-16: ready-for-dev
+  16-1-time-slot-model-and-capacity-for-services: ready-for-dev  # P2-E01-S01
+  16-2-parent-browses-available-slots-for-a-service: ready-for-dev  # P2-E01-S02
+  16-3-parent-books-a-slot-creates-pending-invoice: ready-for-dev  # P2-E01-S03
+  16-4-reception-books-on-behalf-of-a-walk-in: ready-for-dev  # P2-E01-S04
+  16-5-parent-reschedules-a-booking: ready-for-dev  # P2-E01-S05
+  16-6-parent-or-reception-cancels-a-booking: ready-for-dev  # P2-E01-S06
+  16-7-bookings-list-on-parent-dashboard: ready-for-dev  # P2-E01-S07
   epic-16-retrospective: optional
 
   # Epic 17 — Subscription Plans (Play & Talent)  (P2-E02)
