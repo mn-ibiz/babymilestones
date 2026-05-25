@@ -2,12 +2,15 @@ import { register, registered } from "./registry.js";
 import { createDataExportJob } from "./jobs/data-export.js";
 import { createWalletStatementJob } from "./jobs/wallet-statement.js";
 import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
+import { createAuditDrainJob } from "./jobs/audit-drain.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
 export type { StatementRequest } from "./jobs/wallet-statement.js";
 export { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 export type { MpesaReconcileJobDeps, MpesaQuerier } from "./jobs/mpesa-reconcile.js";
+export { createAuditDrainJob } from "./jobs/audit-drain.js";
+export type { AuditDrainJobDeps, Projector } from "./jobs/audit-drain.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -30,6 +33,13 @@ export function registerMpesaReconcileJob(
   deps: Parameters<typeof createMpesaReconcileJob>[0],
 ): void {
   register(createMpesaReconcileJob(deps));
+}
+
+/** Wire the async audit drain worker (X5-S02 AC1: 5s cadence → audit_log). */
+export function registerAuditDrainJob(
+  deps: Parameters<typeof createAuditDrainJob>[0],
+): void {
+  register(createAuditDrainJob(deps));
 }
 
 console.log(`jobs worker booted; registered: ${registered().join(", ") || "none"}`);
