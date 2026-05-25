@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E08-S01 done)
+last_updated: 2026-05-25 (P1-E08-S02 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -91,7 +91,7 @@ development_status:
   # Epic 8 — Receipt Engine (KRA-shaped)  (source E08)
   epic-8: in-progress
   8-1-receipt-schema-with-nullable-etims-fields: done  # P1-E08-S01
-  8-2-receipt-writer-interface: ready-for-dev  # P1-E08-S02
+  8-2-receipt-writer-interface: done  # P1-E08-S02
   8-3-receipt-pdf-render: ready-for-dev  # P1-E08-S03
   8-4-receipt-reprint: ready-for-dev  # P1-E08-S04
   8-5-receipt-void-reversing-entry: ready-for-dev  # P1-E08-S05

@@ -55,3 +55,21 @@ export {
   BankTransferAmountError,
 } from "./bank/topup.js";
 export type { BankTransferConfirmInput, BankCharge } from "./bank/topup.js";
+
+// Receipt writer interface — the single KRA/eTIMS seam (P1-E08-S02).
+export {
+  writeReceipt,
+  defaultReceiptWriter,
+  formatReceiptNumber,
+  LocalReceiptWriter,
+  EtimsReceiptWriter,
+  EtimsNotImplementedError,
+} from "./receipts/index.js";
+export type {
+  ReceiptWriter,
+  ReceiptWriterExecutor,
+  WriteReceiptPayload,
+  WriteReceiptLine,
+  Receipt,
+  ReceiptLine,
+} from "./receipts/index.js";
