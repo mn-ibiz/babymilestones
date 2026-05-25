@@ -18,7 +18,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE_NAME = "bm_session";
 
 /** Path prefixes that never require a session. */
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/_next", "/favicon.ico"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/book", "/_next", "/favicon.ico"];
 
 /**
  * Exact public marketing routes in the `(public)` route group: the home page

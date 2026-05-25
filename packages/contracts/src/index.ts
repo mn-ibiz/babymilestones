@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AcquisitionSource } from "./utm.js";
 
 /** Kenyan phone, normalised to +2547XXXXXXXX. */
 export const phoneSchema = z
@@ -105,6 +106,11 @@ export interface ParentProfile {
   residentialArea: string | null;
   /** SMS marketing opt-in (P1-E02-S04 AC1) — defaults false. */
   smsMarketingOptIn: boolean;
+  /**
+   * Acquisition attribution (P1-E12-S03 AC2): the UTM payload that drove the
+   * signup (set once at profile creation), or null for an organic signup.
+   */
+  acquisitionSource: AcquisitionSource | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1723,3 +1729,8 @@ export function parseSettingValue(
   }
   return { ok: true, value: parsed.data as Record<string, unknown> };
 }
+
+// ---------------------------------------------------------------------------
+// WhatsApp deep-link + UTM acquisition attribution (P1-E12-S03)
+// ---------------------------------------------------------------------------
+export * from "./utm.js";

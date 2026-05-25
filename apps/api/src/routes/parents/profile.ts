@@ -15,6 +15,7 @@ import {
   smsConsentSchema,
   pinChangeSchema,
   isProfileComplete,
+  acquisitionSourceSchema,
   type ParentProfile,
 } from "@bm/contracts";
 import type { ParentsDeps } from "./index.js";
@@ -28,6 +29,7 @@ function toProfile(row: ParentRow): ParentProfile {
     email: row.email,
     residentialArea: row.residentialArea,
     smsMarketingOptIn: row.smsMarketingOptIn,
+    acquisitionSource: row.acquisitionSource ?? null,
   };
 }
 
@@ -85,6 +87,16 @@ export function registerParentProfile(app: FastifyInstance, { db, sessions }: Pa
     const input = parsed.data;
     const userId = auth.user.id;
 
+    // P1-E12-S03 AC2: a WhatsApp-ad signup forwards the captured UTM here. It is
+    // set ONCE, at first profile creation (the signup moment) — never overwritten
+    // on a later edit, so attribution reflects how the parent first arrived. A
+    // malformed/empty payload is ignored (best-effort: attribution must never
+    // block profile save).
+    const acqParsed = acquisitionSourceSchema.safeParse(
+      (req.body as { acquisitionSource?: unknown } | null)?.acquisitionSource,
+    );
+    const acquisitionSource = acqParsed.success ? acqParsed.data : null;
+
     const profile = await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(parents).where(eq(parents.userId, userId));
       let row: ParentRow;
@@ -103,7 +115,8 @@ export function registerParentProfile(app: FastifyInstance, { db, sessions }: Pa
           .returning();
         row = updated!;
       } else {
-        // AC1: create the inline profile.
+        // AC1: create the inline profile. P1-E12-S03 AC2: stamp acquisition
+        // source (if a deep-link forwarded one) at creation only.
         const [created] = await tx
           .insert(parents)
           .values({
@@ -112,6 +125,7 @@ export function registerParentProfile(app: FastifyInstance, { db, sessions }: Pa
             lastName: input.lastName,
             email: input.email,
             residentialArea: input.residentialArea,
+            acquisitionSource: acquisitionSource ?? undefined,
           })
           .returning();
         row = created!;

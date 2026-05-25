@@ -146,6 +146,54 @@ describe("PUT/GET /parents/me (P1-E02-S01)", () => {
     expect(after.json().profile.firstName).toBe("Aminah");
   });
 
+  // --- Acquisition attribution from WhatsApp deep-link (P1-E12-S03 AC2) ---
+
+  it("persists the captured UTM to parents.acquisition_source on signup (AC2)", async () => {
+    const res = await put({
+      firstName: "Amina",
+      lastName: "Otieno",
+      acquisitionSource: { source: "whatsapp", campaign: "play-launch" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().profile.acquisitionSource).toEqual({
+      source: "whatsapp",
+      campaign: "play-launch",
+    });
+
+    const [row] = await dbh.db.select().from(parents).where(eq(parents.userId, userId));
+    expect(row!.acquisitionSource).toEqual({ source: "whatsapp", campaign: "play-launch" });
+  });
+
+  it("leaves acquisition_source null for an organic signup (no UTM)", async () => {
+    const res = await put({ firstName: "Amina", lastName: "Otieno" });
+    expect(res.json().profile.acquisitionSource).toBeNull();
+    const [row] = await dbh.db.select().from(parents).where(eq(parents.userId, userId));
+    expect(row!.acquisitionSource).toBeNull();
+  });
+
+  it("does not overwrite acquisition_source on a later profile edit (set-once)", async () => {
+    await put({
+      firstName: "Amina",
+      lastName: "Otieno",
+      acquisitionSource: { source: "whatsapp" },
+    });
+    // A later edit forwarding a different/no source must not rewrite attribution.
+    await put({ firstName: "Aminah", lastName: "Otieno", acquisitionSource: { source: "google" } });
+    const [row] = await dbh.db.select().from(parents).where(eq(parents.userId, userId));
+    expect(row!.acquisitionSource).toEqual({ source: "whatsapp" });
+  });
+
+  it("ignores a malformed acquisition payload (attribution never blocks save)", async () => {
+    const res = await put({
+      firstName: "Amina",
+      lastName: "Otieno",
+      acquisitionSource: { evil: "x".repeat(999) },
+    });
+    expect(res.statusCode).toBe(200);
+    const [row] = await dbh.db.select().from(parents).where(eq(parents.userId, userId));
+    expect(row!.acquisitionSource).toBeNull();
+  });
+
   // --- SMS marketing consent (P1-E02-S04) ---
 
   const putConsent = (body: Record<string, unknown>, opts: { auth?: boolean; csrf?: boolean } = {}) => {

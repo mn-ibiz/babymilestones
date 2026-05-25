@@ -1,5 +1,19 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+
+/**
+ * Acquisition attribution (P1-E12-S03). The partial UTM payload that drove a
+ * signup, captured from a WhatsApp ad deep-link (`/book/[unit]?utm_*`). Nullable
+ * — an organic signup carries none. Shape mirrors `@bm/contracts`
+ * `AcquisitionSource`; persisted as jsonb.
+ */
+export interface AcquisitionSource {
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  term?: string;
+  content?: string;
+}
 
 /**
  * Parent profile (P1-E02-S01). One profile per user — `userId` is unique, FK to
@@ -20,6 +34,8 @@ export const parents = pgTable("parents", {
   // Consent (P1-E02-S04 AC1). Opt-in marketing SMS — defaults off; the X4 SMS
   // dispatcher reads this before any non-transactional send (AC3).
   smsMarketingOptIn: boolean("sms_marketing_opt_in").notNull().default(false),
+  // Attribution (P1-E12-S03). UTM payload that drove the signup; null = organic.
+  acquisitionSource: jsonb("acquisition_source").$type<AcquisitionSource>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

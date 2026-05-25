@@ -33,6 +33,30 @@ describe("parents table (P1-E02-S01)", () => {
     expect(row!.createdAt).toBeInstanceOf(Date);
   });
 
+  it("stores a jsonb acquisition_source and defaults it to null (P1-E12-S03)", async () => {
+    const userId = await seedUser();
+    const [row] = await dbh.db
+      .insert(parents)
+      .values({
+        userId,
+        firstName: "Amina",
+        lastName: "Otieno",
+        acquisitionSource: { source: "whatsapp", campaign: "play-launch" },
+      })
+      .returning();
+    expect(row!.acquisitionSource).toEqual({ source: "whatsapp", campaign: "play-launch" });
+
+    const [u2] = await dbh.db
+      .insert(users)
+      .values({ phone: "+254700000000", pinHash: "x" })
+      .returning();
+    const [organic] = await dbh.db
+      .insert(parents)
+      .values({ userId: u2!.id, firstName: "B", lastName: "C" })
+      .returning();
+    expect(organic!.acquisitionSource).toBeNull();
+  });
+
   it("enforces one profile per user (unique user_id)", async () => {
     const userId = await seedUser();
     await dbh.db.insert(parents).values({ userId, firstName: "A", lastName: "B" });

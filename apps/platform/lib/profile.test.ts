@@ -14,6 +14,7 @@ const complete: ParentProfile = {
   email: "amina@example.com",
   residentialArea: "Kileleshwa",
   smsMarketingOptIn: false,
+  acquisitionSource: null,
 };
 
 describe("validateDraft (P1-E02-S01 AC2)", () => {
