@@ -68,3 +68,4 @@ STORY 12-2-per-unit-pages | RESULT done | fixed=0 | deferred=0 | reason=none  (P
 STORY 12-3-deep-link-from-whatsapp-ads | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E12-S03)
 STORY 12-4-sign-in-sign-up-entry-points | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E12-S04)
 STORY 13-2-async-drain-worker-audit-log-projection | RESULT done | fixed=1 | deferred=3 | reason=none  (X5-S02)
+STORY 13-3-audit-catalogue-what-gets-audited | RESULT done | fixed=0 | deferred=0 | reason=none  (X5-S03)
