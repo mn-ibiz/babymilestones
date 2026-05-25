@@ -54,3 +54,4 @@ STORY 8-5-receipt-void-reversing-entry | RESULT done | fixed=0 | deferred=0 | re
 STORY 9-1-adapter-interface-stub-implementation | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E09-S01)
 STORY 9-2-admin-config-table-for-sender-id-url | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E09-S02)
 STORY 9-3-templates-registered-versioned | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E09-S03)
+STORY 10-1-nav-shell-role-gated-routes | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E10-S01)
