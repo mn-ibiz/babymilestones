@@ -13,6 +13,8 @@ export type {
   MpesaConfig,
   DarajaTransport,
   StkPushInput,
+  StkQueryInput,
+  StkQueryResult,
   Charge,
   CreateMpesaAdapterOptions,
 } from "./mpesa/stkPush.js";

@@ -53,9 +53,33 @@ export interface Charge {
   failureReason?: string;
 }
 
+/** Input to an STK status query (P1-E04-S03): the durable checkout handle. */
+export interface StkQueryInput {
+  /** Daraja CheckoutRequestID returned by the original stkPush. */
+  checkoutRequestId: string;
+}
+
+/**
+ * Result of a Daraja `stkpushquery` (P1-E04-S03). Maps Daraja's transaction
+ * status into the three outcomes the reconciliation cron acts on:
+ * - `success` — the customer paid (ResultCode 0); credit via the idempotent path.
+ * - `failed`  — the customer cancelled / it timed out (non-zero ResultCode); mark FAILED.
+ * - `pending` — Daraja is still processing (no terminal ResultCode yet); retry later.
+ */
+export interface StkQueryResult {
+  provider: "mpesa";
+  status: "success" | "failed" | "pending";
+  checkoutRequestId: string;
+  /** Terminal Daraja ResultCode when known (0 = paid), else null while pending. */
+  resultCode: number | null;
+  resultDesc: string | null;
+}
+
 /** The provider adapter surface (extends as paystack/cash land). */
 export interface MpesaAdapter {
   stkPush(input: StkPushInput): Promise<Charge>;
+  /** Query the status of a previously-initiated STK push (P1-E04-S03). */
+  stkQuery(input: StkQueryInput): Promise<StkQueryResult>;
 }
 
 export class MpesaConfigError extends Error {}
@@ -72,6 +96,18 @@ interface DarajaStkResponse {
   ResponseCode?: string;
   ResponseDescription?: string;
   CustomerMessage?: string;
+  errorMessage?: string;
+}
+
+interface DarajaStkQueryResponse {
+  ResponseCode?: string;
+  ResponseDescription?: string;
+  MerchantRequestID?: string;
+  CheckoutRequestID?: string;
+  /** Terminal result of the STK: "0" paid, non-zero failed/cancelled. */
+  ResultCode?: string;
+  ResultDesc?: string;
+  errorCode?: string;
   errorMessage?: string;
 }
 
@@ -192,6 +228,58 @@ export function createMpesaAdapter(opts: CreateMpesaAdapterOptions): MpesaAdapte
         status: "pending",
         checkoutRequestId: json.CheckoutRequestID ?? null,
         merchantRequestId: json.MerchantRequestID ?? null,
+      };
+    },
+
+    async stkQuery(input: StkQueryInput): Promise<StkQueryResult> {
+      const token = await fetchToken();
+      const timestamp = darajaTimestamp(now());
+      const password = Buffer.from(
+        `${config.shortcode}${config.passkey}${timestamp}`,
+      ).toString("base64");
+
+      const body = {
+        BusinessShortCode: config.shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        CheckoutRequestID: input.checkoutRequestId,
+      };
+
+      const res = await transport(`${config.baseUrl}/mpesa/stkpushquery/v1/query`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        throw new MpesaTransportError(`Daraja stkpushquery failed (${res.status})`);
+      }
+
+      const json = (await res.json()) as DarajaStkQueryResponse;
+
+      // Daraja only attaches a terminal ResultCode once the STK has resolved.
+      // While it is still being processed it returns a non-"0" ResponseCode
+      // (e.g. 500.001.1001 "transaction is being processed") and NO ResultCode.
+      if (json.ResultCode === undefined || json.ResultCode === null) {
+        return {
+          provider: "mpesa",
+          status: "pending",
+          checkoutRequestId: input.checkoutRequestId,
+          resultCode: null,
+          resultDesc: json.ResponseDescription ?? json.errorMessage ?? null,
+        };
+      }
+
+      const resultCode = Number(json.ResultCode);
+      const resolved = Number.isFinite(resultCode) ? resultCode : null;
+      return {
+        provider: "mpesa",
+        status: resolved === 0 ? "success" : "failed",
+        checkoutRequestId: input.checkoutRequestId,
+        resultCode: resolved,
+        resultDesc: json.ResultDesc ?? json.ResponseDescription ?? null,
       };
     },
   };

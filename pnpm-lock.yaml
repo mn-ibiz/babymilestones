@@ -109,6 +109,12 @@ importers:
       '@bm/export':
         specifier: workspace:*
         version: link:../../packages/export
+      '@bm/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
+      '@bm/sms':
+        specifier: workspace:*
+        version: link:../../packages/sms
       '@bm/wallet':
         specifier: workspace:*
         version: link:../../packages/wallet

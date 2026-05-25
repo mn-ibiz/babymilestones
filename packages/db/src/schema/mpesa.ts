@@ -37,8 +37,10 @@ export const mpesaStkRequests = pgTable(
     /** Normalised payer MSISDN (+2547XXXXXXXX) the prompt was sent to. */
     phone: text("phone").notNull(),
     /**
-     * `INITIATED` | `STK_SENT` | `CALLBACK_PENDING` | `SUCCEEDED` | `FAILED` —
-     * CHECK-constrained in the migration. This story only writes the first two.
+     * `INITIATED` | `STK_SENT` | `CALLBACK_PENDING` | `SUCCEEDED` | `FAILED` |
+     * `EXPIRED` — CHECK-constrained in the migration. S01 writes the first two;
+     * S02 advances to SUCCEEDED/FAILED; the S03 reconciliation cron writes
+     * SUCCEEDED/FAILED (recovered) and EXPIRED (stale > 15 min).
      */
     state: text("state").notNull().default("INITIATED"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -209,7 +209,8 @@ export type MpesaStkState =
   | "STK_SENT"
   | "CALLBACK_PENDING"
   | "SUCCEEDED"
-  | "FAILED";
+  | "FAILED"
+  | "EXPIRED";
 
 /** Initiate response (AC2/AC3): the checkout handle the UI polls on. */
 export interface MpesaStkInitiateResponse {

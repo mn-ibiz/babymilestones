@@ -1,10 +1,13 @@
 import { register, registered } from "./registry.js";
 import { createDataExportJob } from "./jobs/data-export.js";
 import { createWalletStatementJob } from "./jobs/wallet-statement.js";
+import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
 export type { StatementRequest } from "./jobs/wallet-statement.js";
+export { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
+export type { MpesaReconcileJobDeps, MpesaQuerier } from "./jobs/mpesa-reconcile.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -20,6 +23,13 @@ export function registerWalletStatementJob(
   deps: Parameters<typeof createWalletStatementJob>[0],
 ): void {
   register(createWalletStatementJob(deps));
+}
+
+/** Wire the M-Pesa reconciliation cron (P1-E04-S03 AC1: 60s cadence). */
+export function registerMpesaReconcileJob(
+  deps: Parameters<typeof createMpesaReconcileJob>[0],
+): void {
+  register(createMpesaReconcileJob(deps));
 }
 
 console.log(`jobs worker booted; registered: ${registered().join(", ") || "none"}`);
