@@ -62,3 +62,4 @@ STORY 11-1-wallet-page-balance-outstanding-statement | RESULT done | fixed=0 | d
 STORY 11-2-children-list-and-profile-management | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E11-S02)
 STORY 11-3-top-up-flow-from-dashboard | RESULT done | fixed=0 | deferred=2 | reason=none  (P1-E11-S03)
 STORY 11-4-profile-consent-management | RESULT done | fixed=0 | deferred=0 | reason=none  (P1-E11-S04)
+STORY 11-5-bottom-nav-mobile-first-shell | RESULT done | fixed=0 | deferred=3 | reason=none  (P1-E11-S05)
