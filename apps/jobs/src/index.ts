@@ -44,5 +44,13 @@ export function registerAuditDrainJob(
 }
 
 export { logger } from "./logger.js";
+export {
+  createHealthServer,
+  evaluateReadiness,
+  type ReadinessCheck,
+  type ReadinessResult,
+  type HealthServer,
+  type HealthServerOptions,
+} from "./health.js";
 
 logger.info({ event: "jobs.boot", registered: registered() }, "jobs worker booted");

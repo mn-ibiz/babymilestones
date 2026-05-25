@@ -34,6 +34,8 @@ import { registerBankRoutes } from "./routes/payments/bank/index.js";
 import { registerReceptionRoutes } from "./routes/reception/index.js";
 import { registerTreasuryRoutes } from "./routes/treasury/index.js";
 import { registerReceiptRoutes } from "./routes/receipts/index.js";
+import { registerHealthRoutes, type ReadinessCheck } from "./routes/health.js";
+import { sql } from "drizzle-orm";
 
 export interface AppDeps {
   db?: Database;
@@ -96,6 +98,20 @@ export interface AppDeps {
   logStream?: LogDestination;
   logLevel?: string;
   errorTracker?: ErrorTracker;
+  /**
+   * Readiness probes for `/health/ready` (X8-S02). Injected/mockable so tests
+   * never touch real infra. When omitted, a DB probe (trivial `SELECT 1`) is
+   * derived from `deps.db` if present; a Redis probe is wired from
+   * `redisPing` when supplied. An app with no dependencies exposes a readiness
+   * endpoint that mirrors liveness.
+   */
+  readinessChecks?: Record<string, ReadinessCheck>;
+  /**
+   * Optional Redis liveness ping (e.g. `() => client.ping()`). When provided it
+   * is added as the `redis` readiness probe. Kept injected so the API never
+   * opens a real Redis connection from config defaults.
+   */
+  redisPing?: () => Promise<unknown>;
 }
 
 /** Build Paystack config from env (production). Returns null if not fully set. */
@@ -183,7 +199,32 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     });
   });
 
+  // Liveness: legacy probe kept for backwards compatibility (load balancers
+  // already point at it). The canonical X8-S02 surface lives under /health/*.
   app.get("/healthz", async () => ({ status: "ok" }));
+
+  // X8-S02: liveness (/health/live) + readiness (/health/ready). Readiness
+  // probes default from the wired dependencies but stay fully injectable.
+  const readinessChecks: Record<string, ReadinessCheck> =
+    deps.readinessChecks ?? {
+      ...(deps.db
+        ? {
+            db: async () => {
+              // Trivial round-trip: proves the connection is reachable without
+              // touching any domain table. Cheap enough for the p95 budget (AC2).
+              await deps.db!.execute(sql`select 1`);
+            },
+          }
+        : {}),
+      ...(deps.redisPing
+        ? {
+            redis: async () => {
+              await deps.redisPing!();
+            },
+          }
+        : {}),
+    };
+  registerHealthRoutes(app, { checks: readinessChecks });
 
   if (deps.db && deps.sessions) {
     registerAuthRoutes(app, {
