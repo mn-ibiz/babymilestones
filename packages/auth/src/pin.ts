@@ -25,9 +25,16 @@ export function generatePin(): string {
   }
 }
 
+// Under test we drop argon2 cost parameters drastically so the (large) auth test
+// suite stays fast and doesn't flake on timeouts. Production keeps the library
+// defaults (strong argon2id). verify() reads params from the hash either way, so
+// a test-cost hash still verifies correctly and the algorithm remains argon2id.
+const IS_TEST = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
+const TEST_OPTS = { memoryCost: 256, timeCost: 1, parallelism: 1 } as const;
+
 /** argon2id hash. The raw PIN is never logged or echoed (AC5). */
 export function hashPin(pin: string): Promise<string> {
-  return hash(pin); // @node-rs/argon2 defaults to argon2id
+  return IS_TEST ? hash(pin, TEST_OPTS) : hash(pin); // @node-rs/argon2 defaults to argon2id
 }
 
 export function verifyPin(pinHash: string, pin: string): Promise<boolean> {
