@@ -22,8 +22,115 @@ import {
   floatAccountCreateSchema,
   floatAccountUpdateSchema,
   floatAccountKindForPaymentMethod,
+  reconciliationExportQuerySchema,
+  reconciliationExportDayCount,
+  reconciliationExportDays,
+  reconciliationRowsToCsv,
+  centsToKes,
+  RECONCILIATION_EXPORT_COLUMNS,
+  RECONCILIATION_EXPORT_MAX_DAYS,
+  type ReconciliationExportRow,
   type ParentProfile,
 } from "./index.js";
+
+describe("reconciliation export contract (P1-E06-S04)", () => {
+  it("accepts a valid inclusive range and rejects from>to (AC1)", () => {
+    expect(
+      reconciliationExportQuerySchema.safeParse({ fromDate: "2026-05-01", toDate: "2026-05-31" })
+        .success,
+    ).toBe(true);
+    expect(
+      reconciliationExportQuerySchema.safeParse({ fromDate: "2026-05-31", toDate: "2026-05-01" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("accepts a single-day range (from == to)", () => {
+    expect(
+      reconciliationExportQuerySchema.safeParse({ fromDate: "2026-05-10", toDate: "2026-05-10" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects malformed and impossible dates", () => {
+    expect(
+      reconciliationExportQuerySchema.safeParse({ fromDate: "01-05-2026", toDate: "2026-05-31" })
+        .success,
+    ).toBe(false);
+    expect(
+      reconciliationExportQuerySchema.safeParse({ fromDate: "2026-13-40", toDate: "2026-13-41" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects ranges over the cap", () => {
+    expect(
+      reconciliationExportQuerySchema.safeParse({ fromDate: "2024-01-01", toDate: "2026-01-01" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("enumerates inclusive days ascending", () => {
+    expect(reconciliationExportDayCount("2026-05-01", "2026-05-03")).toBe(3);
+    expect(reconciliationExportDays("2026-05-01", "2026-05-03")).toEqual([
+      "2026-05-01",
+      "2026-05-02",
+      "2026-05-03",
+    ]);
+    // Crosses a month boundary correctly.
+    expect(reconciliationExportDays("2026-05-31", "2026-06-01")).toEqual(["2026-05-31", "2026-06-01"]);
+    expect(RECONCILIATION_EXPORT_MAX_DAYS).toBeGreaterThan(365);
+  });
+
+  it("renders cents to exact KES decimal strings (no float drift)", () => {
+    expect(centsToKes(0)).toBe("0.00");
+    expect(centsToKes(5)).toBe("0.05");
+    expect(centsToKes(12345)).toBe("123.45");
+    expect(centsToKes(-12345)).toBe("-123.45");
+    expect(centsToKes(100)).toBe("1.00");
+  });
+
+  it("renders rows as RFC-4180 CSV with the AC2 columns", () => {
+    const rows: ReconciliationExportRow[] = [
+      {
+        date: "2026-05-01",
+        floatAccountId: "a1",
+        account: "Main Till",
+        systemCents: 50_000,
+        realCents: 49_000,
+        driftCents: 1_000,
+        adjustmentsCents: -1_000,
+      },
+    ];
+    const csv = reconciliationRowsToCsv(rows);
+    const lines = csv.split("\r\n");
+    expect(lines[0]).toBe(RECONCILIATION_EXPORT_COLUMNS.join(","));
+    expect(lines[0]).toBe("date,account,system_balance_kes,real_balance_kes,drift_kes,adjustments_kes");
+    expect(lines[1]).toBe("2026-05-01,Main Till,500.00,490.00,10.00,-10.00");
+    // trailing CRLF
+    expect(csv.endsWith("\r\n")).toBe(true);
+  });
+
+  it("quotes fields containing commas or quotes (RFC-4180)", () => {
+    const csv = reconciliationRowsToCsv([
+      {
+        date: "2026-05-01",
+        floatAccountId: "a1",
+        account: 'Equity Bank, "Main"',
+        systemCents: 0,
+        realCents: 0,
+        driftCents: 0,
+        adjustmentsCents: 0,
+      },
+    ]);
+    expect(csv).toContain('"Equity Bank, ""Main"""');
+  });
+
+  it("emits header only for an empty row set", () => {
+    const csv = reconciliationRowsToCsv([]);
+    expect(csv).toBe("date,account,system_balance_kes,real_balance_kes,drift_kes,adjustments_kes\r\n");
+  });
+});
 
 describe("paystackInitSchema (P1-E04-S04 AC1, AC4)", () => {
   it("accepts a whole-KES amount within bounds, defaulting saveCard to false", () => {

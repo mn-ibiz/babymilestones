@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { registerFloatAccountRoutes, type FloatAccountsDeps } from "./float-accounts.js";
 import { registerReconciliationRoutes } from "./reconciliation.js";
+import { registerReconciliationExportRoute } from "./reconciliation-export.js";
 
 export interface TreasuryDeps extends FloatAccountsDeps {
   /** Clock injection for the reconciliation `asOf` day (deterministic tests). */
@@ -16,4 +17,5 @@ export interface TreasuryDeps extends FloatAccountsDeps {
 export function registerTreasuryRoutes(app: FastifyInstance, deps: TreasuryDeps): void {
   registerFloatAccountRoutes(app, deps);
   registerReconciliationRoutes(app, deps);
+  registerReconciliationExportRoute(app, deps);
 }

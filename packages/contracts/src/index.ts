@@ -999,3 +999,120 @@ export interface ReconciliationAdjustment {
   reversesAdjustmentId: string | null;
   createdAt: string;
 }
+
+/* --------------------------------------- reconciliation CSV export (P1-E06-S04) */
+
+/**
+ * Reconciliation export request (P1-E06-S04 AC1). The accountant picks an
+ * inclusive date range (YYYY-MM-DD); the export emits one CSV row per day per
+ * float account across `[fromDate, toDate]`. Both bounds are validated calendar
+ * dates and `fromDate <= toDate`. The range is capped to keep a single export
+ * bounded.
+ */
+export const RECONCILIATION_EXPORT_MAX_DAYS = 366;
+
+const exportDateSchema = z
+  .string()
+  .regex(isoDateRegex, "Date must be YYYY-MM-DD")
+  .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), "Date is not a valid calendar date");
+
+export const reconciliationExportQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  })
+  .refine((v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= RECONCILIATION_EXPORT_MAX_DAYS, {
+    message: `Date range may not exceed ${RECONCILIATION_EXPORT_MAX_DAYS} days`,
+    path: ["toDate"],
+  });
+export type ReconciliationExportQuery = z.infer<typeof reconciliationExportQuerySchema>;
+
+/** Inclusive count of calendar days in `[fromDate, toDate]` (both YYYY-MM-DD). */
+export function reconciliationExportDayCount(fromDate: string, toDate: string): number {
+  const from = Date.parse(`${fromDate}T00:00:00Z`);
+  const to = Date.parse(`${toDate}T00:00:00Z`);
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return 0;
+  return Math.floor((to - from) / 86_400_000) + 1;
+}
+
+/** Every YYYY-MM-DD in `[fromDate, toDate]`, inclusive, ascending. */
+export function reconciliationExportDays(fromDate: string, toDate: string): string[] {
+  const count = reconciliationExportDayCount(fromDate, toDate);
+  const days: string[] = [];
+  const start = Date.parse(`${fromDate}T00:00:00Z`);
+  for (let i = 0; i < count; i += 1) {
+    days.push(new Date(start + i * 86_400_000).toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+/**
+ * One row of the reconciliation export (P1-E06-S04 AC2), in integer cents.
+ *
+ * - `systemCents`  — the ledger-derived float liability as of end-of-day `date`
+ *   (opening balance + SUM of movements tagged to the account up to that day).
+ * - `realCents`    — the real-world balance implied by approved adjustments: the
+ *   system figure corrected by the cumulative approved adjustments through the
+ *   day (`system + Σ approved adjustments ≤ day`).
+ * - `driftCents`   — `system − real` (AC2): the still-uncorrected gap.
+ * - `adjustmentsCents` — the net signed approved adjustments dated that very day.
+ */
+export interface ReconciliationExportRow {
+  date: string;
+  floatAccountId: string;
+  account: string;
+  systemCents: number;
+  realCents: number;
+  driftCents: number;
+  adjustmentsCents: number;
+}
+
+/** Cents → KES decimal string, exact (no float), e.g. -12345 → "-123.45". */
+export function centsToKes(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(Math.trunc(cents));
+  const whole = Math.floor(abs / 100);
+  const frac = abs % 100;
+  return `${sign}${whole}.${String(frac).padStart(2, "0")}`;
+}
+
+/** Header columns of the reconciliation export, in order (AC2). */
+export const RECONCILIATION_EXPORT_COLUMNS = [
+  "date",
+  "account",
+  "system_balance_kes",
+  "real_balance_kes",
+  "drift_kes",
+  "adjustments_kes",
+] as const;
+
+/** RFC-4180 escape: quote a field if it has a comma, quote, CR or LF. */
+function csvField(value: string): string {
+  return /[",\r\n]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
+}
+
+/**
+ * Render the export rows as an RFC-4180 CSV (AC1/AC2): a header row of
+ * {@link RECONCILIATION_EXPORT_COLUMNS} followed by one line per row, amounts as
+ * KES decimal strings. Rows are emitted in caller order; lines are CRLF-joined.
+ */
+export function reconciliationRowsToCsv(rows: readonly ReconciliationExportRow[]): string {
+  const lines: string[] = [RECONCILIATION_EXPORT_COLUMNS.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [
+        r.date,
+        csvField(r.account),
+        centsToKes(r.systemCents),
+        centsToKes(r.realCents),
+        centsToKes(r.driftCents),
+        centsToKes(r.adjustmentsCents),
+      ].join(","),
+    );
+  }
+  return lines.join("\r\n") + "\r\n";
+}

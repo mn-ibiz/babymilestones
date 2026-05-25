@@ -40,6 +40,9 @@ export type { StatementInput, StatementRange } from "./statement.js";
 export { recentTransactions, RECENT_TRANSACTIONS_LIMIT } from "./recent.js";
 export type { RecentTransaction, RecentTransactionsOptions } from "./recent.js";
 
+// Per-day-per-account reconciliation export read model (P1-E06-S04).
+export { reconciliationExportRows } from "./reconciliation-export.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 

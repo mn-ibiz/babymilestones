@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E06-S03 done; epic-6 in-progress)
+last_updated: 2026-05-25 (P1-E06-S04 done; epic-6 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -73,11 +73,11 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6 — Treasury & Float Segregation  (source E06)
-  epic-6: in-progress
+  epic-6: done
   6-1-configure-float-accounts-per-till-per-bank: done  # P1-E06-S01
   6-2-daily-reconciliation-screen: done  # P1-E06-S02
   6-3-treasury-role-permissions: done  # P1-E06-S03
-  6-4-export-float-reconciliation-for-the-accountant: ready-for-dev  # P1-E06-S04
+  6-4-export-float-reconciliation-for-the-accountant: done  # P1-E06-S04
   epic-6-retrospective: optional
 
   # Epic 7 — Service Catalogue & Pricing  (source E07)
