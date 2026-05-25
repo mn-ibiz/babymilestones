@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   index,
@@ -6,6 +7,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { parents } from "./parents.js";
@@ -40,9 +42,23 @@ export const receipts = pgTable(
      * references the original. Nullable self-FK.
      */
     parentId: uuid("parent_id"),
-    /** Total, integer cents. Sum of line totals. Non-negative (CHECK in migration). */
+    /**
+     * Receipt kind (P1-E08-S05): `normal` (default) or `void`. A `void` row is a
+     * reversing entry carrying the negated totals/lines of the receipt it
+     * reverses (`reversesReceiptId`); the original is never mutated or deleted.
+     */
+    kind: text("kind").notNull().default("normal").$type<ReceiptKind>(),
+    /**
+     * For a `void` row, the original receipt this voids (nullable self-FK). A
+     * partial unique index ensures an original is voided at most once (AC3).
+     */
+    reversesReceiptId: uuid("reverses_receipt_id"),
+    /**
+     * Total, integer cents. Sum of line totals. Non-negative on `normal` rows;
+     * negated on `void` rows so original + void nets to 0 (S05).
+     */
     total: bigint("total", { mode: "number" }).notNull(),
-    /** Tax total, integer cents. Sum of line tax. Non-negative (CHECK in migration). */
+    /** Tax total, integer cents. Sum of line tax. Negated on `void` rows (S05). */
     taxTotal: bigint("tax_total", { mode: "number" }).notNull(),
     /** How the receipt was paid (`wallet` | `cash` | `mpesa` | ...). CHECK-free free text for now. */
     paymentMethod: text("payment_method").notNull(),
@@ -75,11 +91,19 @@ export const receipts = pgTable(
       t.sequenceNumber,
     ),
     parentAccountIdx: index("receipts_parent_account_id_idx").on(t.parentAccountId),
+    // An original is voided at most once: partial unique over the void rows (S05 AC3).
+    reversesReceiptUnique: uniqueIndex("receipts_reverses_receipt_id_unique")
+      .on(t.reversesReceiptId)
+      .where(sql`${t.reversesReceiptId} IS NOT NULL`),
+    kindIdx: index("receipts_kind_idx").on(t.kind),
   }),
 );
 
 /** eTIMS submission status enum (P1-E08-S01 AC1). Mirrored by the migration CHECK. */
 export type EtimsStatus = "pending" | "sent" | "accepted" | "rejected";
+
+/** Receipt kind (P1-E08-S05). `normal` is the default; `void` rows reverse an original. */
+export type ReceiptKind = "normal" | "void";
 
 export type ReceiptRow = typeof receipts.$inferSelect;
 export type ReceiptInsert = typeof receipts.$inferInsert;

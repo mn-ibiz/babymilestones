@@ -64,6 +64,11 @@ export {
   LocalReceiptWriter,
   EtimsReceiptWriter,
   EtimsNotImplementedError,
+  // Receipt void as a reversing entry (P1-E08-S05).
+  voidReceipt,
+  AlreadyVoidedError,
+  VoidReceiptNotFoundError,
+  VoidTargetIsVoidError,
 } from "./receipts/index.js";
 export type {
   ReceiptWriter,
@@ -72,4 +77,6 @@ export type {
   WriteReceiptLine,
   Receipt,
   ReceiptLine,
+  VoidReceiptInput,
+  VoidReceiptResult,
 } from "./receipts/index.js";

@@ -99,6 +99,14 @@ export function formatReceiptNumber(series: string, sequenceNumber: number): str
 
 export { LocalReceiptWriter } from "./local-receipt-writer.js";
 export { EtimsReceiptWriter, EtimsNotImplementedError } from "./etims-receipt-writer.js";
+export {
+  voidReceipt,
+  AlreadyVoidedError,
+  VoidReceiptNotFoundError,
+  VoidTargetIsVoidError,
+  type VoidReceiptInput,
+  type VoidReceiptResult,
+} from "./void.js";
 
 import { LocalReceiptWriter } from "./local-receipt-writer.js";
 
