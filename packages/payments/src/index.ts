@@ -36,3 +36,6 @@ export type {
   PaystackAuthorization,
   CreatePaystackAdapterOptions,
 } from "./paystack/paystack.js";
+
+// Paystack webhook signature verification (P1-E04-S05).
+export { verifyPaystackSignature } from "./paystack/verify.js";

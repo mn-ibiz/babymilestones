@@ -1,6 +1,6 @@
 # Story 4.5: Paystack webhook (signature + replay protection)
 
-Status: ready-for-dev
+Status: done
 
 > Canonical ID: P1-E04-S05 · Phase: P1 · Source: _bmad-output/planning-artifacts/stories/p1/P1-E04-S05.md
 
@@ -19,18 +19,18 @@ so that wallet top-ups are credited securely and never replayed.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add `paystack_event` table + migration in `packages/db` (AC: #3)
-  - [ ] Columns: `id` (UNIQUE, from Paystack event id), `event` type, raw payload, `reference`, timestamps
-  - [ ] Additive-only migration
-- [ ] Task 2: Implement signature verification in `packages/payments` (AC: #1, #2)
-  - [ ] `packages/payments/src/paystack/verify.ts` — HMAC-SHA512 over raw body with secret; timing-safe (constant-time) compare
-- [ ] Task 3: Implement webhook route in `apps/api` (AC: #1, #2, #3)
-  - [ ] `apps/api/src/routes/webhooks/paystack.ts`; read raw body for HMAC; invalid signature → 401 with zero DB writes
-  - [ ] Insert into `paystack_event` with UNIQUE id; replay → return 200, no further work
-- [ ] Task 4: Wire `charge.success` to wallet credit (AC: #4)
-  - [ ] On `charge.success`, call `@bm/wallet` `wallet.post(topup)` keyed by `paystack_event.id`; write audit to `audit_outbox`
-- [ ] Task 5: Tests (AC: all)
-  - [ ] Tampered payload rejected with 401 and no writes; valid replay returns 200 without re-posting to the ledger; `charge.success` credits exactly once (vitest, test-first)
+- [x] Task 1: Add `paystack_event` table + migration in `packages/db` (AC: #3)
+  - [x] Columns: `id` (UNIQUE PRIMARY KEY, from Paystack event id), `event` type, raw payload, `reference`, timestamps
+  - [x] Additive-only migration (`0021_paystack_event.sql`)
+- [x] Task 2: Implement signature verification in `packages/payments` (AC: #1, #2)
+  - [x] `packages/payments/src/paystack/verify.ts` — HMAC-SHA512 over raw body with secret; timing-safe (constant-time) compare via `crypto.timingSafeEqual`
+- [x] Task 3: Implement webhook route in `apps/api` (AC: #1, #2, #3)
+  - [x] `apps/api/src/routes/payments/paystack/webhook.ts`; raw body preserved by a route-scoped (encapsulated-plugin) content-type parser; invalid/missing signature → 401 with zero DB writes
+  - [x] Insert into `paystack_event` with UNIQUE id (ON CONFLICT DO NOTHING); replay → 200, no further work
+- [x] Task 4: Wire `charge.success` to wallet credit (AC: #4)
+  - [x] On `charge.success`, call `@bm/wallet.post(topup)` keyed by `paystack_event.id` (amount from our `paystack_transaction` row, never the body); writes `audit_outbox`
+- [x] Task 5: Tests (AC: all)
+  - [x] Tampered/wrong-secret/missing-signature rejected with 401 and no writes; valid replay 5× returns 200 with exactly one ledger entry; `charge.success` credits exactly once keyed by event id (vitest, test-first)
 
 ## Dev Notes
 
@@ -51,14 +51,34 @@ so that wallet top-ups are credited securely and never replayed.
 
 ### Agent Model Used
 
+claude-opus-4-7
+
 ### Debug Log References
+
+- `pnpm test && pnpm typecheck && pnpm lint && pnpm build` — all green from repo root.
+- Targeted: `packages/payments` verify (7 tests), `apps/api` webhook integration (9 tests).
 
 ### Completion Notes List
 
+- Signature is verified over the RAW body BEFORE any DB access; invalid/missing/tampered/wrong-secret → 401 with zero writes (AC1, AC2). Constant-time compare via `crypto.timingSafeEqual` with a length pre-check (avoids the throw on unequal lengths).
+- Fastify discards the raw body by default; the webhook is registered inside an **encapsulated plugin** with a `parseAs: "buffer"` `application/json` content-type parser that stashes `req.rawBody` and still JSON-parses for the handler. Scoping it to the plugin keeps every other route on the default JSON parser (verified: the M-Pesa JSON callback and all other suites stay green).
+- Replay is guarded twice: `paystack_event.id` PRIMARY KEY (`ON CONFLICT DO NOTHING` → a re-delivery returns no row and short-circuits) AND the wallet ledger `idempotency_key` UNIQUE keyed by the same event id. Replay 5× → exactly one ledger credit (AC3).
+- `charge.success` credits via `@bm/wallet.post` keyed by the event id, using the amount from OUR `paystack_transaction` row (never the untrusted body), advances the txn to `SUCCEEDED`, and audits `payment.paystack.webhook.credited` (AC4). An unknown reference is recorded + audited (`...orphan`) but credits nothing.
+
 ### File List
+
+- `packages/db/migrations/0021_paystack_event.sql` (new)
+- `packages/db/src/schema/paystack.ts` (modified — `paystackEvents` table + row types)
+- `packages/payments/src/paystack/verify.ts` (new)
+- `packages/payments/src/paystack/verify.test.ts` (new)
+- `packages/payments/src/index.ts` (modified — export `verifyPaystackSignature`)
+- `apps/api/src/routes/payments/paystack/webhook.ts` (new)
+- `apps/api/src/routes/payments/paystack/webhook.test.ts` (new)
+- `apps/api/src/routes/payments/paystack/index.ts` (modified — register webhook)
 
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-24 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+| 2026-05-25 | 1.0 | Implemented Paystack webhook: HMAC-SHA512 raw-body verify (constant-time), `paystack_event` replay guard, `charge.success` → wallet credit keyed by event id. Test-first; full gate green. | claude-opus-4-7 |

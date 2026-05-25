@@ -1,4 +1,13 @@
-import { bigint, boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { wallets } from "./wallets.js";
 
@@ -58,3 +67,38 @@ export const paystackTransactions = pgTable(
 
 export type PaystackTransactionRow = typeof paystackTransactions.$inferSelect;
 export type PaystackTransactionInsert = typeof paystackTransactions.$inferInsert;
+
+/**
+ * Paystack webhook event (P1-E04-S05). One row per event Paystack delivers.
+ *
+ * Keyed by the Paystack `data.id` (the stable per-event id) as the PRIMARY KEY
+ * → UNIQUE, so a replayed/re-delivered webhook collapses to a single row via
+ * `ON CONFLICT DO NOTHING` — the authoritative replay guard. The wallet credit
+ * (`@bm/wallet.post`) is keyed off this same id so a racing re-delivery cannot
+ * double-credit (the ledger `idempotency_key` UNIQUE is the second layer).
+ *
+ * The HMAC-SHA512 signature is verified over the RAW request body in the API
+ * layer BEFORE this insert: an invalid signature is rejected (401) with zero
+ * writes, so only cryptographically-trusted events ever land here. The Paystack
+ * secret key lives in env only — never in this table.
+ */
+export const paystackEvents = pgTable(
+  "paystack_event",
+  {
+    /** The Paystack event id (`data.id`). PRIMARY KEY → UNIQUE; replay = no-op. */
+    id: text("id").primaryKey(),
+    /** Event type, e.g. `charge.success`. Drives routing + forensics. */
+    event: text("event").notNull(),
+    /** Client `reference` we generated (echoed by Paystack); resolves the txn row. */
+    reference: text("reference"),
+    /** Full verified webhook payload, stored verbatim for forensics/replay. */
+    rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    referenceIdx: index("paystack_event_reference_idx").on(t.reference),
+  }),
+);
+
+export type PaystackEventRow = typeof paystackEvents.$inferSelect;
+export type PaystackEventInsert = typeof paystackEvents.$inferInsert;
