@@ -1,0 +1,43 @@
+name: Preview
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+# One preview environment per PR, namespaced `pr-<number>`, torn down on close.
+jobs:
+  # Build + publish a per-PR preview for every app while the PR is open.
+  preview:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    environment: preview
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [api, platform, pos, admin, jobs]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@bm/${{ matrix.app }}
+      - name: Deploy preview
+        env:
+          APP: ${{ matrix.app }}
+          PREVIEW_NAMESPACE: pr-${{ github.event.pull_request.number }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: ./infra/preview.sh up "$APP" "$PREVIEW_NAMESPACE"
+
+  # Tear the whole `pr-<number>` namespace down once the PR is closed/merged.
+  teardown:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    environment: preview
+    steps:
+      - uses: actions/checkout@v4
+      - name: Destroy preview environment
+        env:
+          PREVIEW_NAMESPACE: pr-${{ github.event.pull_request.number }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: ./infra/preview.sh down "$PREVIEW_NAMESPACE"

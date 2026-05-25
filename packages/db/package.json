@@ -13,11 +13,15 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate:deploy": "tsx src/migrate.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
     "drizzle-orm": "^0.38.2",
     "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
   }
 }

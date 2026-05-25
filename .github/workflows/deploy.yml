@@ -1,0 +1,50 @@
+name: Deploy
+on:
+  push: { branches: [main] }
+
+# Gated deploy: migrations are applied once, fail-closed, BEFORE any app deploys.
+jobs:
+  # Apply additive-only migrations from packages/db. If this fails, no deploy
+  # job runs (they all `needs: migrate`), so the cluster never serves code that
+  # expects a schema that was not applied.
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Apply numbered SQL migrations against the production database. The step
+      # exits non-zero on any failure, which fail-closes the whole deploy.
+      - name: Apply gated migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter @bm/db run migrate:deploy
+
+  # One deploy job per app, each gated on a successful migration.
+  deploy:
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [api, platform, pos, admin, jobs]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build --filter=@bm/${{ matrix.app }}
+      - name: Release app
+        env:
+          APP: ${{ matrix.app }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        # Hand the built artifact to the platform release command. The concrete
+        # target is wired by the deploy story; the gate ordering is what matters.
+        run: ./infra/deploy.sh "$APP"
