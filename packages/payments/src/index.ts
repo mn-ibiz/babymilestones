@@ -47,3 +47,11 @@ export {
   CashTopupAmountError,
 } from "./cash/topup.js";
 export type { CashTopupInput, CashCharge } from "./cash/topup.js";
+
+// Bank transfer top-up confirmed by an admin (P1-E04-S07).
+export {
+  confirmBankTransfer,
+  BANK_MANUAL_SOURCE,
+  BankTransferAmountError,
+} from "./bank/topup.js";
+export type { BankTransferConfirmInput, BankCharge } from "./bank/topup.js";

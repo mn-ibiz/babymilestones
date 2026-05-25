@@ -229,6 +229,43 @@ export const cashTopupSchema = z.object({
 });
 export type CashTopupRequestInput = z.infer<typeof cashTopupSchema>;
 
+// ---------------------------------------------------------------------------
+// Bank transfer top-up, admin-confirmed (P1-E04-S07)
+// ---------------------------------------------------------------------------
+
+/** Bounds for a single bank transfer, in integer cents (KES) — reuse cash bounds. */
+export const BANK_TRANSFER_MIN_CENTS = CASH_TOPUP_MIN_CENTS;
+export const BANK_TRANSFER_MAX_CENTS = CASH_TOPUP_MAX_CENTS;
+/** Max length of the bank reference / narration captured on a recorded transfer. */
+export const BANK_TRANSFER_REFERENCE_MAX = 140;
+
+/**
+ * Record a pending bank transfer (P1-E04-S07 AC1). An admin enters a transfer
+ * they observed; `parentId` is optional at recording time (the transfer may not
+ * yet be matched to a parent). Amount is integer cents.
+ */
+export const bankTransferRecordSchema = z.object({
+  amount: z
+    .number({ message: "Amount is required" })
+    .int("amount must be integer cents")
+    .min(BANK_TRANSFER_MIN_CENTS, `Minimum bank transfer is ${BANK_TRANSFER_MIN_CENTS} cents`)
+    .max(BANK_TRANSFER_MAX_CENTS, `Maximum bank transfer is ${BANK_TRANSFER_MAX_CENTS} cents`),
+  reference: z.string().trim().min(1, "reference is required").max(BANK_TRANSFER_REFERENCE_MAX),
+  parentId: z.string().uuid("parentId must be a UUID").optional(),
+});
+export type BankTransferRecordInput = z.infer<typeof bankTransferRecordSchema>;
+
+/**
+ * Confirm a recorded bank transfer (P1-E04-S07 AC2). The admin matches the
+ * transfer to a parent (if not already matched at record time) and confirms,
+ * crediting the wallet. The pending row id is the URL param; the body carries
+ * only the parent match.
+ */
+export const bankTransferConfirmSchema = z.object({
+  parentId: z.string().uuid("parentId must be a UUID"),
+});
+export type BankTransferConfirmRequestInput = z.infer<typeof bankTransferConfirmSchema>;
+
 /** Lifecycle state of an STK request as surfaced to the polling client (AC4). */
 export type MpesaStkState =
   | "INITIATED"
