@@ -7,3 +7,21 @@ export {
   formatReceiptCents,
   RECEIPT_BUSINESS_NAME,
 } from "./receipt-preview.js";
+
+// Full KRA-shaped receipt render (P1-E08-S03) — A4 HTML + 80mm thermal.
+export {
+  toReceiptDocument,
+  renderReceipt,
+  renderReceiptA4,
+  renderReceiptThermal,
+  receiptContentType,
+  maskPhoneLast4,
+  // formatReceiptCents already re-exported from receipt-preview (same impl).
+  DEFAULT_BUSINESS_DETAILS,
+  type ReceiptDocument,
+  type ReceiptDocumentLine,
+  type ReceiptRecordInput,
+  type ReceiptRenderContext,
+  type ReceiptBusinessDetails,
+  type ReceiptFormat,
+} from "./receipt-document.js";

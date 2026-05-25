@@ -21,6 +21,7 @@ import { registerCashRoutes } from "./routes/payments/cash/index.js";
 import { registerBankRoutes } from "./routes/payments/bank/index.js";
 import { registerReceptionRoutes } from "./routes/reception/index.js";
 import { registerTreasuryRoutes } from "./routes/treasury/index.js";
+import { registerReceiptRoutes } from "./routes/receipts/index.js";
 
 export interface AppDeps {
   db?: Database;
@@ -169,6 +170,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // P1-E06-S01: Treasury float-account CRUD. Manual admin/treasury config —
     // no provider wiring, so always on (guarded internally).
     registerTreasuryRoutes(app, { db, sessions: deps.sessions });
+
+    // P1-E08-S03: Receipt-engine render — GET /receipts/:id?format=a4|thermal.
+    // Server-side render of a persisted receipt (A4 HTML + 80mm thermal text),
+    // staff-only and read-only. No provider wiring, so always on.
+    registerReceiptRoutes(app, { db, sessions: deps.sessions });
 
     // P1-E04-S01: M-Pesa STK push routes register only when Daraja wiring is
     // present (explicit dep in tests, or full env config in production).
