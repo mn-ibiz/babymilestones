@@ -12,7 +12,7 @@
 #   P2 E01..E07 -> 16..22; P3 E01..E06 -> 23..28; P4 E04..E05 -> 29..30;
 #   P5 E01..E06 -> 31..36.
 #
-# STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
+# STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
 last_updated: 2026-05-25 (X8-S04 per-app CI/CD pipelines: ci.yml verify+build matrix, deploy.yml gated migrations, preview.yml per-PR envs, rollback runbook, @bm/ci-tooling workflow validator; epic-15 done)
@@ -166,172 +166,172 @@ development_status:
   epic-16-retrospective: optional
 
   # Epic 17 — Subscription Plans (Play & Talent)  (P2-E02)
-  epic-17: backlog
-  17-1-subscription-plan-catalogue: backlog  # P2-E02-S01
-  17-2-parent-subscribes-to-a-plan: backlog  # P2-E02-S02
-  17-3-bookings-deduct-subscription-entitlement-first: backlog  # P2-E02-S03
-  17-4-pause-freeze-and-resume-a-subscription: backlog  # P2-E02-S04
-  17-5-renewal-dunning-state-machine: backlog  # P2-E02-S05
-  17-6-cancel-subscription: backlog  # P2-E02-S06
+  epic-17: ready-for-dev
+  17-1-subscription-plan-catalogue: ready-for-dev  # P2-E02-S01
+  17-2-parent-subscribes-to-a-plan: ready-for-dev  # P2-E02-S02
+  17-3-bookings-deduct-subscription-entitlement-first: ready-for-dev  # P2-E02-S03
+  17-4-pause-freeze-and-resume-a-subscription: ready-for-dev  # P2-E02-S04
+  17-5-renewal-dunning-state-machine: ready-for-dev  # P2-E02-S05
+  17-6-cancel-subscription: ready-for-dev  # P2-E02-S06
   epic-17-retrospective: optional
 
   # Epic 18 — Pickup Authorisation & Free-Text Observations  (P2-E03)
-  epic-18: backlog
-  18-1-authorised-pickup-list-per-child: backlog  # P2-E03-S01
-  18-2-attendant-check-in-screen: backlog  # P2-E03-S02
-  18-3-pickup-handoff-with-free-text-observations: backlog  # P2-E03-S03
-  18-4-observations-feed-in-parent-s-account: backlog  # P2-E03-S04
-  18-5-24-month-retention-anonymisation: backlog  # P2-E03-S05
+  epic-18: ready-for-dev
+  18-1-authorised-pickup-list-per-child: ready-for-dev  # P2-E03-S01
+  18-2-attendant-check-in-screen: ready-for-dev  # P2-E03-S02
+  18-3-pickup-handoff-with-free-text-observations: ready-for-dev  # P2-E03-S03
+  18-4-observations-feed-in-parent-s-account: ready-for-dev  # P2-E03-S04
+  18-5-24-month-retention-anonymisation: ready-for-dev  # P2-E03-S05
   epic-18-retrospective: optional
 
   # Epic 19 — POS App (in-store mode)  (P2-E04)
-  epic-19: backlog
-  19-1-pos-app-scaffold-auth: backlog  # P2-E04-S01
-  19-2-product-catalogue-read-for-pos: backlog  # P2-E04-S02
-  19-3-cart-line-discounts-overall-discount: backlog  # P2-E04-S03
-  19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet: backlog  # P2-E04-S04
-  19-5-end-of-day-cash-up: backlog  # P2-E04-S05
+  epic-19: ready-for-dev
+  19-1-pos-app-scaffold-auth: ready-for-dev  # P2-E04-S01
+  19-2-product-catalogue-read-for-pos: ready-for-dev  # P2-E04-S02
+  19-3-cart-line-discounts-overall-discount: ready-for-dev  # P2-E04-S03
+  19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet: ready-for-dev  # P2-E04-S04
+  19-5-end-of-day-cash-up: ready-for-dev  # P2-E04-S05
   epic-19-retrospective: optional
 
   # Epic 20 — Loyalty Redemption UI + Engine  (P2-E05)
-  epic-20: backlog
-  20-1-loyalty-earn-ledger-already-shipped-p1-harden-here: backlog  # P2-E05-S01
-  20-2-configurable-earn-and-redeem-rates: backlog  # P2-E05-S02
-  20-3-redemption-at-parent-checkout: backlog  # P2-E05-S03
-  20-4-loyalty-balance-and-history-in-parent-app: backlog  # P2-E05-S04
+  epic-20: ready-for-dev
+  20-1-loyalty-earn-ledger-already-shipped-p1-harden-here: ready-for-dev  # P2-E05-S01
+  20-2-configurable-earn-and-redeem-rates: ready-for-dev  # P2-E05-S02
+  20-3-redemption-at-parent-checkout: ready-for-dev  # P2-E05-S03
+  20-4-loyalty-balance-and-history-in-parent-app: ready-for-dev  # P2-E05-S04
   epic-20-retrospective: optional
 
   # Epic 21 — Backup Retention Configurability  (P2-E06)
-  epic-21: backlog
-  21-1-settings-for-backup-retention-policy: backlog  # P2-E06-S01
-  21-2-backup-pruner-respects-policy: backlog  # P2-E06-S02
+  epic-21: ready-for-dev
+  21-1-settings-for-backup-retention-policy: ready-for-dev  # P2-E06-S01
+  21-2-backup-pruner-respects-policy: ready-for-dev  # P2-E06-S02
   epic-21-retrospective: optional
 
   # Epic 22 — Auto-credit & Outstanding Surface (parent app)  (P2-E07)
-  epic-22: backlog
-  22-1-outstanding-balance-banner-on-parent-dashboard: backlog  # P2-E07-S01
-  22-2-sms-stub-nudge-templates-for-outstanding-balances: backlog  # P2-E07-S02
-  22-3-auto-credit-toggle-visibility-for-parent-read-only: backlog  # P2-E07-S03
+  epic-22: ready-for-dev
+  22-1-outstanding-balance-banner-on-parent-dashboard: ready-for-dev  # P2-E07-S01
+  22-2-sms-stub-nudge-templates-for-outstanding-balances: ready-for-dev  # P2-E07-S02
+  22-3-auto-credit-toggle-visibility-for-parent-read-only: ready-for-dev  # P2-E07-S03
   epic-22-retrospective: optional
 
   # Epic 23 — Attribution & Commission Ledger  (P3-E01)
-  epic-23: backlog
-  23-1-per-staff-commission-rate-with-effective-dating: backlog  # P3-E01-S01
-  23-2-commission-line-recorded-on-every-attributed-booking: backlog  # P3-E01-S02
-  23-3-monthly-commission-run-scheduled-job: backlog  # P3-E01-S03
-  23-4-ad-hoc-commission-calculation-e-g-on-the-15th: backlog  # P3-E01-S04
-  23-5-commission-payout-export-csv: backlog  # P3-E01-S05
+  epic-23: ready-for-dev
+  23-1-per-staff-commission-rate-with-effective-dating: ready-for-dev  # P3-E01-S01
+  23-2-commission-line-recorded-on-every-attributed-booking: ready-for-dev  # P3-E01-S02
+  23-3-monthly-commission-run-scheduled-job: ready-for-dev  # P3-E01-S03
+  23-4-ad-hoc-commission-calculation-e-g-on-the-15th: ready-for-dev  # P3-E01-S04
+  23-5-commission-payout-export-csv: ready-for-dev  # P3-E01-S05
   epic-23-retrospective: optional
 
   # Epic 24 — Stylist Commission Viewer (named, not auth)  (P3-E02)
-  epic-24: backlog
-  24-1-public-but-named-commission-viewer-route: backlog  # P3-E02-S01
-  24-2-earnings-breakdown-count-of-visits-top-services: backlog  # P3-E02-S02
+  epic-24: ready-for-dev
+  24-1-public-but-named-commission-viewer-route: ready-for-dev  # P3-E02-S01
+  24-2-earnings-breakdown-count-of-visits-top-services: ready-for-dev  # P3-E02-S02
   epic-24-retrospective: optional
 
   # Epic 25 — Kids-Only Salon Flow  (P3-E03)
-  epic-25: backlog
-  25-1-stylist-availability-and-slot-creation: backlog  # P3-E03-S01
-  25-2-parent-picks-a-service-then-a-stylist-then-a-slot: backlog  # P3-E03-S02
-  25-3-salon-counter-check-in-and-service-completion: backlog  # P3-E03-S03
-  25-4-reassign-a-salon-booking-between-stylists: backlog  # P3-E03-S04
-  25-5-salon-specific-reporting-tile: backlog  # P3-E03-S05
+  epic-25: ready-for-dev
+  25-1-stylist-availability-and-slot-creation: ready-for-dev  # P3-E03-S01
+  25-2-parent-picks-a-service-then-a-stylist-then-a-slot: ready-for-dev  # P3-E03-S02
+  25-3-salon-counter-check-in-and-service-completion: ready-for-dev  # P3-E03-S03
+  25-4-reassign-a-salon-booking-between-stylists: ready-for-dev  # P3-E03-S04
+  25-5-salon-specific-reporting-tile: ready-for-dev  # P3-E03-S05
   epic-25-retrospective: optional
 
   # Epic 26 — Loyalty Engine: Clawback + Negative Carry  (P3-E04)
-  epic-26: backlog
-  26-1-proportional-loyalty-clawback-on-refund: backlog  # P3-E04-S01
-  26-2-negative-loyalty-carry-repaid-by-future-earnings: backlog  # P3-E04-S02
-  26-3-admin-manual-loyalty-adjustment: backlog  # P3-E04-S03
-  26-4-loyalty-redemption-respects-pending-settlement: backlog  # P3-E04-S04
+  epic-26: ready-for-dev
+  26-1-proportional-loyalty-clawback-on-refund: ready-for-dev  # P3-E04-S01
+  26-2-negative-loyalty-carry-repaid-by-future-earnings: ready-for-dev  # P3-E04-S02
+  26-3-admin-manual-loyalty-adjustment: ready-for-dev  # P3-E04-S03
+  26-4-loyalty-redemption-respects-pending-settlement: ready-for-dev  # P3-E04-S04
   epic-26-retrospective: optional
 
   # Epic 27 — Operational Reporting  (P3-E05)
-  epic-27: backlog
-  27-1-daily-operations-dashboard: backlog  # P3-E05-S01
-  27-2-revenue-by-unit-by-period: backlog  # P3-E05-S02
-  27-3-top-staff-leaderboard: backlog  # P3-E05-S03
-  27-4-wallet-aging-report: backlog  # P3-E05-S04
-  27-5-peak-hours-heatmap: backlog  # P3-E05-S05
+  epic-27: ready-for-dev
+  27-1-daily-operations-dashboard: ready-for-dev  # P3-E05-S01
+  27-2-revenue-by-unit-by-period: ready-for-dev  # P3-E05-S02
+  27-3-top-staff-leaderboard: ready-for-dev  # P3-E05-S03
+  27-4-wallet-aging-report: ready-for-dev  # P3-E05-S04
+  27-5-peak-hours-heatmap: ready-for-dev  # P3-E05-S05
   epic-27-retrospective: optional
 
   # Epic 28 — Jobs Runner  (P3-E06)
-  epic-28: backlog
-  28-1-job-framework-scheduling-observability: backlog  # P3-E06-S01
-  28-2-anonymisation-worker-registered: backlog  # P3-E06-S02
-  28-3-commission-run-registered: backlog  # P3-E06-S03
-  28-4-sms-retry-worker-registered: backlog  # P3-E06-S04
-  28-5-m-pesa-stk-reconciliation-cron-now-under-framework: backlog  # P3-E06-S05
+  epic-28: ready-for-dev
+  28-1-job-framework-scheduling-observability: ready-for-dev  # P3-E06-S01
+  28-2-anonymisation-worker-registered: ready-for-dev  # P3-E06-S02
+  28-3-commission-run-registered: ready-for-dev  # P3-E06-S03
+  28-4-sms-retry-worker-registered: ready-for-dev  # P3-E06-S04
+  28-5-m-pesa-stk-reconciliation-cron-now-under-framework: ready-for-dev  # P3-E06-S05
   epic-28-retrospective: optional
 
   # Epic 29 — POS ↔ WooCommerce Sync  (P4-E04)
-  epic-29: backlog
-  29-1-online-orders-tab-in-pos-pulled-from-woocommerce: backlog  # P4-E04-S01
-  29-2-order-status-transitions-sync-back-to-woocommerce: backlog  # P4-E04-S02
-  29-3-print-packing-slip: backlog  # P4-E04-S03
-  29-4-daily-dispatch-report: backlog  # P4-E04-S04
-  29-5-stock-push-pos-catalogue-stock-changes-propagate-to: backlog  # P4-E04-S05
-  29-6-woocommerce-rest-client-credentials-config: backlog  # P4-E04-S06
-  29-7-sync-scheduler-dead-letter-for-woocommerce-calls: backlog  # P4-E04-S07
+  epic-29: ready-for-dev
+  29-1-online-orders-tab-in-pos-pulled-from-woocommerce: ready-for-dev  # P4-E04-S01
+  29-2-order-status-transitions-sync-back-to-woocommerce: ready-for-dev  # P4-E04-S02
+  29-3-print-packing-slip: ready-for-dev  # P4-E04-S03
+  29-4-daily-dispatch-report: ready-for-dev  # P4-E04-S04
+  29-5-stock-push-pos-catalogue-stock-changes-propagate-to: ready-for-dev  # P4-E04-S05
+  29-6-woocommerce-rest-client-credentials-config: ready-for-dev  # P4-E04-S06
+  29-7-sync-scheduler-dead-letter-for-woocommerce-calls: ready-for-dev  # P4-E04-S07
   epic-29-retrospective: optional
 
   # Epic 30 — Events & Recital Ticketing  (P4-E05)
-  epic-30: backlog
-  30-1-event-creation: backlog  # P4-E05-S01
-  30-2-public-event-listing-detail-page: backlog  # P4-E05-S02
-  30-3-ticket-purchase-with-guest-checkout: backlog  # P4-E05-S03
-  30-4-free-events-rsvp-only: backlog  # P4-E05-S04
-  30-5-door-check-in-via-ticket-code-or-manual-list: backlog  # P4-E05-S05
+  epic-30: ready-for-dev
+  30-1-event-creation: ready-for-dev  # P4-E05-S01
+  30-2-public-event-listing-detail-page: ready-for-dev  # P4-E05-S02
+  30-3-ticket-purchase-with-guest-checkout: ready-for-dev  # P4-E05-S03
+  30-4-free-events-rsvp-only: ready-for-dev  # P4-E05-S04
+  30-5-door-check-in-via-ticket-code-or-manual-list: ready-for-dev  # P4-E05-S05
   epic-30-retrospective: optional
 
   # Epic 31 — Mom Coaching & Birth Doula  (P5-E01)
-  epic-31: backlog
-  31-1-coaching-catalogue-1-1-group: backlog  # P5-E01-S01
-  31-2-coach-availability-and-1-1-booking: backlog  # P5-E01-S02
-  31-3-group-session-booking: backlog  # P5-E01-S03
-  31-4-coach-session-notes-private: backlog  # P5-E01-S04
-  31-5-sensitive-flow-discreet-billing-labels: backlog  # P5-E01-S05
+  epic-31: ready-for-dev
+  31-1-coaching-catalogue-1-1-group: ready-for-dev  # P5-E01-S01
+  31-2-coach-availability-and-1-1-booking: ready-for-dev  # P5-E01-S02
+  31-3-group-session-booking: ready-for-dev  # P5-E01-S03
+  31-4-coach-session-notes-private: ready-for-dev  # P5-E01-S04
+  31-5-sensitive-flow-discreet-billing-labels: ready-for-dev  # P5-E01-S05
   epic-31-retrospective: optional
 
   # Epic 32 — eTIMS Writer Swap  (P5-E02)
-  epic-32: backlog
-  32-1-etims-adapter-implementation: backlog  # P5-E02-S01
-  32-2-etims-retry-dead-letter: backlog  # P5-E02-S02
-  32-3-switch-flag-with-rollback: backlog  # P5-E02-S03
-  32-4-vat-registration-metadata: backlog  # P5-E02-S04
+  epic-32: ready-for-dev
+  32-1-etims-adapter-implementation: ready-for-dev  # P5-E02-S01
+  32-2-etims-retry-dead-letter: ready-for-dev  # P5-E02-S02
+  32-3-switch-flag-with-rollback: ready-for-dev  # P5-E02-S03
+  32-4-vat-registration-metadata: ready-for-dev  # P5-E02-S04
   epic-32-retrospective: optional
 
   # Epic 33 — SMS Go-Live  (P5-E03)
-  epic-33: backlog
-  33-1-live-sms-adapter-provider-agnostic: backlog  # P5-E03-S01
-  33-2-live-stub-switch-flag: backlog  # P5-E03-S02
-  33-3-rate-limit-cost-control: backlog  # P5-E03-S03
-  33-4-template-editor-admin: backlog  # P5-E03-S04
+  epic-33: ready-for-dev
+  33-1-live-sms-adapter-provider-agnostic: ready-for-dev  # P5-E03-S01
+  33-2-live-stub-switch-flag: ready-for-dev  # P5-E03-S02
+  33-3-rate-limit-cost-control: ready-for-dev  # P5-E03-S03
+  33-4-template-editor-admin: ready-for-dev  # P5-E03-S04
   epic-33-retrospective: optional
 
   # Epic 34 — Feedback Engine  (P5-E04)
-  epic-34: backlog
-  34-1-0-5-rating-after-every-paid-touchpoint: backlog  # P5-E04-S01
-  34-2-feedback-dashboard-by-unit-and-by-staff: backlog  # P5-E04-S02
-  34-3-negative-feedback-alert: backlog  # P5-E04-S03
-  34-4-public-review-snippets-optional: backlog  # P5-E04-S04
+  epic-34: ready-for-dev
+  34-1-0-5-rating-after-every-paid-touchpoint: ready-for-dev  # P5-E04-S01
+  34-2-feedback-dashboard-by-unit-and-by-staff: ready-for-dev  # P5-E04-S02
+  34-3-negative-feedback-alert: ready-for-dev  # P5-E04-S03
+  34-4-public-review-snippets-optional: ready-for-dev  # P5-E04-S04
   epic-34-retrospective: optional
 
   # Epic 35 — Advanced Reporting / Cohort Analytics  (P5-E05)
-  epic-35: backlog
-  35-1-consolidated-p-l-by-period: backlog  # P5-E05-S01
-  35-2-cohort-retention-by-signup-month: backlog  # P5-E05-S02
-  35-3-repeat-attendance-metrics-for-events-and-classes: backlog  # P5-E05-S03
-  35-4-wallet-float-vs-revenue-snapshot: backlog  # P5-E05-S04
-  35-5-expenses-module: backlog  # P5-E05-S05
-  35-6-tax-ready-exports: backlog  # P5-E05-S06
+  epic-35: ready-for-dev
+  35-1-consolidated-p-l-by-period: ready-for-dev  # P5-E05-S01
+  35-2-cohort-retention-by-signup-month: ready-for-dev  # P5-E05-S02
+  35-3-repeat-attendance-metrics-for-events-and-classes: ready-for-dev  # P5-E05-S03
+  35-4-wallet-float-vs-revenue-snapshot: ready-for-dev  # P5-E05-S04
+  35-5-expenses-module: ready-for-dev  # P5-E05-S05
+  35-6-tax-ready-exports: ready-for-dev  # P5-E05-S06
   epic-35-retrospective: optional
 
   # Epic 36 — Marketing Site Polish  (P5-E06)
-  epic-36: backlog
-  36-1-brand-polish-pass: backlog  # P5-E06-S01
-  36-2-seo-performance-budget-tightening: backlog  # P5-E06-S02
-  36-3-cms-driven-unit-pages: backlog  # P5-E06-S03
-  36-4-blog-stories-optional: backlog  # P5-E06-S04
-  36-5-social-proof-testimonials: backlog  # P5-E06-S05
+  epic-36: ready-for-dev
+  36-1-brand-polish-pass: ready-for-dev  # P5-E06-S01
+  36-2-seo-performance-budget-tightening: ready-for-dev  # P5-E06-S02
+  36-3-cms-driven-unit-pages: ready-for-dev  # P5-E06-S03
+  36-4-blog-stories-optional: ready-for-dev  # P5-E06-S04
+  36-5-social-proof-testimonials: ready-for-dev  # P5-E06-S05
   epic-36-retrospective: optional
