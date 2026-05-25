@@ -5,6 +5,8 @@
  * DB; the seam (a `template` key + `data` bag → rendered body) stays the same.
  */
 
+import { BRAND } from "@bm/ui/brand";
+
 /** Known template keys. Add a key here + a renderer below to register one. */
 export type SmsTemplateKey =
   | "auth.reset.code"
@@ -38,7 +40,7 @@ function str(data: SmsTemplateData, key: string): string {
  */
 const RENDERERS: Record<SmsTemplateKey, Renderer> = {
   "auth.reset.code": (d) =>
-    `Your Baby Milestones reset code is ${str(d, "code")}. It expires in 10 minutes.`,
+    `Your ${BRAND.name} reset code is ${str(d, "code")}. It expires in 10 minutes.`,
   "reception.receipt": (d) => str(d, "body"),
   "receipt.reprint": (d) => str(d, "body"),
   "wallet.topup.bank": (d) =>
@@ -50,7 +52,7 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
   "payment.mpesa.failed": (d) =>
     `Your M-Pesa top-up of KES ${str(d, "amountKes")} could not be completed. No money was deducted. Please try again.`,
   "parent.data.export.ready": (d) =>
-    `Your Baby Milestones data export is ready. Download (valid 7 days, one-time): ${str(d, "link")}`,
+    `Your ${BRAND.name} data export is ready. Download (valid 7 days, one-time): ${str(d, "link")}`,
   raw: (d) => str(d, "body"),
 };
 

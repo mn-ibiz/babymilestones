@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="44" viewBox="0 0 160 44" role="img" aria-label="Baby Milestones">
+  <circle cx="22" cy="22" r="22" fill="#FF6B9D" />
+  <text x="22" y="28" text-anchor="middle" font-size="18" fill="#FFFFFF" font-family="system-ui, sans-serif">BM</text>
+  <text x="52" y="28" font-size="18" fill="#1A1A2E" font-family="system-ui, sans-serif" font-weight="700">Baby Milestones</text>
+</svg>

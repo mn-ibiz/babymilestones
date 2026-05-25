@@ -1,5 +1,19 @@
 export { tokens, tailwindPreset } from "@bm/config";
 
+// ── X7-S04 brand source ─────────────────────────────────────────────────────
+// Single brand source (strings, asset manifest, colour overrides) consumed by
+// receipts (E08), SMS-stub bodies (E09, via the `@bm/ui/brand` subpath), and UI.
+export {
+  BRAND,
+  brandAssets,
+  brandColors,
+  brandTokens,
+  resolveBrandAsset,
+  type BrandAsset,
+  type BrandAssetName,
+  type BrandColorOverrides,
+} from "./brand/index.js";
+
 // ── X7-S02 primitive component library ──────────────────────────────────────
 export { cn, type ClassValue } from "./cn.js";
 export { FOCUS_RING } from "./styles.js";

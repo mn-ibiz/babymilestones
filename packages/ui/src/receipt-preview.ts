@@ -13,9 +13,10 @@
  * separate epic (P1-E08) and is intentionally out of scope here.
  */
 import type { ReceiptPayload } from "@bm/contracts";
+import { BRAND } from "./brand/index.js";
 
-/** Business name printed at the top of every receipt. */
-export const RECEIPT_BUSINESS_NAME = "Baby Milestones";
+/** Business name printed at the top of every receipt — from the brand source (X7-S04). */
+export const RECEIPT_BUSINESS_NAME = BRAND.name;
 
 /** Format integer cents to a KES money string (e.g. 50000 → "KES 500.00"). */
 export function formatReceiptCents(cents: number): string {

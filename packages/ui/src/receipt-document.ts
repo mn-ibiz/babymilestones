@@ -20,9 +20,10 @@
  * never rendered. Money is integer minor units (KES cents), matching the schema.
  */
 import { tokens } from "@bm/config";
+import { BRAND } from "./brand/index.js";
 
-/** Business name printed at the top of every receipt (matches the reception variant). */
-export const RECEIPT_BUSINESS_NAME = "Baby Milestones";
+/** Business name printed at the top of every receipt — from the brand source (X7-S04). */
+export const RECEIPT_BUSINESS_NAME = BRAND.name;
 
 /** Static business details printed on the full receipt (AC3). */
 export interface ReceiptBusinessDetails {
@@ -38,7 +39,7 @@ export interface ReceiptBusinessDetails {
 export const DEFAULT_BUSINESS_DETAILS: ReceiptBusinessDetails = {
   name: RECEIPT_BUSINESS_NAME,
   addressLines: ["Nairobi, Kenya"],
-  phone: "+254 700 000 000",
+  phone: BRAND.supportPhone,
   kraPin: null,
 };
 
