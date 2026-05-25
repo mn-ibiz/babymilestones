@@ -13,6 +13,10 @@ import {
   PAYSTACK_MIN_KES,
   PAYSTACK_MAX_KES,
   parentSearchQuerySchema,
+  recordVisitSchema,
+  isVisitOutstanding,
+  STAFF_NAME_SNAPSHOT_MAX,
+  SERVICE_RATE_MAX_CENTS,
   isOutstanding,
   type ParentProfile,
 } from "./index.js";
@@ -195,6 +199,56 @@ describe("parentSearchQuerySchema (P1-E05-S01 AC1)", () => {
   it("rejects a blank/whitespace-only query", () => {
     expect(parentSearchQuerySchema.safeParse({ q: "   " }).success).toBe(false);
     expect(parentSearchQuerySchema.safeParse({ q: "" }).success).toBe(false);
+  });
+});
+
+describe("recordVisitSchema (P1-E05-S04 AC1–AC3)", () => {
+  const valid = {
+    parentId: "11111111-1111-1111-1111-111111111111",
+    childId: "22222222-2222-2222-2222-222222222222",
+    serviceId: "33333333-3333-3333-3333-333333333333",
+    staffId: "44444444-4444-4444-4444-444444444444",
+    staffName: "Jane K",
+    rate: 250_00,
+  };
+  it("accepts a complete valid visit", () => {
+    const r = recordVisitSchema.parse(valid);
+    expect(r.rate).toBe(250_00);
+    expect(r.staffName).toBe("Jane K");
+  });
+  it("trims the staff name snapshot", () => {
+    expect(recordVisitSchema.parse({ ...valid, staffName: "  Jane K  " }).staffName).toBe("Jane K");
+  });
+  it("rejects a blank staff name", () => {
+    expect(recordVisitSchema.safeParse({ ...valid, staffName: "   " }).success).toBe(false);
+  });
+  it("rejects a name beyond the max length", () => {
+    expect(
+      recordVisitSchema.safeParse({ ...valid, staffName: "x".repeat(STAFF_NAME_SNAPSHOT_MAX + 1) })
+        .success,
+    ).toBe(false);
+  });
+  it("allows a zero rate (free/promo service) but not negative", () => {
+    expect(recordVisitSchema.safeParse({ ...valid, rate: 0 }).success).toBe(true);
+    expect(recordVisitSchema.safeParse({ ...valid, rate: -1 }).success).toBe(false);
+  });
+  it("rejects a non-integer or over-max rate", () => {
+    expect(recordVisitSchema.safeParse({ ...valid, rate: 10.5 }).success).toBe(false);
+    expect(recordVisitSchema.safeParse({ ...valid, rate: SERVICE_RATE_MAX_CENTS + 1 }).success).toBe(
+      false,
+    );
+  });
+  it("rejects non-UUID ids", () => {
+    expect(recordVisitSchema.safeParse({ ...valid, childId: "nope" }).success).toBe(false);
+    expect(recordVisitSchema.safeParse({ ...valid, staffId: "nope" }).success).toBe(false);
+  });
+});
+
+describe("isVisitOutstanding (P1-E05-S04 AC4)", () => {
+  it("is true only for the outstanding outcome", () => {
+    expect(isVisitOutstanding("outstanding")).toBe(true);
+    expect(isVisitOutstanding("settled")).toBe(false);
+    expect(isVisitOutstanding("settled_on_credit")).toBe(false);
   });
 });
 

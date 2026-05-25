@@ -468,6 +468,85 @@ export interface PhoneCheckResult {
 }
 
 // ---------------------------------------------------------------------------
+// Record a service visit (P1-E05-S04)
+// ---------------------------------------------------------------------------
+
+/** Bounds for a service rate (the visit charge), in integer cents (KES). */
+export const SERVICE_RATE_MIN_CENTS = 0; // a free/promo service is allowed
+export const SERVICE_RATE_MAX_CENTS = 50_000_000; // KES 500,000.00
+/** Max length of the snapshotted staff display name. */
+export const STAFF_NAME_SNAPSHOT_MAX = 120;
+
+/**
+ * Record a service visit (P1-E05-S04 AC1–AC4). Reception picks a service, the
+ * parent's child, and the attributed staff member, then confirms. The server
+ * creates a `bookings` row + a pending `invoices` row, marks the visit checked
+ * in, and runs the check-in debit (P1-E03-S05) against that invoice in one
+ * transaction (AC3). On insufficient balance with auto-credit off the booking
+ * still proceeds and an outstanding invoice is left (AC4).
+ *
+ * `parentId` is the parent's *user* id (the wallet + parent profile are derived
+ * server-side — never trusted from the client, mirroring the top-up flow). The
+ * staff actor (`posted_by`/`actor`) is the session user, never the body.
+ *
+ * The services + staff catalogues are a later epic (P1-E07). For now the client
+ * sends `serviceId` + `staffId` as opaque references plus the snapshot fields
+ * (`staffName`, `rate`) directly. DEFERRED: load active-only services/staff from
+ * the P1-E07 catalogue and snapshot server-side once that epic ships.
+ */
+export const recordVisitSchema = z.object({
+  parentId: z.string().uuid("parentId must be a UUID"),
+  childId: z.string().uuid("childId must be a UUID"),
+  serviceId: z.string().uuid("serviceId must be a UUID"),
+  staffId: z.string().uuid("staffId must be a UUID"),
+  /** Snapshotted staff display name (AC2). */
+  staffName: z
+    .string()
+    .trim()
+    .min(1, "A staff member is required")
+    .max(STAFF_NAME_SNAPSHOT_MAX, `Staff name must be ${STAFF_NAME_SNAPSHOT_MAX} characters or fewer`),
+  /** Snapshotted service rate / visit charge in integer cents (AC2, AC3). */
+  rate: z
+    .number({ message: "A service rate is required" })
+    .int("rate must be integer cents")
+    .min(SERVICE_RATE_MIN_CENTS, `Rate must be at least ${SERVICE_RATE_MIN_CENTS} cents`)
+    .max(SERVICE_RATE_MAX_CENTS, `Rate must be at most ${SERVICE_RATE_MAX_CENTS} cents`),
+  /** Optional caller dedup key; the server derives one if absent. */
+  idempotencyKey: z.string().trim().min(1).optional(),
+});
+export type RecordVisitInput = z.infer<typeof recordVisitSchema>;
+
+/** Check-in outcome surfaced to the reception flow (mirrors @bm/wallet). */
+export type VisitDebitOutcome = "settled" | "settled_on_credit" | "outstanding";
+
+/**
+ * Record-visit result (AC3, AC4). `bookingId`/`invoiceId` are the created rows;
+ * `outcome` is the check-in resolution. `warning` is true (with copy in
+ * `warningMessage`) when the wallet was insufficient and auto-credit was off —
+ * the visit still proceeded but an outstanding invoice was created (AC4).
+ */
+export interface RecordVisitResponse {
+  bookingId: string;
+  invoiceId: string;
+  outcome: VisitDebitOutcome;
+  /** Cents actually debited (0 on the outstanding path). */
+  debitedCents: number;
+  /** True when the booking proceeded on an underfunded wallet (AC4). */
+  warning: boolean;
+  /** Human-facing warning copy when `warning` is true, else null. */
+  warningMessage: string | null;
+}
+
+/**
+ * AC4: the reception UI surfaces a warning (but still confirms the visit) when
+ * the check-in left an outstanding invoice. Pure rule shared by the API shaping
+ * and the UI so the threshold lives in one place.
+ */
+export function isVisitOutstanding(outcome: VisitDebitOutcome): boolean {
+  return outcome === "outstanding";
+}
+
+// ---------------------------------------------------------------------------
 // Paystack card top-up (P1-E04-S04)
 // ---------------------------------------------------------------------------
 

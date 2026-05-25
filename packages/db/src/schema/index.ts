@@ -8,6 +8,7 @@ export * from "./wallets.js";
 export * from "./wallet-ledger.js";
 export * from "./invoices.js";
 export * from "./wallet-ledger-invoice-settlement.js";
+export * from "./bookings.js";
 export * from "./otp.js";
 export * from "./sms.js";
 export * from "./permissions.js";
