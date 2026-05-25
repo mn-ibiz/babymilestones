@@ -15,7 +15,8 @@ describe("parent shell nav wiring", () => {
   it("active tab resolves to the section for nested routes", () => {
     expect(activeNavHref("/wallet/statement")).toBe("/wallet");
     expect(activeNavHref("/children")).toBe("/children");
-    expect(activeNavHref("/")).toBe("/");
+    // Home is the authed dashboard at `/home` now (`/` is the public page).
+    expect(activeNavHref("/home")).toBe("/home");
   });
 });
 

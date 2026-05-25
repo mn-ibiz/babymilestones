@@ -23,9 +23,10 @@ describe("PARENT_NAV_ITEMS", () => {
     }
   });
 
-  it("home points at the dashboard root, others at their sections", () => {
+  it("home points at the authed dashboard, others at their sections", () => {
     const byKey = Object.fromEntries(PARENT_NAV_ITEMS.map((i) => [i.key, i.href]));
-    expect(byKey.home).toBe("/");
+    // `/` is the public marketing page (P1-E12-S01); the dashboard is `/home`.
+    expect(byKey.home).toBe("/home");
     expect(byKey.wallet).toBe("/wallet");
     expect(byKey.children).toBe("/children");
     expect(byKey.profile).toBe("/profile");
@@ -36,8 +37,10 @@ describe("isNavItemActive", () => {
   const home = PARENT_NAV_ITEMS[0]!;
   const wallet = PARENT_NAV_ITEMS[1]!;
 
-  it("matches home only on the exact root path", () => {
-    expect(isNavItemActive(home, "/")).toBe(true);
+  it("matches home on the dashboard path and nested routes only", () => {
+    expect(isNavItemActive(home, "/home")).toBe(true);
+    expect(isNavItemActive(home, "/home/anything")).toBe(true);
+    expect(isNavItemActive(home, "/")).toBe(false);
     expect(isNavItemActive(home, "/wallet")).toBe(false);
     expect(isNavItemActive(home, "/children/abc")).toBe(false);
   });
@@ -60,18 +63,20 @@ describe("isNavItemActive", () => {
 
 describe("activeNavHref", () => {
   it("returns the href of the matching tab", () => {
-    expect(activeNavHref("/")).toBe("/");
+    expect(activeNavHref("/home")).toBe("/home");
     expect(activeNavHref("/wallet/statement")).toBe("/wallet");
     expect(activeNavHref("/children")).toBe("/children");
     expect(activeNavHref("/profile")).toBe("/profile");
   });
 
   it("returns null when no tab matches", () => {
+    // `/` is the public marketing page — owned by no authed tab.
+    expect(activeNavHref("/")).toBeNull();
     expect(activeNavHref("/settings/unknown")).toBeNull();
   });
 
-  it("never matches home for a non-root path", () => {
-    expect(activeNavHref("/wallet")).not.toBe("/");
+  it("never matches home for a section path", () => {
+    expect(activeNavHref("/wallet")).not.toBe("/home");
   });
 
   it("prefers the most specific (longest) matching tab", () => {

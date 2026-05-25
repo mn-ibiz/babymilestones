@@ -17,12 +17,23 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 const SESSION_COOKIE_NAME = "bm_session";
 
-/** Public paths that never require a session. */
+/** Path prefixes that never require a session. */
 const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/_next", "/favicon.ico"];
+
+/**
+ * The marketing home (P1-E12-S01) lives at the exact root `/` in the public
+ * route group and must render for first-time, unauthenticated visitors. The
+ * authed dashboard now lives at `/home`, so `/` is matched exactly (not as a
+ * prefix, which would expose every path).
+ */
+function isPublicPath(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+}
 
 export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

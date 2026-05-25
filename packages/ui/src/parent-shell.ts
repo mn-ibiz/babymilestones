@@ -21,10 +21,11 @@ export interface ParentNavItem {
 
 /**
  * The four parent tabs, in display order: Home / Wallet / Children / Profile.
- * Home is the dashboard root; the others map to the authed `(app)` sections.
+ * Home is the authed dashboard at `/home` (the public marketing page owns `/`,
+ * per P1-E12-S01); the others map to the authed `(app)` sections.
  */
 export const PARENT_NAV_ITEMS: readonly ParentNavItem[] = [
-  { key: "home", label: "Home", href: "/", icon: "home" },
+  { key: "home", label: "Home", href: "/home", icon: "home" },
   { key: "wallet", label: "Wallet", href: "/wallet", icon: "wallet" },
   { key: "children", label: "Children", href: "/children", icon: "children" },
   { key: "profile", label: "Profile", href: "/profile", icon: "profile" },

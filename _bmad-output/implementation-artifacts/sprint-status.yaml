@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E11-S04 profile + consent management done)
+last_updated: 2026-05-25 (P1-E12-S01 marketing home page done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -124,8 +124,8 @@ development_status:
   epic-11-retrospective: optional
 
   # Epic 12 — Marketing & Landing  (source E12)
-  epic-12: ready-for-dev
-  12-1-home-page: ready-for-dev  # P1-E12-S01
+  epic-12: in-progress
+  12-1-home-page: done  # P1-E12-S01
   12-2-per-unit-pages: ready-for-dev  # P1-E12-S02
   12-3-deep-link-from-whatsapp-ads: ready-for-dev  # P1-E12-S03
   12-4-sign-in-sign-up-entry-points: ready-for-dev  # P1-E12-S04
