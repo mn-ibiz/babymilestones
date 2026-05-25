@@ -140,10 +140,22 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     });
     registerAdminRoutes(app, { db, sessions: deps.sessions });
 
-    // P1-E05-S01: Reception operator surface — parent search by phone/name.
-    // Read-only; needs only db + sessions, so always on (guarded internally to
-    // staff holding `read wallet`).
-    registerReceptionRoutes(app, { db, sessions: deps.sessions });
+    // Resolve provider wiring once (explicit deps in tests, env in production) so
+    // both the parent-facing payment routes and the reception top-up rails (S03)
+    // share the same Daraja/Paystack config + transport.
+    const mpesa = deps.mpesa ?? mpesaConfigFromEnv();
+    const paystack = deps.paystack ?? paystackConfigFromEnv();
+
+    // P1-E05-S01/S02/S03: Reception operator surface — parent search + profile
+    // (read-only, always on) and the unified top-up (S03), which credits cash
+    // synchronously and pushes the M-Pesa/Paystack rails when their wiring is
+    // present (a method whose rail is unwired returns 503).
+    registerReceptionRoutes(app, {
+      db,
+      sessions: deps.sessions,
+      mpesa: mpesa ?? undefined,
+      paystack: paystack ?? undefined,
+    });
 
     // P1-E04-S06: Reception/Cashier counter cash top-up. Needs only db +
     // sessions (cash is a manual entry — no provider wiring), so always on.
@@ -155,7 +167,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
     // P1-E04-S01: M-Pesa STK push routes register only when Daraja wiring is
     // present (explicit dep in tests, or full env config in production).
-    const mpesa = deps.mpesa ?? mpesaConfigFromEnv();
     if (mpesa) {
       registerMpesaRoutes(app, {
         db,
@@ -167,7 +178,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
     // P1-E04-S04: Paystack card top-up routes register only when Paystack wiring
     // is present (explicit dep in tests, or full env config in production).
-    const paystack = deps.paystack ?? paystackConfigFromEnv();
     if (paystack) {
       registerPaystackRoutes(app, { db, sessions: deps.sessions, paystack });
     }

@@ -368,6 +368,70 @@ export const bankTransferConfirmSchema = z.object({
 });
 export type BankTransferConfirmRequestInput = z.infer<typeof bankTransferConfirmSchema>;
 
+// ---------------------------------------------------------------------------
+// Reception unified top-up (P1-E05-S03)
+// ---------------------------------------------------------------------------
+
+/**
+ * The payment methods Reception can pick in the top-up sheet (P1-E05-S03 AC1).
+ * `cash` and the two provider rails (`mpesa_stk`, `paystack_card`) are handled by
+ * the reception top-up endpoint; `bank_transfer` appears in the picker but is an
+ * admin-confirmed flow (P1-E04-S07) routed elsewhere — the endpoint rejects it
+ * with guidance rather than silently crediting.
+ */
+export const RECEPTION_TOPUP_METHODS = [
+  "cash",
+  "mpesa_stk",
+  "paystack_card",
+  "bank_transfer",
+] as const;
+export type ReceptionTopupMethod = (typeof RECEPTION_TOPUP_METHODS)[number];
+
+/**
+ * Reception unified top-up request (P1-E05-S03 AC1, AC4). One staff endpoint that
+ * dispatches by `method`: cash credits synchronously, M-Pesa STK pushes to the
+ * parent's phone (credited async on callback), Paystack inits a hosted checkout.
+ * The funded parent is the parent's *user* id; the wallet + payer phone/email are
+ * derived server-side — never accepted from the client. The staff actor is the
+ * session user (`posted_by`), never the body. Amount is integer cents (the ledger
+ * never stores floats); whole-KES provider amounts are derived from it. An
+ * optional dedup key makes the cash recording idempotent.
+ */
+export const receptionTopupSchema = z.object({
+  parentId: z.string().uuid("parentId must be a UUID"),
+  method: z.enum(RECEPTION_TOPUP_METHODS, { message: "Choose a payment method" }),
+  amount: z
+    .number({ message: "Amount is required" })
+    .int("amount must be integer cents")
+    .min(CASH_TOPUP_MIN_CENTS, `Minimum top-up is ${CASH_TOPUP_MIN_CENTS} cents`)
+    .max(CASH_TOPUP_MAX_CENTS, `Maximum top-up is ${CASH_TOPUP_MAX_CENTS} cents`),
+  idempotencyKey: z.string().trim().min(1).optional(),
+});
+export type ReceptionTopupInput = z.infer<typeof receptionTopupSchema>;
+
+/** Top-up status as surfaced to the live-polling reception sheet (AC2). */
+export type ReceptionTopupStatus = "settled" | "pending" | "failed";
+
+/**
+ * Reception top-up dispatch result (AC1, AC2, AC3). `status` drives the sheet:
+ * `settled` (cash — receipt prints immediately, AC3), `pending` (M-Pesa STK /
+ * Paystack — the sheet polls `transactionId` for live updates, AC2). The provider
+ * handle is the M-Pesa `checkoutRequestId` or the Paystack `reference`;
+ * `authorizationUrl` is the Paystack hosted-checkout URL when present.
+ */
+export interface ReceptionTopupResponse {
+  method: ReceptionTopupMethod;
+  status: ReceptionTopupStatus;
+  /** Provider/transaction handle the sheet polls for live status (null for cash). */
+  transactionId: string | null;
+  /** Cash-only: the posted ledger entry id (the receipt source of truth). */
+  ledgerEntryId?: string;
+  /** Cash-only: true when an idempotent replay posted no new credit. */
+  replayed?: boolean;
+  /** Paystack-only: the hosted-checkout URL to hand to the parent. */
+  authorizationUrl?: string;
+}
+
 /** Lifecycle state of an STK request as surfaced to the polling client (AC4). */
 export type MpesaStkState =
   | "INITIATED"
