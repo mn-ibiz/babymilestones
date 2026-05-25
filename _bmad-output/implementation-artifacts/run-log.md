@@ -72,3 +72,4 @@ STORY 13-3-audit-catalogue-what-gets-audited | RESULT done | fixed=0 | deferred=
 STORY 14-2-primitive-components | RESULT done | fixed=0 | deferred=3 | reason=none  (X7-S02)
 STORY 14-3-compound-components-for-p1-surfaces | RESULT done | fixed=0 | deferred=0 | reason=none  (X7-S03)
 STORY 14-4-brand-assets-pipeline | RESULT done | fixed=0 | deferred=3 | reason=none  (X7-S04)
+STORY 15-1-structured-logging-error-tracking | RESULT done | fixed=3 | deferred=4 | reason=none  (X8-S01)
