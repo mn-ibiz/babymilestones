@@ -13,7 +13,7 @@
 # STATUS DEFINITIONS: backlog | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-25 (P1-E10-S04 done, epic-10 done)
+last_updated: 2026-05-25 (P1-E11-S01 done; epic-11 in-progress)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -113,8 +113,8 @@ development_status:
   epic-10-retrospective: optional
 
   # Epic 11 — Parent Dashboard MVP  (source E11)
-  epic-11: ready-for-dev
-  11-1-wallet-page-balance-outstanding-statement: ready-for-dev  # P1-E11-S01
+  epic-11: in-progress
+  11-1-wallet-page-balance-outstanding-statement: done  # P1-E11-S01
   11-2-children-list-and-profile-management: ready-for-dev  # P1-E11-S02
   11-3-top-up-flow-from-dashboard: ready-for-dev  # P1-E11-S03
   11-4-profile-consent-management: ready-for-dev  # P1-E11-S04

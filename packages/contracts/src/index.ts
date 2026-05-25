@@ -273,6 +273,36 @@ export interface OpenInvoicesResponse {
   totalCents: number;
 }
 
+// ---------------------------------------------------------------------------
+// Parent wallet overview (P1-E11-S01) — the parent dashboard wallet page
+// ---------------------------------------------------------------------------
+
+/**
+ * The authed parent's own wallet overview (P1-E11-S01). Backs the parent
+ * dashboard wallet page hero (balance + outstanding + read-only auto-credit
+ * status, AC1), the last-10 transactions list (AC3), and the read-only loyalty
+ * points balance (AC4 — earn-only in P1). Everything here is READ-ONLY: the
+ * auto-credit flag is flipped by an admin elsewhere, and loyalty is earn-only.
+ * Money is integer cents; format to KES at the edge.
+ */
+export interface WalletOverview {
+  /** Computed wallet balance in integer cents (credits − debits). */
+  balanceCents: number;
+  /** Outstanding amount owed in integer cents (sum of open invoices). */
+  outstandingCents: number;
+  /** Current value of `wallets.auto_credit_enabled` (read-only here — admin sets). */
+  autoCreditEnabled: boolean;
+  /** Loyalty points balance, read-only (earn-only in P1; 0 until earning lands). */
+  loyaltyPoints: number;
+  /** Latest 10 wallet-ledger postings, newest-first, each with balance-after. */
+  recentTransactions: RecentTransaction[];
+}
+
+/** Wallet overview response for the parent dashboard wallet page (AC1/AC3/AC4). */
+export interface WalletOverviewResponse {
+  wallet: WalletOverview;
+}
+
 /**
  * AC1: the outstanding amount renders red when the parent owes money (> 0) and
  * neutral otherwise. Pure rule shared by the API shaping and the header UI so
