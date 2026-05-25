@@ -133,6 +133,6 @@ export const TOP_UP_METHODS: readonly TopUpMethod[] = [
     key: "bank",
     label: "Bank transfer",
     description: "Transfer to our bank account; we credit on confirmation.",
-    href: "/top-up#bank",
+    href: "/top-up#bank-heading",
   },
 ] as const;
