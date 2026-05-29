@@ -136,6 +136,9 @@ export const AUDIT_ACTION_CATALOGUE = {
     "subscription.resumed",
     "subscription.renewed",
     "subscription.dunning",
+    "subscription.cancel_requested",
+    "subscription.cancel_reversed",
+    "subscription.cancelled",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

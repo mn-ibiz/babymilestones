@@ -88,3 +88,4 @@ STORY 17-2-parent-subscribes-to-a-plan | RESULT done | fixed=3 | deferred=1 | re
 STORY 17-3-bookings-deduct-subscription-entitlement-first | RESULT done | fixed=2 | deferred=0 | reason=none  (P2-E02-S03; code-review: entitlement refund-on-cancel + half-open period; concurrency verified)
 STORY 17-4-pause-freeze-and-resume-a-subscription | RESULT done | fixed=4 | deferred=0 | reason=none  (P2-E02-S04; code-review: HIGH fence-widen (paused double-charge), audit actor, clock, reception route)
 STORY 17-5-renewal-dunning-state-machine | RESULT done | fixed=2 | deferred=0 | reason=none  (P2-E02-S05; code-review: CRITICAL double-charge (replay voids redundant invoice) + grace-paused resumable)
+STORY 17-6-cancel-subscription | RESULT done | fixed=2 | deferred=0 | reason=none  (P2-E02-S06; code-review: HIGH paused-zombie reap + reverse race) — EPIC 17 COMPLETE; epics 16+17 done (13 stories)

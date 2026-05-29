@@ -55,6 +55,8 @@ export {
   resolvePlanPriceAt,
   pauseSubscription,
   resumeSubscription,
+  requestSubscriptionCancellation,
+  reverseSubscriptionCancellation,
   SubscriptionNotFoundError,
   SubscriptionStateError,
   type CreatePlanInput,

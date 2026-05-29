@@ -107,6 +107,8 @@ export const subscriptions = pgTable(
     pausedAt: timestamp("paused_at", { withTimezone: true }),
     /** When the subscription entered dunning (P2-E02-S05); anchors the grace window. */
     dunningSince: timestamp("dunning_since", { withTimezone: true }),
+    /** Scheduled cancellation (P2-E02-S06): renewal terminates at period end instead of charging. */
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
     /** Closed pause intervals `[{ pausedAt, resumedAt }]` for audit/reporting. */
     pauseHistory: jsonb("pause_history")
       .$type<Array<{ pausedAt: string; resumedAt: string }>>()

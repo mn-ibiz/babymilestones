@@ -11,8 +11,10 @@ import {
   listPlans,
   pauseSubscription,
   PlanPriceOrderError,
+  requestSubscriptionCancellation,
   resolvePlanPriceAt,
   resumeSubscription,
+  reverseSubscriptionCancellation,
   setPlanPrice,
   SUBSCRIPTION_PERIODS,
   SubscriptionStateError,
@@ -166,5 +168,15 @@ describe("subscription pause / resume (P2-E02-S04)", () => {
   it("rejects resuming a non-paused subscription", async () => {
     const id = await seedSubscription();
     await expect(resumeSubscription(dbh.db, { subscriptionId: id })).rejects.toBeInstanceOf(SubscriptionStateError);
+  });
+
+  it("schedules a cancellation (flag set, still active) and reverses it (P2-E02-S06 AC1/AC2)", async () => {
+    const id = await seedSubscription();
+    const requested = await requestSubscriptionCancellation(dbh.db, { subscriptionId: id });
+    expect(requested.cancelAtPeriodEnd).toBe(true);
+    expect(requested.status).toBe("active"); // current period plays out
+    const reversed = await reverseSubscriptionCancellation(dbh.db, { subscriptionId: id });
+    expect(reversed.cancelAtPeriodEnd).toBe(false);
+    expect(reversed.status).toBe("active");
   });
 });

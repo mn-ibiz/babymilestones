@@ -23,8 +23,10 @@ import {
   getService,
   listPlans,
   pauseSubscription,
+  requestSubscriptionCancellation,
   resolvePlanPriceAt,
   resumeSubscription,
+  reverseSubscriptionCancellation,
   SubscriptionNotFoundError,
   SubscriptionStateError,
 } from "@bm/catalog";
@@ -297,6 +299,38 @@ export function registerParentSubscriptions(app: FastifyInstance, deps: Subscrip
         status: updated.status,
         currentPeriodEnd: updated.currentPeriodEnd,
       });
+    } catch (err) {
+      if (err instanceof SubscriptionStateError) return reply.code(409).send({ error: err.message });
+      if (err instanceof SubscriptionNotFoundError) return reply.code(404).send({ error: "Subscription not found" });
+      throw err;
+    }
+  });
+
+  // Cancel (P2-E02-S06 AC1) — scheduled for period end; current period plays out.
+  app.post("/parents/me/subscriptions/:id/cancel", async (req: FastifyRequest, reply: FastifyReply) => {
+    const ctx = await requireParent(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    if (!(await ownedSubscription(reply, ctx.parentId, id))) return reply;
+    try {
+      const updated = await requestSubscriptionCancellation(db, { subscriptionId: id, actor: ctx.userId, ip: req.ip });
+      return reply.code(200).send({ subscriptionId: updated.id, status: updated.status, cancelAtPeriodEnd: updated.cancelAtPeriodEnd, currentPeriodEnd: updated.currentPeriodEnd });
+    } catch (err) {
+      if (err instanceof SubscriptionStateError) return reply.code(409).send({ error: err.message });
+      if (err instanceof SubscriptionNotFoundError) return reply.code(404).send({ error: "Subscription not found" });
+      throw err;
+    }
+  });
+
+  // Reverse a scheduled cancellation (P2-E02-S06 AC2) — reversible until period end.
+  app.post("/parents/me/subscriptions/:id/uncancel", async (req: FastifyRequest, reply: FastifyReply) => {
+    const ctx = await requireParent(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    if (!(await ownedSubscription(reply, ctx.parentId, id))) return reply;
+    try {
+      const updated = await reverseSubscriptionCancellation(db, { subscriptionId: id, actor: ctx.userId, ip: req.ip });
+      return reply.code(200).send({ subscriptionId: updated.id, status: updated.status, cancelAtPeriodEnd: updated.cancelAtPeriodEnd });
     } catch (err) {
       if (err instanceof SubscriptionStateError) return reply.code(409).send({ error: err.message });
       if (err instanceof SubscriptionNotFoundError) return reply.code(404).send({ error: "Subscription not found" });

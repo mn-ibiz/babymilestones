@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (17-5 renewal/dunning DONE: daily cron charges next period, dunning + 3-day grace + SMS, auto-credit; code-reviewed + 2 fixes incl. CRITICAL double-charge; full suite green. Epic-17: 5/6 done)
+last_updated: 2026-05-29 (17-6 cancel DONE — EPIC 17 (Subscriptions) COMPLETE 6/6: cancel_at_period_end + cron termination + reverse; code-reviewed + 2 fixes. Epics 16 + 17 fully done (13/13 stories); full suite green 17/17 packages)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -166,13 +166,13 @@ development_status:
   epic-16-retrospective: optional
 
   # Epic 17 — Subscription Plans (Play & Talent)  (P2-E02)
-  epic-17: in-progress
+  epic-17: done
   17-1-subscription-plan-catalogue: done  # P2-E02-S01
   17-2-parent-subscribes-to-a-plan: done  # P2-E02-S02
   17-3-bookings-deduct-subscription-entitlement-first: done  # P2-E02-S03
   17-4-pause-freeze-and-resume-a-subscription: done  # P2-E02-S04
   17-5-renewal-dunning-state-machine: done  # P2-E02-S05
-  17-6-cancel-subscription: ready-for-dev  # P2-E02-S06
+  17-6-cancel-subscription: done  # P2-E02-S06
   epic-17-retrospective: optional
 
   # Epic 18 — Pickup Authorisation & Free-Text Observations  (P2-E03)

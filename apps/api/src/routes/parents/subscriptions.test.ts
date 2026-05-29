@@ -160,4 +160,29 @@ describe("parent subscribes to a plan (P2-E02-S02)", () => {
     const subId = (await subscribe(owner, { planId, childId })).json().subscriptionId as string;
     expect((await action(other, subId, "pause")).statusCode).toBe(404);
   });
+
+  it("schedules a cancellation (period plays out) and reverses it (P2-E02-S06 AC1/AC2)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    await topup(parent.walletId, 10_000);
+    const childId = await addChild(parent.parentId);
+    const planId = await seedPlan({ amountCents: 5000 });
+    const subId = (await subscribe(parent, { planId, childId })).json().subscriptionId as string;
+
+    const cancelled = await app.inject({
+      method: "POST",
+      url: `/parents/me/subscriptions/${subId}/cancel`,
+      headers: { cookie: `${parent.session}; ${parent.csrfCookie}`, "x-csrf-token": parent.csrfToken },
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json().cancelAtPeriodEnd).toBe(true);
+    expect(cancelled.json().status).toBe("active"); // still usable through the period
+
+    const reversed = await app.inject({
+      method: "POST",
+      url: `/parents/me/subscriptions/${subId}/uncancel`,
+      headers: { cookie: `${parent.session}; ${parent.csrfCookie}`, "x-csrf-token": parent.csrfToken },
+    });
+    expect(reversed.statusCode).toBe(200);
+    expect(reversed.json().cancelAtPeriodEnd).toBe(false);
+  });
 });

@@ -31,6 +31,7 @@ describe("subscription renewal / dunning cron (P2-E02-S05)", () => {
     periodEnd?: Date;
     dunningSince?: Date | null;
     amountCents?: number;
+    cancelAtPeriodEnd?: boolean;
   } = {}) {
     const svc = await createService(dbh.db, { name: "Play", unit: "play" });
     const plan = await createPlan(dbh.db, { serviceId: svc.id, name: "P", entitlementCount: 8, period: "month" });
@@ -52,6 +53,7 @@ describe("subscription renewal / dunning cron (P2-E02-S05)", () => {
         currentPeriodEnd: opts.periodEnd ?? PERIOD_ENDED,
         status: opts.status ?? "active",
         dunningSince: opts.dunningSince ?? null,
+        cancelAtPeriodEnd: opts.cancelAtPeriodEnd ?? false,
         entitlementRemaining: 0,
       })
       .returning();
@@ -135,6 +137,26 @@ describe("subscription renewal / dunning cron (P2-E02-S05)", () => {
     // No phantom pending invoice left to be settled by a later top-up.
     const pending = await dbh.db.select().from(invoices).where(eq(invoices.status, "pending"));
     expect(pending).toHaveLength(0);
+  });
+
+  it("terminates a due subscription scheduled to cancel — no charge (P2-E02-S06 AC1/AC3)", async () => {
+    const id = await seed({ fund: 10_000, cancelAtPeriodEnd: true });
+    await run();
+    const sub = await get(id);
+    expect(sub.status).toBe("cancelled");
+    // No renewal charge: the wallet's only ledger entry is the top-up (no debit).
+    const ledger = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "subscription.renewed"));
+    expect(ledger).toHaveLength(0);
+    const cancels = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "subscription.cancelled"));
+    expect(cancels).toHaveLength(1);
+  });
+
+  it("reaps a paused subscription that was scheduled to cancel (no zombie) (P2-E02-S06)", async () => {
+    const id = await seed({ status: "active", fund: 0, cancelAtPeriodEnd: true });
+    // Pause it while the cancel is scheduled (paused + cancel_at_period_end).
+    await dbh.db.update(subscriptions).set({ status: "paused", pausedAt: NOW }).where(eq(subscriptions.id, id));
+    await run();
+    expect((await get(id)).status).toBe("cancelled"); // reaped, not stuck
   });
 
   it("a grace-paused subscription can be manually resumed (AC4)", async () => {

@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import {
   audit,
   invoices,
@@ -124,15 +124,42 @@ export function createSubscriptionRenewJob(deps: SubscriptionRenewJobDeps): Job 
     intervalMs: DAILY_MS,
     run: async () => {
       const at = clock();
+      // Renewal candidates (active/dunning) + any paused sub set to cancel, so a
+      // cancelled-then-paused subscription is still reaped (not left a zombie).
       const due = await db
         .select()
         .from(subscriptions)
-        .where(inArray(subscriptions.status, ["active", "dunning"]));
+        .where(
+          or(
+            inArray(subscriptions.status, ["active", "dunning"]),
+            and(eq(subscriptions.status, "paused"), eq(subscriptions.cancelAtPeriodEnd, true)),
+          ),
+        );
       for (const sub of due) {
+        // Scheduled cancellation (P2-E02-S06): terminate at period end instead of
+        // charging — an active sub when its paid period ends, or a dunning sub
+        // immediately (stop chasing a subscription the parent asked to end).
+        if (sub.cancelAtPeriodEnd) {
+          const periodEnded = sub.currentPeriodEnd.getTime() <= at.getTime();
+          if (sub.status === "dunning" || sub.status === "paused" || periodEnded) {
+            // Conditional on the flag still set so a concurrent un-cancel wins the race.
+            await db
+              .update(subscriptions)
+              .set({ status: "cancelled", dunningSince: null, updatedAt: at })
+              .where(and(eq(subscriptions.id, sub.id), eq(subscriptions.cancelAtPeriodEnd, true)));
+            await audit(db, {
+              actor: null,
+              action: "subscription.cancelled",
+              target: { table: "subscriptions", id: sub.id },
+              payload: { reason: "scheduled_cancel" },
+            });
+          }
+          continue; // never renew a subscription set to cancel
+        }
         if (sub.status === "active") {
           if (sub.currentPeriodEnd.getTime() > at.getTime()) continue; // not due yet
           await attemptRenewal(sub, at);
-        } else {
+        } else if (sub.status === "dunning") {
           // dunning: pause after the grace window (AC4), else retry the charge.
           if (sub.dunningSince && at.getTime() - sub.dunningSince.getTime() >= DUNNING_GRACE_MS) {
             // Set pausedAt so the parent can manually resume (AC4) — resume then

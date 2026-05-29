@@ -295,3 +295,70 @@ export async function resumeSubscription(
     return updated!;
   });
 }
+
+/* --- Cancellation (P2-E02-S06) ------------------------------------------- */
+
+/**
+ * Schedule a cancellation (P2-E02-S06 AC1): set `cancelAtPeriodEnd` so the
+ * renewal cron terminates the subscription at period end instead of charging the
+ * next period. The current paid period plays out; entitlement stays usable.
+ * Reversible until the flip (AC2). Throws when already cancelled.
+ */
+export async function requestSubscriptionCancellation(
+  db: Database,
+  input: { subscriptionId: string; actor?: string | null; ip?: string | null },
+): Promise<SubscriptionRow> {
+  return db.transaction(async (tx) => {
+    const [sub] = await tx
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, input.subscriptionId))
+      .for("update");
+    if (!sub) throw new SubscriptionNotFoundError(input.subscriptionId);
+    if (sub.status === "cancelled") throw new SubscriptionStateError("not cancelled", sub.status);
+    const [updated] = await tx
+      .update(subscriptions)
+      .set({ cancelAtPeriodEnd: true, updatedAt: new Date() })
+      .where(eq(subscriptions.id, sub.id))
+      .returning();
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "subscription.cancel_requested",
+      target: { table: "subscriptions", id: sub.id },
+      payload: { current_period_end: sub.currentPeriodEnd.toISOString(), ip: input.ip ?? undefined },
+    });
+    return updated!;
+  });
+}
+
+/**
+ * Reverse a scheduled cancellation (P2-E02-S06 AC2): clear `cancelAtPeriodEnd`
+ * while the subscription is still live (before the renewal cron flips it to
+ * cancelled). Throws when already cancelled.
+ */
+export async function reverseSubscriptionCancellation(
+  db: Database,
+  input: { subscriptionId: string; actor?: string | null; ip?: string | null },
+): Promise<SubscriptionRow> {
+  return db.transaction(async (tx) => {
+    const [sub] = await tx
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, input.subscriptionId))
+      .for("update");
+    if (!sub) throw new SubscriptionNotFoundError(input.subscriptionId);
+    if (sub.status === "cancelled") throw new SubscriptionStateError("not cancelled", sub.status);
+    const [updated] = await tx
+      .update(subscriptions)
+      .set({ cancelAtPeriodEnd: false, updatedAt: new Date() })
+      .where(eq(subscriptions.id, sub.id))
+      .returning();
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "subscription.cancel_reversed",
+      target: { table: "subscriptions", id: sub.id },
+      payload: { ip: input.ip ?? undefined },
+    });
+    return updated!;
+  });
+}
