@@ -20,13 +20,15 @@ describe("parent loyalty (P2-E05-S03/S04)", () => {
   let userId: string;
   let walletId: string;
   let sessionCookie: string;
+  let csrfCookie: string;
   let csrfToken: string;
 
   async function loginAs(phone: string, raw: string, pin: string) {
     const login = await app.inject({ method: "POST", url: "/auth/login", payload: { phone: raw, pin } });
     const cookies = login.headers["set-cookie"] as string[];
     const cookie = cookies.find((c) => c.startsWith("bm_session="))!.split(";")[0]!;
-    return { cookie, csrfToken: login.json().csrfToken as string };
+    const csrf = cookies.find((c) => c.startsWith("bm_csrf="))!.split(";")[0]!;
+    return { cookie, csrfCookie: csrf, csrfToken: login.json().csrfToken as string };
   }
 
   beforeEach(async () => {
@@ -39,8 +41,14 @@ describe("parent loyalty (P2-E05-S03/S04)", () => {
     walletId = w!.id;
     const s = await loginAs(PHONE, RAW, PIN);
     sessionCookie = s.cookie;
+    csrfCookie = s.csrfCookie;
     csrfToken = s.csrfToken;
   });
+
+  /** Cookie header carrying both the session and the CSRF double-submit cookie. */
+  function authedCookie(): string {
+    return `${sessionCookie}; ${csrfCookie}`;
+  }
   afterEach(async () => {
     await app.close();
     await dbh.close();
@@ -90,7 +98,7 @@ describe("parent loyalty (P2-E05-S03/S04)", () => {
       const res = await app.inject({
         method: "POST",
         url: "/parents/me/loyalty/redeem",
-        headers: { cookie: sessionCookie, "x-csrf-token": csrfToken },
+        headers: { cookie: authedCookie(), "x-csrf-token": csrfToken },
         payload: { points: 40, idempotencyKey: "redeem-1" },
       });
       expect(res.statusCode).toBe(200);
@@ -104,7 +112,7 @@ describe("parent loyalty (P2-E05-S03/S04)", () => {
       const res = await app.inject({
         method: "POST",
         url: "/parents/me/loyalty/redeem",
-        headers: { cookie: sessionCookie, "x-csrf-token": csrfToken },
+        headers: { cookie: authedCookie(), "x-csrf-token": csrfToken },
         payload: { points: 31, idempotencyKey: "redeem-over" },
       });
       expect(res.statusCode).toBe(409);
@@ -117,13 +125,13 @@ describe("parent loyalty (P2-E05-S03/S04)", () => {
       const first = await app.inject({
         method: "POST",
         url: "/parents/me/loyalty/redeem",
-        headers: { cookie: sessionCookie, "x-csrf-token": csrfToken },
+        headers: { cookie: authedCookie(), "x-csrf-token": csrfToken },
         payload: { points: 40, idempotencyKey: "dup" },
       });
       const second = await app.inject({
         method: "POST",
         url: "/parents/me/loyalty/redeem",
-        headers: { cookie: sessionCookie, "x-csrf-token": csrfToken },
+        headers: { cookie: authedCookie(), "x-csrf-token": csrfToken },
         payload: { points: 40, idempotencyKey: "dup" },
       });
       expect(first.statusCode).toBe(200);
@@ -142,7 +150,7 @@ describe("parent loyalty (P2-E05-S03/S04)", () => {
       const res = await app.inject({
         method: "POST",
         url: "/parents/me/loyalty/redeem",
-        headers: { cookie: sessionCookie, "x-csrf-token": csrfToken },
+        headers: { cookie: authedCookie(), "x-csrf-token": csrfToken },
         payload: { points: 0, idempotencyKey: "x" },
       });
       expect(res.statusCode).toBe(400);

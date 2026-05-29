@@ -13,6 +13,7 @@ import { registerAdminSmsConfig } from "./sms-config.js";
 import { registerAdminSmsTemplates } from "./sms-templates.js";
 import { registerAdminAudit } from "./audit.js";
 import { registerAdminSettings } from "./settings.js";
+import { registerAdminLoyaltyRates } from "./loyalty-rates.js";
 
 export interface AdminDeps {
   db: Database;
@@ -34,4 +35,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminSmsTemplates(app, deps);
   registerAdminAudit(app, deps);
   registerAdminSettings(app, deps);
+  registerAdminLoyaltyRates(app, deps);
 }

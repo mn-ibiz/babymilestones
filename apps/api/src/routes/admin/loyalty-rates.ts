@@ -30,8 +30,12 @@ function csrfHeaderOf(req: FastifyRequest): string | null {
 export function registerAdminLoyaltyRates(app: FastifyInstance, deps: AdminDeps): void {
   const { db, sessions } = deps;
   const resolveUser = makeResolveUser(db);
-  const readGuard = requirePermission("read", "settings");
-  const writeGuard = requirePermission("manage", "settings");
+  // Loyalty rates are part of the admin "config" surface (same gate as the
+  // Settings sub-app, which uses `manage config`). Admin/super_admin hold it;
+  // reception/treasury do not (→ 403). Both read + write use the same grant,
+  // mirroring admin/settings.ts.
+  const readGuard = requirePermission("manage", "config");
+  const writeGuard = requirePermission("manage", "config");
 
   app.get("/admin/loyalty/rates", async (req: FastifyRequest, reply: FastifyReply) => {
     const auth = await validateSession(
