@@ -2375,6 +2375,14 @@ export interface LoyaltyBalanceResponse {
 }
 
 /**
+ * Full parent loyalty account payload from `GET /parents/me/loyalty`: the S04
+ * balance/totals/history plus the S03 redemption `quote` for the checkout toggle.
+ */
+export interface LoyaltyAccountResponse extends LoyaltyBalanceResponse {
+  quote: LoyaltyRedemptionQuote;
+}
+
+/**
  * Effective loyalty rates (P2-E05-S02).
  *  earnRate   — KES of qualifying spend per 1 point (default 100)
  *  redeemRate — KES value of 1 point at redemption (default 1)

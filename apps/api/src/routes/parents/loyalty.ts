@@ -12,7 +12,7 @@ import {
   InsufficientPointsError,
 } from "@bm/wallet";
 import type {
-  LoyaltyBalanceResponse,
+  LoyaltyAccountResponse,
   LoyaltyHistoryItem,
   LoyaltyRedemptionQuote,
   RedeemPointsResponse,
@@ -98,7 +98,7 @@ export function registerParentLoyalty(app: FastifyInstance, deps: ParentsDeps): 
       redeemRate,
     };
 
-    const body: LoyaltyBalanceResponse & { quote: LoyaltyRedemptionQuote } = {
+    const body: LoyaltyAccountResponse = {
       balance: totals.balance,
       lifetimeEarned: totals.lifetimeEarned,
       lifetimeRedeemed: totals.lifetimeRedeemed,
