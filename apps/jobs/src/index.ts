@@ -30,6 +30,21 @@ export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
 
+// P3-E06-S01: the job framework — runJob records each run in job_runs + alerts
+// on failure; startScheduler is the single-worker cron loop.
+export { runJob, startScheduler } from "./runner.js";
+export type {
+  RunnerDeps,
+  RunOptions,
+  RunResult,
+  SchedulerHandle,
+  JobTracker,
+  RunnerLogger,
+} from "./runner.js";
+// P3-E06-S01 AC1: the registry surface (name, schedule, on-failure policy).
+export { schedule, allJobs } from "./registry.js";
+export type { Job, JobDescriptor, OnFailurePolicy } from "./registry.js";
+
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
  * shim below registers nothing until real infra is injected (DATABASE_URL +
@@ -81,7 +96,7 @@ export function registerSubscriptionRenewJob(
   register(createSubscriptionRenewJob(deps));
 }
 
-/** Wire the nightly 24-month observation anonymisation cron (P2-E03-S05). */
+/** Wire the nightly 24-month observation anonymisation cron (P2-E03-S05 / P3-E06-S02). */
 export function registerAnonymiseObservationsJob(
   deps: Parameters<typeof createAnonymiseObservationsJob>[0],
 ): void {

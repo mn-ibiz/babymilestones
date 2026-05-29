@@ -13,12 +13,19 @@ import { registerAdminSmsConfig } from "./sms-config.js";
 import { registerAdminSmsTemplates } from "./sms-templates.js";
 import { registerAdminAudit } from "./audit.js";
 import { registerAdminSettings } from "./settings.js";
+import { registerAdminJobs, type RunnableJob } from "./jobs.js";
 
 export interface AdminDeps {
   db: Database;
   sessions: SessionStore;
   /** SMS sender for parent notifications. Defaults to the DB-backed stub. */
   sms?: SmsSender;
+  /**
+   * Background jobs the super-admin console can trigger manually (P3-E06-S01
+   * AC4). Wired from `apps/jobs` at boot; omitted in surfaces that don't run a
+   * worker (the run-now endpoint then exposes an empty registry).
+   */
+  jobs?: RunnableJob[];
 }
 
 /** Admin-only API surface (P1-E03-S06+). All routes guard with the rbac matrix. */
@@ -34,4 +41,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminSmsTemplates(app, deps);
   registerAdminAudit(app, deps);
   registerAdminSettings(app, deps);
+  registerAdminJobs(app, { db: deps.db, sessions: deps.sessions, jobs: deps.jobs });
 }

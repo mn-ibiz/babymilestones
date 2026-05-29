@@ -148,6 +148,11 @@ export const AUDIT_ACTION_CATALOGUE = {
     "attendance.checked_out",
     "observation.anonymised",
   ],
+  /** Background-jobs runner (P3-E06). A super-admin "run now" is an audited
+   * mutation (AC4); a cron tick's lifecycle is recorded in `job_runs`, not the
+   * audit log. The SMS-retry worker dead-lettering a message (P3-E06-S04 AC3) is
+   * a state change worth a forensic trail. */
+  jobs: ["job.run_now", "sms.retry.dead_lettered"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */
