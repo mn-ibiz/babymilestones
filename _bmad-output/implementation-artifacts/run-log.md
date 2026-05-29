@@ -77,3 +77,4 @@ STORY 15-2-health-endpoints | RESULT done | fixed=0 | deferred=3 | reason=none  
 STORY 15-3-daily-db-backup-retention | RESULT done | fixed=0 | deferred=0 | reason=none  (X8-S03)
 STORY 15-4-ci-cd-pipelines-per-app | RESULT done | fixed=0 | deferred=3 | reason=none  (X8-S04)
 STORY 16-1-time-slot-model-and-capacity-for-services | RESULT done | fixed=6 | deferred=2 | reason=none  (P2-E01-S01; code-review: 6 findings patched, 2 deferred to 16-3/16-6)
+STORY 16-2-parent-browses-available-slots-for-a-service | RESULT done | fixed=8 | deferred=0 | reason=none  (P2-E01-S02; code-review: 8 fixes incl. critical route collision, build verified)

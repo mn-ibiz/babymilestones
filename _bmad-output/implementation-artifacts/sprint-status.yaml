@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (16-1 time-slot model + capacity DONE: service_schedules/session_slots, catalog slot-gen + remaining-capacity, admin CRUD API + audit, nightly cron; code-reviewed (3 adversarial layers) + 6 fixes applied; full suite green)
+last_updated: 2026-05-29 (16-2 parent slot browse DONE: age range on services, parent availability API + 7-day grid + remaining capacity, /book listing; code-reviewed + 8 fixes incl. critical route collision; platform build + full suite green)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -157,7 +157,7 @@ development_status:
   # Epic 16 — Booking Engine  (P2-E01)
   epic-16: in-progress
   16-1-time-slot-model-and-capacity-for-services: done  # P2-E01-S01
-  16-2-parent-browses-available-slots-for-a-service: ready-for-dev  # P2-E01-S02
+  16-2-parent-browses-available-slots-for-a-service: done  # P2-E01-S02
   16-3-parent-books-a-slot-creates-pending-invoice: ready-for-dev  # P2-E01-S03
   16-4-reception-books-on-behalf-of-a-walk-in: ready-for-dev  # P2-E01-S04
   16-5-parent-reschedules-a-booking: ready-for-dev  # P2-E01-S05

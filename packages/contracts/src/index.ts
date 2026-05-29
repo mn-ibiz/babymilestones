@@ -1245,16 +1245,43 @@ const optionalTaxTreatmentCreate = z
  * service is always created active; prices are set separately (effective-dated).
  * `taxTreatment` defaults to `vat_exempt` when omitted (P1-E07-S04 AC3).
  */
-export const serviceCreateSchema = z.object({
-  name: z.string().trim().min(1, "name is required").max(SERVICE_NAME_MAX),
-  description: optionalServiceText.refine(
-    (v) => v === null || v.length <= SERVICE_DESCRIPTION_MAX,
-    `description must be ${SERVICE_DESCRIPTION_MAX} characters or fewer`,
-  ),
-  unit: z.enum(SERVICE_UNITS, { message: "Choose a service unit" }),
-  attributionRoleRequired: optionalAttributionRole,
-  taxTreatment: optionalTaxTreatmentCreate,
-});
+/** Largest sensible age bound in months (100 years) — guards typos, not policy. */
+export const AGE_MONTHS_MAX = 1200;
+
+/** Optional age-in-months bound (P2-E01-S02): absent or null = unbounded. */
+const optionalAgeMonths = z
+  .union([z.number().int("age must be a whole number of months").min(0, "age cannot be negative").max(AGE_MONTHS_MAX), z.null()])
+  .optional();
+
+/** True when a child of `ageMonths` fits a service's `[min, max]` month range (null bounds = open). */
+export function slotFitsAge(
+  ageMonths: number,
+  ageMinMonths: number | null,
+  ageMaxMonths: number | null,
+): boolean {
+  if (ageMinMonths !== null && ageMonths < ageMinMonths) return false;
+  if (ageMaxMonths !== null && ageMonths > ageMaxMonths) return false;
+  return true;
+}
+
+export const serviceCreateSchema = z
+  .object({
+    name: z.string().trim().min(1, "name is required").max(SERVICE_NAME_MAX),
+    description: optionalServiceText.refine(
+      (v) => v === null || v.length <= SERVICE_DESCRIPTION_MAX,
+      `description must be ${SERVICE_DESCRIPTION_MAX} characters or fewer`,
+    ),
+    unit: z.enum(SERVICE_UNITS, { message: "Choose a service unit" }),
+    attributionRoleRequired: optionalAttributionRole,
+    taxTreatment: optionalTaxTreatmentCreate,
+    ageMinMonths: optionalAgeMonths,
+    ageMaxMonths: optionalAgeMonths,
+  })
+  .refine(
+    (v) =>
+      v.ageMinMonths == null || v.ageMaxMonths == null || v.ageMinMonths <= v.ageMaxMonths,
+    { message: "ageMinMonths must be ≤ ageMaxMonths", path: ["ageMaxMonths"] },
+  );
 export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
 
 /**
@@ -1276,6 +1303,8 @@ export const serviceUpdateSchema = z
         message: `taxTreatment must be one of: ${TAX_TREATMENTS.join(", ")}`,
       })
       .optional(),
+    ageMinMonths: optionalAgeMonths,
+    ageMaxMonths: optionalAgeMonths,
   })
   .refine(
     (v) =>
@@ -1283,8 +1312,15 @@ export const serviceUpdateSchema = z
       v.isActive !== undefined ||
       v.description !== null ||
       v.attributionRoleRequired !== null ||
-      v.taxTreatment !== undefined,
+      v.taxTreatment !== undefined ||
+      v.ageMinMonths !== undefined ||
+      v.ageMaxMonths !== undefined,
     "at least one field is required",
+  )
+  .refine(
+    (v) =>
+      v.ageMinMonths == null || v.ageMaxMonths == null || v.ageMinMonths <= v.ageMaxMonths,
+    { message: "ageMinMonths must be ≤ ageMaxMonths", path: ["ageMaxMonths"] },
   );
 export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;
 
@@ -1398,6 +1434,49 @@ export const scheduleUpdateSchema = z
     { message: "endTime must be after startTime", path: ["endTime"] },
   );
 export type ScheduleUpdateInput = z.infer<typeof scheduleUpdateSchema>;
+
+/* --- Slot availability browse (P2-E01-S02) ------------------------------- */
+
+/** How many days of availability the parent browse shows (AC1 — a 7-day grid). */
+export const AVAILABILITY_WINDOW_DAYS = 7;
+
+/** A service a parent can browse + book, for the `/book` listing (P2-E01-S02). */
+export interface BookableService {
+  id: string;
+  name: string;
+  description: string | null;
+  unit: ServiceUnit;
+  ageMinMonths: number | null;
+  ageMaxMonths: number | null;
+}
+
+/** One bookable slot in the parent browse, with display state (AC1/AC3). */
+export interface AvailableSlot {
+  id: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  capacity: number;
+  remainingCapacity: number;
+  /** Past or earlier-today — greyed out / disabled (AC3). */
+  isPast: boolean;
+  /** Bookable now: not past AND has remaining capacity. */
+  available: boolean;
+}
+
+/** Parent availability response for a service + child over the browse window. */
+export interface ServiceAvailability {
+  serviceId: string;
+  childId: string;
+  /** First day of the grid (`YYYY-MM-DD`, server clock) — anchors the client grid. */
+  windowStart: string;
+  ageMonths: number;
+  ageMinMonths: number | null;
+  ageMaxMonths: number | null;
+  /** Whether the child's age fits the service's range (AC2). When false, `slots` is empty. */
+  eligible: boolean;
+  slots: AvailableSlot[];
+}
 
 /* --- Staff data records (P1-E07-S03) ------------------------------------- */
 

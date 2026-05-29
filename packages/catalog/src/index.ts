@@ -59,8 +59,11 @@ export {
   resyncScheduleSlots,
   listSlotsWithRemaining,
   getSlotWithRemaining,
+  isSlotPast,
+  browseServiceSlots,
   type SlotWindow,
   type CreateScheduleInput,
   type UpdateScheduleInput,
   type SlotWithRemaining,
+  type BrowseSlot,
 } from "./schedules.js";

@@ -107,6 +107,31 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     expect(read.json().attributionRoleRequired).toBe("stylist");
   });
 
+  it("persists an age-eligibility range and reads it back (P2-E01-S02 AC2)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      ...validService,
+      ageMinMonths: 0,
+      ageMaxMonths: 12,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().ageMinMonths).toBe(0);
+    expect(res.json().ageMaxMonths).toBe(12);
+  });
+
+  it("rejects a one-sided age update that inverts the merged range (P2-E01-S02 AC2)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const created = await req("POST", "/admin/services", creds, {
+      ...validService,
+      ageMinMonths: 0,
+      ageMaxMonths: 12,
+    });
+    // Patch only the min above the stored max — must 400, not hit the DB CHECK (500).
+    const res = await req("PATCH", `/admin/services/${created.json().id}`, creds, { ageMinMonths: 50 });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("ageMaxMonths");
+  });
+
   it("rejects an attribution role outside the staff-role taxonomy (P1-E07-S02 AC1)", async () => {
     const creds = await loginStaff("+254712000001", "7421");
     const res = await req("POST", "/admin/services", creds, {

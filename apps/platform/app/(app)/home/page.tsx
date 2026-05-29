@@ -22,6 +22,13 @@ export default function HomePage() {
             <span className="text-base font-medium">{item.label}</span>
           </Link>
         ))}
+        {/* Booking entry point (P2-E01-S02) — leads to the bookable-services list. */}
+        <Link
+          href="/book"
+          className="rounded-lg border border-ink/10 bg-surface p-4 text-ink hover:bg-ink/5"
+        >
+          <span className="text-base font-medium">Book a session</span>
+        </Link>
       </div>
     </div>
   );

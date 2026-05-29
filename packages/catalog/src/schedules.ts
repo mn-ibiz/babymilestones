@@ -388,3 +388,53 @@ export async function getSlotWithRemaining(
   const counts = await bookingCountsBySlot(db, [slotId]);
   return withRemaining(slot, counts.get(slotId) ?? 0);
 }
+
+/* --- Parent browse read model (P2-E01-S02) ------------------------------- */
+
+/** A slot decorated for the parent browse: remaining capacity + display state. */
+export type BrowseSlot = SlotWithRemaining & {
+  /** True when the slot is in the past or earlier today (greyed/disabled, AC3). */
+  isPast: boolean;
+  /** Bookable now: not past AND has remaining capacity. */
+  available: boolean;
+};
+
+/**
+ * Decide whether a slot is in the past relative to `today`/`nowMinutes` (AC3).
+ * A slot on an earlier date is past; a slot today is past once its END time has
+ * passed (`nowMinutes` = minutes since midnight). Future dates are never past.
+ */
+export function isSlotPast(
+  slotDate: string,
+  endTime: string,
+  today: string,
+  nowMinutes: number,
+): boolean {
+  if (slotDate < today) return true;
+  if (slotDate > today) return false;
+  return hmToMinutes(endTime) <= nowMinutes;
+}
+
+/**
+ * Slots for the parent browse (P2-E01-S02 AC1/AC3): a service's concrete slots
+ * over `[fromDate, fromDate + days)` with computed remaining capacity, each
+ * tagged `isPast` (earlier date or already-ended today) and `available`
+ * (not past AND remaining > 0). Ordered by date then start time. `today` and
+ * `nowMinutes` anchor the "now" used for the past/earlier-today check.
+ */
+export async function browseServiceSlots(
+  db: Executor,
+  opts: { serviceId: string; fromDate: string; days?: number; today: string; nowMinutes: number },
+): Promise<BrowseSlot[]> {
+  const days = opts.days ?? 7;
+  const toDate = addDaysIso(opts.fromDate, days - 1);
+  const slots = await listSlotsWithRemaining(db, {
+    serviceId: opts.serviceId,
+    fromDate: opts.fromDate,
+    toDate,
+  });
+  return slots.map((s) => {
+    const isPast = isSlotPast(s.slotDate, s.endTime, opts.today, opts.nowMinutes);
+    return { ...s, isPast, available: !isPast && s.remainingCapacity > 0 };
+  });
+}

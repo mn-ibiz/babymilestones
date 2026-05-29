@@ -1,4 +1,14 @@
-import { bigint, boolean, date, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  date,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 /**
  * `services` (P1-E07-S01) — the paid services the centre offers, managed by
@@ -53,6 +63,14 @@ export const services = pgTable("services", {
    * by the receipt engine (P1-E08) + eTIMS (P5) to compute / display line-tax.
    */
   taxTreatment: text("tax_treatment").$type<TaxTreatment>().notNull().default("vat_exempt"),
+  /**
+   * Optional age-eligibility range in MONTHS (P2-E01-S02 AC2). Nullable bounds:
+   * null min = no lower bound, null max = no upper bound, both null = open to all
+   * ages. The booking-browse flow filters slots to children whose
+   * {@link ageInMonths} falls within `[ageMinMonths, ageMaxMonths]`.
+   */
+  ageMinMonths: integer("age_min_months"),
+  ageMaxMonths: integer("age_max_months"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

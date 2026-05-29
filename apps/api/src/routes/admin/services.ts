@@ -43,6 +43,8 @@ function serializeService(row: Awaited<ReturnType<typeof getService>>) {
     isActive: row.isActive,
     attributionRoleRequired: row.attributionRoleRequired,
     taxTreatment: row.taxTreatment,
+    ageMinMonths: row.ageMinMonths,
+    ageMaxMonths: row.ageMaxMonths,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -163,6 +165,16 @@ export function registerAdminServices(app: FastifyInstance, deps: AdminServicesD
     const { id } = req.params as { id: string };
     const existing = await getService(db, id);
     if (!existing) return reply.code(404).send({ error: "Service not found" });
+    // The schema validates min≤max only when BOTH bounds are in the patch; re-check
+    // the MERGED range against the stored row so a one-sided age edit can't violate
+    // the services_age_range_ck CHECK and surface as a raw 500.
+    const mergedMin =
+      parsed.data.ageMinMonths !== undefined ? parsed.data.ageMinMonths : existing.ageMinMonths;
+    const mergedMax =
+      parsed.data.ageMaxMonths !== undefined ? parsed.data.ageMaxMonths : existing.ageMaxMonths;
+    if (mergedMin != null && mergedMax != null && mergedMin > mergedMax) {
+      return reply.code(400).send({ error: "ageMinMonths must be ≤ ageMaxMonths", field: "ageMaxMonths" });
+    }
     const row = await updateService(db, id, parsed.data);
     await audit(db, {
       actor: actor.id,

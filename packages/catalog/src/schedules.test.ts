@@ -7,9 +7,11 @@ import {
   addDaysIso,
   createSchedule,
   dayOfWeekIso,
+  browseServiceSlots,
   deleteFutureUnbookedSlots,
   enumerateSlotDates,
   generateSlotsForSchedule,
+  isSlotPast,
   getSchedule,
   getSlotWithRemaining,
   hmToMinutes,
@@ -390,6 +392,49 @@ describe("slot reconciliation on schedule edit / retire (P2-E01-S01 AC4)", () =>
     const retired = (await updateSchedule(dbh.db, sched.id, { isActive: false }))!;
     await resyncScheduleSlots(dbh.db, retired, { fromDate: FROM, days: 14 });
     expect(await listSlotsWithRemaining(dbh.db, { serviceId: svc.id })).toHaveLength(0);
+  });
+
+  it("browseServiceSlots tags isPast + available over the 7-day window (AC1/AC3)", async () => {
+    const svc = await createService(dbh.db, { name: "Soft Play", unit: "play" });
+    const sched = await createSchedule(dbh.db, {
+      serviceId: svc.id,
+      dayOfWeek: dayOfWeekIso(FROM),
+      startTime: "09:00",
+      endTime: "10:00",
+      slotDurationMinutes: 60,
+      capacity: 5,
+    });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: FROM, days: 14 });
+
+    // Before 09:00 on the slot's day → available.
+    const early = await browseServiceSlots(dbh.db, {
+      serviceId: svc.id,
+      fromDate: FROM,
+      days: 7,
+      today: FROM,
+      nowMinutes: 5 * 60,
+    });
+    expect(early).toHaveLength(1); // only FROM's slot falls in the 7-day window
+    expect(early[0]!.isPast).toBe(false);
+    expect(early[0]!.available).toBe(true);
+
+    // After 10:00 the slot has ended → past + unavailable.
+    const late = await browseServiceSlots(dbh.db, {
+      serviceId: svc.id,
+      fromDate: FROM,
+      days: 7,
+      today: FROM,
+      nowMinutes: 11 * 60,
+    });
+    expect(late[0]!.isPast).toBe(true);
+    expect(late[0]!.available).toBe(false);
+  });
+
+  it("isSlotPast handles date + earlier/later-today boundaries (AC3)", () => {
+    expect(isSlotPast("2026-06-14", "10:00", "2026-06-15", 0)).toBe(true); // earlier date
+    expect(isSlotPast("2026-06-16", "10:00", "2026-06-15", 24 * 60)).toBe(false); // later date
+    expect(isSlotPast("2026-06-15", "10:00", "2026-06-15", 10 * 60)).toBe(true); // ended exactly now
+    expect(isSlotPast("2026-06-15", "10:00", "2026-06-15", 9 * 60)).toBe(false); // still upcoming today
   });
 
   it("deleteFutureUnbookedSlots leaves PAST slots untouched", async () => {

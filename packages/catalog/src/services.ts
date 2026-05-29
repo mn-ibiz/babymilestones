@@ -77,6 +77,9 @@ export interface CreateServiceInput {
   attributionRoleRequired?: AttributionRole | null;
   /** VAT / tax treatment (P1-E07-S04 AC1). Defaults to `vat_exempt` (AC3). */
   taxTreatment?: TaxTreatment;
+  /** Optional age-eligibility range in months (P2-E01-S02 AC2). Null = unbounded. */
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -89,6 +92,8 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       unit: input.unit,
       attributionRoleRequired: input.attributionRoleRequired ?? null,
       taxTreatment: input.taxTreatment ?? DEFAULT_TAX_TREATMENT,
+      ageMinMonths: input.ageMinMonths ?? null,
+      ageMaxMonths: input.ageMaxMonths ?? null,
     })
     .returning();
   return row!;
@@ -102,6 +107,9 @@ export interface UpdateServiceInput {
   attributionRoleRequired?: AttributionRole | null;
   /** VAT / tax treatment (P1-E07-S04 AC1). Non-null — only changed when present. */
   taxTreatment?: TaxTreatment;
+  /** Age-eligibility range in months (P2-E01-S02). Null clears the bound. */
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
 }
 
 /**
@@ -118,6 +126,8 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
   if (patch.attributionRoleRequired !== undefined)
     set.attributionRoleRequired = patch.attributionRoleRequired;
   if (patch.taxTreatment !== undefined) set.taxTreatment = patch.taxTreatment;
+  if (patch.ageMinMonths !== undefined) set.ageMinMonths = patch.ageMinMonths;
+  if (patch.ageMaxMonths !== undefined) set.ageMaxMonths = patch.ageMaxMonths;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;
 }
