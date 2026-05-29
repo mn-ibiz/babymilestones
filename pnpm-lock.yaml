@@ -115,6 +115,9 @@ importers:
 
   apps/jobs:
     dependencies:
+      '@bm/catalog':
+        specifier: workspace:*
+        version: link:../../packages/catalog
       '@bm/db':
         specifier: workspace:*
         version: link:../../packages/db

@@ -5,6 +5,7 @@ import { createWalletStatementJob } from "./jobs/wallet-statement.js";
 import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 import { createAuditDrainJob } from "./jobs/audit-drain.js";
 import { createDbBackupJob } from "./jobs/db-backup.js";
+import { createSlotGenerationJob } from "./jobs/slot-generation.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -20,6 +21,8 @@ export type {
   BackupResult,
   BackupStore,
 } from "./jobs/db-backup.js";
+export { createSlotGenerationJob } from "./jobs/slot-generation.js";
+export type { SlotGenerationJobDeps } from "./jobs/slot-generation.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -56,6 +59,13 @@ export function registerDbBackupJob(
   deps: Parameters<typeof createDbBackupJob>[0],
 ): void {
   register(createDbBackupJob(deps));
+}
+
+/** Wire the nightly slot-generation cron (P2-E01-S01 AC2: daily, 60-day horizon). */
+export function registerSlotGenerationJob(
+  deps: Parameters<typeof createSlotGenerationJob>[0],
+): void {
+  register(createSlotGenerationJob(deps));
 }
 
 export { logger } from "./logger.js";

@@ -37,6 +37,12 @@ export const bookings = pgTable(
     invoiceId: uuid("invoice_id")
       .notNull()
       .references(() => invoices.id),
+    /**
+     * The session slot this booking consumes (P2-E01-S01) — nullable uuid with a
+     * FK to `session_slots`. Existing P1 arrivals carry NULL; a slot's
+     * remaining_capacity counts the bookings whose `slotId` matches it (AC3).
+     */
+    slotId: uuid("slot_id"),
     /** A visit is created already checked-in (AC3) — set at confirm time. */
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -45,6 +51,7 @@ export const bookings = pgTable(
   (t) => ({
     parentIdCreatedAtIdx: index("bookings_parent_id_created_at_idx").on(t.parentId, t.createdAt),
     invoiceIdUniq: uniqueIndex("bookings_invoice_id_uniq").on(t.invoiceId),
+    slotIdIdx: index("bookings_slot_id_idx").on(t.slotId),
   }),
 );
 

@@ -89,6 +89,8 @@ export const AUDIT_ACTION_CATALOGUE = {
     "catalog.service.create",
     "catalog.service.update",
     "catalog.service.price_change",
+    "catalog.schedule.create",
+    "catalog.schedule.update",
     "catalog.staff.create",
     "catalog.staff.update",
     "treasury.float_account.create",
@@ -120,6 +122,8 @@ export const AUDIT_ACTION_CATALOGUE = {
     "wallet.statement.export.completed",
     "treasury.reconciliation.export",
   ],
+  /** Daily DB backup lifecycle (X8-S03) — every run + prune is recorded. */
+  backup: ["backup.run.succeeded", "backup.run.failed", "backup.run.pruned"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

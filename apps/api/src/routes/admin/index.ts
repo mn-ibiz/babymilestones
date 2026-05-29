@@ -5,6 +5,7 @@ import type { SmsSender } from "@bm/sms";
 import { registerAdminRefund } from "./refund.js";
 import { registerAdminAutoCredit } from "./auto-credit.js";
 import { registerAdminServices } from "./services.js";
+import { registerAdminSchedules } from "./schedules.js";
 import { registerAdminStaff } from "./staff.js";
 import { registerAdminUsers } from "./users.js";
 import { registerAdminSmsConfig } from "./sms-config.js";
@@ -24,6 +25,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminRefund(app, deps);
   registerAdminAutoCredit(app, deps);
   registerAdminServices(app, deps);
+  registerAdminSchedules(app, deps);
   registerAdminStaff(app, deps);
   registerAdminUsers(app, deps);
   registerAdminSmsConfig(app, deps);

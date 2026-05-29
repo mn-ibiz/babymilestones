@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@bm/catalog": "workspace:*",
     "@bm/db": "workspace:*",
     "@bm/export": "workspace:*",
     "@bm/observability": "workspace:*",

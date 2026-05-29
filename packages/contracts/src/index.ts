@@ -1310,6 +1310,95 @@ export const servicePriceCreateSchema = z.object({
 });
 export type ServicePriceCreateInput = z.infer<typeof servicePriceCreateSchema>;
 
+/* --- Service schedules / time-slots (P2-E01-S01) ------------------------- */
+
+/** HH:MM 24h wall-clock time (mirrors the `service_schedules` migration CHECK). */
+export const SCHEDULE_TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/u;
+/**
+ * A generated slot is at least 5 minutes and at most a full day long. The 5-min
+ * floor is a sane product minimum that also bounds how many windows one schedule
+ * can materialise per day (≤ 288), keeping bulk slot inserts well within
+ * Postgres' bind-parameter limit.
+ */
+export const SLOT_DURATION_MIN_MINUTES = 5;
+export const SLOT_DURATION_MAX_MINUTES = 24 * 60;
+/** Sanity ceiling on per-slot capacity (children per slot). */
+export const SLOT_CAPACITY_MAX = 1000;
+
+/** "HH:MM" → minutes since midnight. Assumes {@link SCHEDULE_TIME_REGEX} matched. */
+function scheduleHmToMinutes(hm: string): number {
+  const [h, m] = hm.split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+const scheduleTimeField = z
+  .string()
+  .trim()
+  .regex(SCHEDULE_TIME_REGEX, "time must be HH:MM (24-hour)");
+const dayOfWeekField = z
+  .number({ message: "dayOfWeek is required" })
+  .int("dayOfWeek must be an integer 0–6")
+  .min(0, "dayOfWeek must be 0 (Sun) – 6 (Sat)")
+  .max(6, "dayOfWeek must be 0 (Sun) – 6 (Sat)");
+const slotDurationField = z
+  .number({ message: "slotDurationMinutes is required" })
+  .int("slotDurationMinutes must be a whole number of minutes")
+  .min(SLOT_DURATION_MIN_MINUTES, `slotDurationMinutes must be at least ${SLOT_DURATION_MIN_MINUTES}`)
+  .max(SLOT_DURATION_MAX_MINUTES, "slotDurationMinutes cannot exceed a full day");
+const slotCapacityField = z
+  .number({ message: "capacity is required" })
+  .int("capacity must be a whole number")
+  .min(0, "capacity cannot be negative")
+  .max(SLOT_CAPACITY_MAX, "capacity is too large");
+
+/**
+ * Create a recurring availability schedule for a service (P2-E01-S01 AC1). The
+ * service id comes from the route path, not the body. `endTime` must be strictly
+ * after `startTime`, and at least one whole slot must fit in the window.
+ */
+export const scheduleCreateSchema = z
+  .object({
+    dayOfWeek: dayOfWeekField,
+    startTime: scheduleTimeField,
+    endTime: scheduleTimeField,
+    slotDurationMinutes: slotDurationField,
+    capacity: slotCapacityField,
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => scheduleHmToMinutes(v.startTime) < scheduleHmToMinutes(v.endTime), {
+    message: "endTime must be after startTime",
+    path: ["endTime"],
+  })
+  .refine(
+    (v) => v.slotDurationMinutes <= scheduleHmToMinutes(v.endTime) - scheduleHmToMinutes(v.startTime),
+    { message: "slotDurationMinutes must fit within the start–end window", path: ["slotDurationMinutes"] },
+  );
+export type ScheduleCreateInput = z.infer<typeof scheduleCreateSchema>;
+
+/**
+ * Update a schedule (P2-E01-S01 AC4). All fields optional (partial patch); at
+ * least one must be present. When both times are supplied, `endTime` must be
+ * after `startTime`. Edits only affect FUTURE generated slots.
+ */
+export const scheduleUpdateSchema = z
+  .object({
+    dayOfWeek: dayOfWeekField.optional(),
+    startTime: scheduleTimeField.optional(),
+    endTime: scheduleTimeField.optional(),
+    slotDurationMinutes: slotDurationField.optional(),
+    capacity: slotCapacityField.optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "at least one field is required")
+  .refine(
+    (v) =>
+      v.startTime === undefined ||
+      v.endTime === undefined ||
+      scheduleHmToMinutes(v.startTime) < scheduleHmToMinutes(v.endTime),
+    { message: "endTime must be after startTime", path: ["endTime"] },
+  );
+export type ScheduleUpdateInput = z.infer<typeof scheduleUpdateSchema>;
+
 /* --- Staff data records (P1-E07-S03) ------------------------------------- */
 
 /** Max length of a staff display name. */
