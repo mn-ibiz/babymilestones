@@ -197,7 +197,7 @@ development_status:
   epic-20: in-progress
   20-1-loyalty-earn-ledger-already-shipped-p1-harden-here: done  # P2-E05-S01
   20-2-configurable-earn-and-redeem-rates: done  # P2-E05-S02
-  20-3-redemption-at-parent-checkout: ready-for-dev  # P2-E05-S03
+  20-3-redemption-at-parent-checkout: done  # P2-E05-S03
   20-4-loyalty-balance-and-history-in-parent-app: ready-for-dev  # P2-E05-S04
   epic-20-retrospective: optional
 

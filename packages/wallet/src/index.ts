@@ -74,6 +74,13 @@ export type {
   SetRateInput,
 } from "./loyalty-rates.js";
 
+// Loyalty redemption — points -> wallet credit, atomic + idempotent (P2-E05-S03).
+export { redeemPoints, InsufficientPointsError } from "./loyalty-redeem.js";
+export type {
+  RedeemPointsInput,
+  RedeemPointsResult,
+} from "./loyalty-redeem.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
