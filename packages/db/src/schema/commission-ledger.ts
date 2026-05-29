@@ -44,6 +44,13 @@ export const commissionLedger = pgTable(
     reversesEntryId: uuid("reverses_entry_id").references((): AnyPgColumn => commissionLedger.id),
     /** When the booking settled / was reversed (period attribution for runs). */
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The commission run (P3-E01-S03/S04) that claimed this entry. Null until a
+     * run includes it; stamped so no later run double-counts it (S04 AC3). FK
+     * declared by the migration (0061) — typed as a plain uuid here to avoid a
+     * schema import cycle with commission-runs.
+     */
+    runId: uuid("run_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -52,6 +59,7 @@ export const commissionLedger = pgTable(
       .on(t.bookingId)
       .where(sql`${t.source} = 'booking'`),
     reversesIdx: index("commission_ledger_reverses_idx").on(t.reversesEntryId),
+    runIdx: index("commission_ledger_run_idx").on(t.runId),
   }),
 );
 

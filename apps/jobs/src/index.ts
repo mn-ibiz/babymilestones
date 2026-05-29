@@ -8,6 +8,7 @@ import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
+import { createCommissionRunJob } from "./jobs/commission-run.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -29,6 +30,8 @@ export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
+export { createCommissionRunJob } from "./jobs/commission-run.js";
+export type { CommissionRunJobDeps } from "./jobs/commission-run.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -86,6 +89,13 @@ export function registerAnonymiseObservationsJob(
   deps: Parameters<typeof createAnonymiseObservationsJob>[0],
 ): void {
   register(createAnonymiseObservationsJob(deps));
+}
+
+/** Wire the monthly commission run (P3-E01-S03: 02:00 on the 1st). */
+export function registerCommissionRunJob(
+  deps: Parameters<typeof createCommissionRunJob>[0],
+): void {
+  register(createCommissionRunJob(deps));
 }
 
 export { logger } from "./logger.js";

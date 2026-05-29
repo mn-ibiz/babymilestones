@@ -51,6 +51,13 @@ export {
 } from "./commission-rates.js";
 
 export {
+  createCommissionRun,
+  priorMonthPeriod,
+  type CreateCommissionRunInput,
+  type CommissionRunResult,
+} from "./commission-run.js";
+
+export {
   SUBSCRIPTION_PERIODS,
   isSubscriptionPeriod,
   addPeriod,
