@@ -142,6 +142,12 @@ export const AUDIT_ACTION_CATALOGUE = {
   ],
   /** Authorised pickup list per child (P2-E03-S01) — create / edit / delete. */
   pickup: ["pickup.created", "pickup.updated", "pickup.deleted"],
+  /** Attendance & observations (P2-E03) — check-in, hand-off/check-out, anonymisation. */
+  attendance: [
+    "attendance.checked_in",
+    "attendance.checked_out",
+    "observation.anonymised",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

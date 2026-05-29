@@ -7,6 +7,7 @@ import { createAuditDrainJob } from "./jobs/audit-drain.js";
 import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
+import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -26,6 +27,8 @@ export { createSlotGenerationJob } from "./jobs/slot-generation.js";
 export type { SlotGenerationJobDeps } from "./jobs/slot-generation.js";
 export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
+export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
+export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -76,6 +79,13 @@ export function registerSubscriptionRenewJob(
   deps: Parameters<typeof createSubscriptionRenewJob>[0],
 ): void {
   register(createSubscriptionRenewJob(deps));
+}
+
+/** Wire the nightly 24-month observation anonymisation cron (P2-E03-S05). */
+export function registerAnonymiseObservationsJob(
+  deps: Parameters<typeof createAnonymiseObservationsJob>[0],
+): void {
+  register(createAnonymiseObservationsJob(deps));
 }
 
 export { logger } from "./logger.js";

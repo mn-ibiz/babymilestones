@@ -9,6 +9,8 @@ import { registerRecordVisit } from "./record-visit.js";
 import { registerReceptionBooking } from "./booking.js";
 import { registerRecentTransactions } from "./recent-transactions.js";
 import { registerReceipt } from "./receipt.js";
+import { registerAttendance } from "./attendance.js";
+import { registerHandoff } from "./handoff.js";
 import type { MpesaRouteConfig } from "../payments/mpesa/initiate.js";
 import type { PaystackRouteConfig } from "../payments/paystack/init.js";
 
@@ -22,6 +24,8 @@ export interface ReceptionDeps {
   mpesa?: MpesaRouteConfig;
   /** Paystack secret-key config + injected transport for the card rail (P1-E05-S03). */
   paystack?: PaystackRouteConfig;
+  /** Clock injection for the attendant screen's default "today" (P2-E03-S02). */
+  now?: () => Date;
 }
 
 export function registerReceptionRoutes(app: FastifyInstance, deps: ReceptionDeps): void {
@@ -32,4 +36,6 @@ export function registerReceptionRoutes(app: FastifyInstance, deps: ReceptionDep
   registerReceptionBooking(app, deps);
   registerRecentTransactions(app, deps);
   registerReceipt(app, deps);
+  registerAttendance(app, deps);
+  registerHandoff(app, deps);
 }

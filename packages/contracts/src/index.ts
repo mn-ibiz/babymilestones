@@ -786,6 +786,247 @@ export interface PickupAuthorisation {
   updatedAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Attendant check-in (P2-E03-S02)
+// ---------------------------------------------------------------------------
+
+/** Max bookings accepted in a single bulk check-in call (AC4). */
+export const ATTENDANCE_BULK_MAX = 100;
+
+/** One of today's session slots with its booking counts, for the attendant list (AC1). */
+export interface AttendanceSlot {
+  slotId: string;
+  serviceId: string;
+  serviceName: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  capacity: number;
+  /** Confirmed (non-cancelled) bookings in the slot. */
+  bookedCount: number;
+  /** How many of those have been checked in. */
+  checkedInCount: number;
+}
+
+/** A child card on the per-slot booking list (AC2). */
+export interface AttendanceBookingCard {
+  bookingId: string;
+  childId: string;
+  childName: string;
+  /** Per-child photo consent (P1-E02-S04) — the UI only shows a photo when true (AC2). */
+  photoConsent: boolean;
+  /** How the booking was paid — `wallet` triggers a check-in debit, `subscription` is pre-covered. */
+  paidVia: "wallet" | "subscription";
+  /** Set once the child has been checked in (AC3), else null. */
+  checkedInAt: string | null;
+  /** Drop-off time captured at check-in (AC2), else null. */
+  droppedOffAt: string | null;
+  /** Set once the child has been handed over (S03), else null. */
+  checkedOutAt: string | null;
+}
+
+/** Check-in resolution (mirrors @bm/wallet; subscription bookings resolve `covered`). */
+export type CheckInOutcome = "settled" | "settled_on_credit" | "outstanding" | "covered";
+
+/** Check in one booking (AC3). Optional drop-off time field (AC2). */
+export const attendanceCheckInSchema = z.object({
+  bookingId: z.string().uuid("bookingId must be a UUID"),
+  /** ISO timestamp the child was dropped off (AC2). Optional. */
+  droppedOffAt: z.string().datetime({ message: "droppedOffAt must be an ISO timestamp" }).optional(),
+});
+export type AttendanceCheckInInput = z.infer<typeof attendanceCheckInSchema>;
+
+/** Bulk check-in (AC4): a non-empty list of booking ids. */
+export const attendanceBulkCheckInSchema = z.object({
+  bookingIds: z
+    .array(z.string().uuid("each bookingId must be a UUID"))
+    .min(1, "At least one booking is required")
+    .max(ATTENDANCE_BULK_MAX, `At most ${ATTENDANCE_BULK_MAX} bookings per call`),
+});
+export type AttendanceBulkCheckInInput = z.infer<typeof attendanceBulkCheckInSchema>;
+
+/** Result of checking in one booking. */
+export interface AttendanceCheckInResult {
+  bookingId: string;
+  attendanceId: string;
+  outcome: CheckInOutcome;
+  /** Cents actually debited (0 for `covered` / `outstanding`). */
+  debitedCents: number;
+  /** True when the check-in left an outstanding invoice (underfunded + auto-credit off). */
+  warning: boolean;
+}
+
+/** Per-booking outcome in a bulk check-in (AC4) — `ok` xor `error`. */
+export interface AttendanceBulkResultItem {
+  bookingId: string;
+  ok: boolean;
+  outcome: CheckInOutcome | null;
+  error: string | null;
+}
+
+/**
+ * AC3: the reception UI surfaces a warning (but still checks the child in) when
+ * the check-in left an outstanding invoice. Pure rule shared by API + UI.
+ */
+export function isCheckInOutstanding(outcome: CheckInOutcome): boolean {
+  return outcome === "outstanding";
+}
+
+// ---------------------------------------------------------------------------
+// Pickup hand-off + free-text observations (P2-E03-S03)
+// ---------------------------------------------------------------------------
+
+/** The fixed mood picker — 5 emojis, default 😊 (AC1). */
+export const OBSERVATION_MOODS = ["😄", "😊", "😐", "😟", "😢"] as const;
+export type ObservationMood = (typeof OBSERVATION_MOODS)[number];
+export const OBSERVATION_DEFAULT_MOOD: ObservationMood = "😊";
+
+/** Default activity chip list (AC1: configurable — overridable via settings). */
+export const OBSERVATION_ACTIVITIES_DEFAULT = [
+  "Free play",
+  "Story time",
+  "Arts & crafts",
+  "Music",
+  "Outdoor play",
+  "Snack",
+  "Nap",
+] as const;
+
+/** Settings key the configurable activity-chip list is stored under. */
+export const OBSERVATION_ACTIVITIES_SETTING_KEY = "observation_activities";
+
+export const OBSERVATION_NOTE_MAX = 280;
+export const OBSERVATION_ACTIVITIES_MAX = 20;
+export const OBSERVATION_ACTIVITY_LABEL_MAX = 60;
+export const ATTENDANT_NAME_MAX = 120;
+
+/**
+ * Record a pickup hand-off (P2-E03-S03 AC1/AC2): a mood (one of the 5 emojis),
+ * any number of activity chips (each a short label), and a single optional
+ * free-text note. `attendantName` is the operator's display name for the parent
+ * feed (S04); the server falls back to the staff identifier when absent.
+ */
+export const handoffSchema = z.object({
+  bookingId: z.string().uuid("bookingId must be a UUID"),
+  mood: z.enum(OBSERVATION_MOODS),
+  activities: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, "An activity label cannot be empty")
+        .max(OBSERVATION_ACTIVITY_LABEL_MAX, `Each activity must be ${OBSERVATION_ACTIVITY_LABEL_MAX} characters or fewer`),
+    )
+    .max(OBSERVATION_ACTIVITIES_MAX, `At most ${OBSERVATION_ACTIVITIES_MAX} activities`)
+    .default([]),
+  note: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v.length <= OBSERVATION_NOTE_MAX, `Note must be ${OBSERVATION_NOTE_MAX} characters or fewer`)
+    .transform((v) => (v === "" ? null : v)),
+  attendantName: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v.length <= ATTENDANT_NAME_MAX, `Attendant name must be ${ATTENDANT_NAME_MAX} characters or fewer`)
+    .transform((v) => (v === "" ? null : v)),
+});
+export type HandoffInput = z.infer<typeof handoffSchema>;
+
+/** The mood + activity options the hand-off screen renders (AC1). */
+export interface ObservationOptions {
+  moods: readonly string[];
+  defaultMood: string;
+  activities: string[];
+}
+
+/** Result of a hand-off (AC2, AC4). */
+export interface HandoffResult {
+  observationId: string;
+  /** The receipt auto-generated for the visit (AC4). */
+  receiptId: string;
+  /** When the child was checked out (AC2). */
+  checkedOutAt: string;
+}
+
+/**
+ * Compose the one-line SMS summary the parent receives at hand-off (AC2). Pure
+ * so the body is identical across API + tests: "😊 · Story time, Snack — note".
+ */
+export function handoffSummary(mood: string, activities: string[], note: string | null): string {
+  const parts = [mood];
+  if (activities.length > 0) parts.push(activities.join(", "));
+  const base = parts.join(" · ");
+  return note ? `${base} — ${note}` : base;
+}
+
+// ---------------------------------------------------------------------------
+// Observations feed in the parent's account (P2-E03-S04)
+// ---------------------------------------------------------------------------
+
+/** Cap on observations returned in one feed page (newest-first). */
+export const OBSERVATION_FEED_LIMIT = 200;
+
+/** One entry in a child's read-only observations timeline (AC1). */
+export interface ObservationFeedItem {
+  id: string;
+  childId: string;
+  /** Mood emoji recorded at hand-off. */
+  mood: string;
+  /** Activity chips selected at hand-off. */
+  activities: string[];
+  /** Free-text note (may be null). */
+  note: string | null;
+  /** Attendant display name snapshot. */
+  attendantName: string;
+  /** The service the visit was for (for the service filter, AC2). */
+  serviceId: string | null;
+  serviceName: string | null;
+  /** ISO timestamp the observation was recorded (the visit date, AC1). */
+  date: string;
+}
+
+/** Filters for the observations feed (AC2). All optional; dates are YYYY-MM-DD. */
+export interface ObservationFeedFilter {
+  from?: string;
+  to?: string;
+  serviceId?: string;
+}
+
+/**
+ * Keep only the observations matching the active feed filters (AC2). Pure so the
+ * platform UI and any client-side narrowing share the server's rule. Dates are
+ * compared on the calendar day (inclusive) of the observation's `date`.
+ */
+export function filterObservations(
+  items: ObservationFeedItem[],
+  filter: ObservationFeedFilter,
+): ObservationFeedItem[] {
+  return items.filter((o) => {
+    const day = o.date.slice(0, 10);
+    if (filter.from && day < filter.from) return false;
+    if (filter.to && day > filter.to) return false;
+    if (filter.serviceId && o.serviceId !== filter.serviceId) return false;
+    return true;
+  });
+}
+
+/** Kenya standard VAT rate, in basis points (16%). */
+export const KENYA_VAT_RATE_BPS = 1600;
+
+/**
+ * The VAT already embedded in an amount that was charged as a single total
+ * (P1-E08 line-tax). A booking charges exactly the service price, so the receipt
+ * line total always equals that price; only a `vat_inclusive` service carries
+ * VAT *within* it (backed out here). `vat_exempt` / `zero_rated` / `vat_exclusive`
+ * charged-as-is carry no embedded VAT → 0. Integer cents, no float drift.
+ */
+export function inclusiveVatCents(amountCents: number, treatment: TaxTreatment): number {
+  if (treatment !== "vat_inclusive") return 0;
+  return Math.round((amountCents * KENYA_VAT_RATE_BPS) / (10_000 + KENYA_VAT_RATE_BPS));
+}
+
 /**
  * AC3: the profile-completion banner shows until the profile is "complete".
  * Complete = a profile row exists with both required names. Pure so it can be

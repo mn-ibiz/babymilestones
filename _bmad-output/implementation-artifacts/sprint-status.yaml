@@ -1,5 +1,5 @@
 # generated: 2026-05-24 23:30
-# last_updated: 2026-05-25 10:57
+# last_updated: 2026-05-29
 # project: Baby Milestones
 # project_key: BM
 # tracking_system: file-system
@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (17-6 cancel DONE — EPIC 17 (Subscriptions) COMPLETE 6/6: cancel_at_period_end + cron termination + reverse; code-reviewed + 2 fixes. Epics 16 + 17 fully done (13/13 stories); full suite green 17/17 packages)
+last_updated: 2026-05-29 (EPIC 18 (Pickup Auth & Free-Text Observations) dev+review COMPLETE 5/5: pickup CRUD, attendant check-in (attendances table + wallet debit), pickup hand-off (observations + receipt + SMS), parent observations feed, 24-month anonymisation cron. Each story TDD'd + adversarially code-reviewed + all findings fixed (18 fixes total). Migrations 0052–0054. Full suite green 17/17 packages, typecheck+lint 34/34. 18-1..18-5 = done (post-dev 10-agent code review: 5 fixes + 4 tests))
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -176,17 +176,17 @@ development_status:
   epic-17-retrospective: optional
 
   # Epic 18 — Pickup Authorisation & Free-Text Observations  (P2-E03)
-  epic-18: in-progress
+  epic-18: done
   18-1-authorised-pickup-list-per-child: done  # P2-E03-S01
-  18-2-attendant-check-in-screen: ready-for-dev  # P2-E03-S02
-  18-3-pickup-handoff-with-free-text-observations: ready-for-dev  # P2-E03-S03
-  18-4-observations-feed-in-parent-s-account: ready-for-dev  # P2-E03-S04
-  18-5-24-month-retention-anonymisation: ready-for-dev  # P2-E03-S05
+  18-2-attendant-check-in-screen: done  # P2-E03-S02
+  18-3-pickup-handoff-with-free-text-observations: done  # P2-E03-S03
+  18-4-observations-feed-in-parent-s-account: done  # P2-E03-S04
+  18-5-24-month-retention-anonymisation: done  # P2-E03-S05
   epic-18-retrospective: optional
 
   # Epic 19 — POS App (in-store mode)  (P2-E04)
-  epic-19: ready-for-dev
-  19-1-pos-app-scaffold-auth: ready-for-dev  # P2-E04-S01
+  epic-19: in-progress
+  19-1-pos-app-scaffold-auth: in-progress  # P2-E04-S01
   19-2-product-catalogue-read-for-pos: ready-for-dev  # P2-E04-S02
   19-3-cart-line-discounts-overall-discount: ready-for-dev  # P2-E04-S03
   19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet: ready-for-dev  # P2-E04-S04

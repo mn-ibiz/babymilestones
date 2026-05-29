@@ -274,6 +274,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       sessions: deps.sessions,
       mpesa: mpesa ?? undefined,
       paystack: paystack ?? undefined,
+      now: deps.now ? () => new Date(deps.now!()) : undefined,
     });
 
     // P1-E04-S06: Reception/Cashier counter cash top-up. Needs only db +
