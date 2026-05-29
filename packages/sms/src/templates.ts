@@ -19,6 +19,7 @@ export type SmsTemplateKey =
   | "parent.data.export.ready"
   | "booking.confirmed"
   | "subscription.confirmed"
+  | "subscription.dunning"
   | "raw";
 
 /** Data bag passed to a template; renderers read the fields they need. */
@@ -59,6 +60,8 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
     `${str(d, "childName")} is booked for ${str(d, "serviceName")} on ${str(d, "date")} at ${str(d, "time")}. — ${BRAND.name}`,
   "subscription.confirmed": (d) =>
     `${str(d, "childName")} is subscribed to ${str(d, "planName")} (${str(d, "entitlement")} sessions). — ${BRAND.name}`,
+  "subscription.dunning": (d) =>
+    `We couldn't renew your ${str(d, "planName")} subscription — please top up your ${BRAND.name} wallet to keep it active.`,
   raw: (d) => str(d, "body"),
 };
 

@@ -20,7 +20,7 @@ import { children } from "./children.js";
 export type SubscriptionPeriod = "week" | "month" | "term";
 
 /** Lifecycle status of a parent subscription. */
-export type SubscriptionStatus = "active" | "paused" | "cancelled";
+export type SubscriptionStatus = "active" | "paused" | "cancelled" | "dunning";
 
 /**
  * `subscription_plans` (P2-E02-S01) — an admin-managed plan granting
@@ -105,6 +105,8 @@ export const subscriptions = pgTable(
     entitlementRemaining: integer("entitlement_remaining").notNull(),
     /** Start of the current pause (P2-E02-S04); null while active/cancelled. */
     pausedAt: timestamp("paused_at", { withTimezone: true }),
+    /** When the subscription entered dunning (P2-E02-S05); anchors the grace window. */
+    dunningSince: timestamp("dunning_since", { withTimezone: true }),
     /** Closed pause intervals `[{ pausedAt, resumedAt }]` for audit/reporting. */
     pauseHistory: jsonb("pause_history")
       .$type<Array<{ pausedAt: string; resumedAt: string }>>()

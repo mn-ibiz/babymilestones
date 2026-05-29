@@ -6,6 +6,7 @@ import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 import { createAuditDrainJob } from "./jobs/audit-drain.js";
 import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
+import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -23,6 +24,8 @@ export type {
 } from "./jobs/db-backup.js";
 export { createSlotGenerationJob } from "./jobs/slot-generation.js";
 export type { SlotGenerationJobDeps } from "./jobs/slot-generation.js";
+export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
+export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -66,6 +69,13 @@ export function registerSlotGenerationJob(
   deps: Parameters<typeof createSlotGenerationJob>[0],
 ): void {
   register(createSlotGenerationJob(deps));
+}
+
+/** Wire the daily subscription renewal / dunning cron (P2-E02-S05). */
+export function registerSubscriptionRenewJob(
+  deps: Parameters<typeof createSubscriptionRenewJob>[0],
+): void {
+  register(createSubscriptionRenewJob(deps));
 }
 
 export { logger } from "./logger.js";
