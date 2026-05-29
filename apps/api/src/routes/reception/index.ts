@@ -6,6 +6,7 @@ import { registerParentSearch } from "./parents-search.js";
 import { registerParentProfile } from "./parent-profile.js";
 import { registerReceptionTopup } from "./topup.js";
 import { registerRecordVisit } from "./record-visit.js";
+import { registerReceptionBooking } from "./booking.js";
 import { registerRecentTransactions } from "./recent-transactions.js";
 import { registerReceipt } from "./receipt.js";
 import type { MpesaRouteConfig } from "../payments/mpesa/initiate.js";
@@ -28,6 +29,7 @@ export function registerReceptionRoutes(app: FastifyInstance, deps: ReceptionDep
   registerParentProfile(app, deps);
   registerReceptionTopup(app, deps);
   registerRecordVisit(app, deps);
+  registerReceptionBooking(app, deps);
   registerRecentTransactions(app, deps);
   registerReceipt(app, deps);
 }

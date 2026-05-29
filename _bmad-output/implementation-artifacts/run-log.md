@@ -79,3 +79,4 @@ STORY 15-4-ci-cd-pipelines-per-app | RESULT done | fixed=0 | deferred=3 | reason
 STORY 16-1-time-slot-model-and-capacity-for-services | RESULT done | fixed=6 | deferred=2 | reason=none  (P2-E01-S01; code-review: 6 findings patched, 2 deferred to 16-3/16-6)
 STORY 16-2-parent-browses-available-slots-for-a-service | RESULT done | fixed=8 | deferred=0 | reason=none  (P2-E01-S02; code-review: 8 fixes incl. critical route collision, build verified)
 STORY 16-3-parent-books-a-slot-creates-pending-invoice | RESULT done | fixed=3 | deferred=0 | reason=none  (P2-E01-S03; code-review: atomic audit, duplicate guard, bookable UI)
+STORY 16-4-reception-books-on-behalf-of-a-walk-in | RESULT done | fixed=3 | deferred=0 | reason=none  (P2-E01-S04; code-review: IDOR fix on reception reads, retired-staff guard, flash UX)

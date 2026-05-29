@@ -483,6 +483,10 @@ export interface BookSlotInput {
   slotId: string;
   parentId: string;
   childId: string;
+  /** Attributed staff member id (P2-E01-S04) — null for an unattributed self-book. */
+  staffId?: string | null;
+  /** Staff display-name snapshot at booking time (history-stable). Defaults to "". */
+  staffNameSnapshot?: string;
   /** Acting user id for the audit row (null = system). */
   actor?: string | null;
   /** Request IP for the audit payload. */
@@ -557,9 +561,10 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
         serviceId: slot.serviceId,
         slotId: slot.id,
         invoiceId: invoice!.id,
-        // No staff attribution on a parent self-booked slot; the rate snapshot is
-        // the service price at booking time (the booking's own price record).
-        staffNameSnapshot: "",
+        // Staff attribution (P2-E01-S04) — null + "" for an unattributed self-book.
+        // The rate snapshot is the service price at booking time.
+        staffId: input.staffId ?? null,
+        staffNameSnapshot: input.staffNameSnapshot ?? "",
         staffRateSnapshot: amountCents,
       })
       .returning();

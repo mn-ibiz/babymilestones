@@ -1487,6 +1487,19 @@ export const bookingCreateSchema = z.object({
 });
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
 
+/**
+ * Reception books a slot on behalf of a walk-in (P2-E01-S04). `parentId` +
+ * `childId` are the walk-in's profile + child; `staffId` attributes the booking
+ * when the service requires a role.
+ */
+export const receptionBookingCreateSchema = z.object({
+  parentId: z.string().uuid("parentId must be a valid id"),
+  childId: z.string().uuid("childId must be a valid id"),
+  slotId: z.string().uuid("slotId must be a valid id"),
+  staffId: z.string().uuid("staffId must be a valid id").optional(),
+});
+export type ReceptionBookingCreateInput = z.infer<typeof receptionBookingCreateSchema>;
+
 /** Successful booking confirmation returned to the parent (P2-E01-S03). */
 export interface BookingConfirmation {
   bookingId: string;
