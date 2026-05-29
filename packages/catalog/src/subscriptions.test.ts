@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb } from "@bm/db/testing";
 import { createService } from "./services.js";
 import {
+  addPeriod,
   createPlan,
   getPlan,
   isSubscriptionPeriod,
@@ -33,6 +34,16 @@ describe("subscription plans (P2-E02-S01)", () => {
     expect(SUBSCRIPTION_PERIODS).toEqual(["week", "month", "term"]);
     expect(isSubscriptionPeriod("month")).toBe(true);
     expect(isSubscriptionPeriod("year")).toBe(false);
+  });
+
+  it("addPeriod advances by week/month/term, clamping month-end (no rollover)", () => {
+    expect(addPeriod(new Date("2026-06-15T00:00:00Z"), "week").toISOString().slice(0, 10)).toBe("2026-06-22");
+    expect(addPeriod(new Date("2026-06-15T00:00:00Z"), "month").toISOString().slice(0, 10)).toBe("2026-07-15");
+    expect(addPeriod(new Date("2026-06-15T00:00:00Z"), "term").toISOString().slice(0, 10)).toBe("2026-09-15");
+    // Jan 31 + 1 month clamps to Feb 28 (2026 is not a leap year) — never March.
+    expect(addPeriod(new Date("2026-01-31T00:00:00Z"), "month").toISOString().slice(0, 10)).toBe("2026-02-28");
+    // Leap year: Jan 31 + 1 month → Feb 29.
+    expect(addPeriod(new Date("2028-01-31T00:00:00Z"), "month").toISOString().slice(0, 10)).toBe("2028-02-29");
   });
 
   it("creates a plan active by default (AC1)", async () => {

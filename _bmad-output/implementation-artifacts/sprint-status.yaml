@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (17-1 subscription plan catalogue DONE: subscription_plans + effective-dated plan prices, catalog CRUD + admin API + audit; code-reviewed (mirror of P1-E07) + 2 parity fixes; full suite green. Epic-17 started)
+last_updated: 2026-05-29 (17-2 subscribe DONE: subscriptions table + wallet pre-pay + SMS; code-reviewed + 3 fixes incl. HIGH money/atomicity (subscription-first idempotency anchor); full suite green. Epic-17: 2/6 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -168,7 +168,7 @@ development_status:
   # Epic 17 — Subscription Plans (Play & Talent)  (P2-E02)
   epic-17: in-progress
   17-1-subscription-plan-catalogue: done  # P2-E02-S01
-  17-2-parent-subscribes-to-a-plan: ready-for-dev  # P2-E02-S02
+  17-2-parent-subscribes-to-a-plan: done  # P2-E02-S02
   17-3-bookings-deduct-subscription-entitlement-first: ready-for-dev  # P2-E02-S03
   17-4-pause-freeze-and-resume-a-subscription: ready-for-dev  # P2-E02-S04
   17-5-renewal-dunning-state-machine: ready-for-dev  # P2-E02-S05

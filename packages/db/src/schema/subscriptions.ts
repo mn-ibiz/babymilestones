@@ -1,8 +1,25 @@
-import { bigint, boolean, date, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  boolean,
+  date,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { services } from "./services.js";
+import { parents } from "./parents.js";
+import { children } from "./children.js";
 
 /** Billing/entitlement period of a subscription plan. */
 export type SubscriptionPeriod = "week" | "month" | "term";
+
+/** Lifecycle status of a parent subscription. */
+export type SubscriptionStatus = "active" | "paused" | "cancelled";
 
 /**
  * `subscription_plans` (P2-E02-S01) — an admin-managed plan granting
@@ -58,3 +75,45 @@ export const subscriptionPlanPrices = pgTable(
 
 export type SubscriptionPlanPriceRow = typeof subscriptionPlanPrices.$inferSelect;
 export type SubscriptionPlanPriceInsert = typeof subscriptionPlanPrices.$inferInsert;
+
+/**
+ * `subscriptions` (P2-E02-S02) — a parent+child enrolled in a plan. The full
+ * period is pre-paid from the wallet at creation; `entitlementRemaining`
+ * bookings are granted for the current period (deducted first by the booking
+ * flow, P2-E02-S03). Status drives pause/resume (S04), cancel (S06) and renewal
+ * (S05). CHECK-constrained in migration 0047.
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    parentId: uuid("parent_id")
+      .notNull()
+      .references(() => parents.id),
+    childId: uuid("child_id")
+      .notNull()
+      .references(() => children.id),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => subscriptionPlans.id),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+    status: text("status").$type<SubscriptionStatus>().notNull().default("active"),
+    /** Bookings left in the current period (>= 0). */
+    entitlementRemaining: integer("entitlement_remaining").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    parentIdIdx: index("subscriptions_parent_id_idx").on(t.parentId),
+    childIdIdx: index("subscriptions_child_id_idx").on(t.childId),
+    // At most one ACTIVE subscription per (child, plan) — durable fence.
+    childPlanActiveUniq: uniqueIndex("subscriptions_child_plan_active_uniq")
+      .on(t.childId, t.planId)
+      .where(sql`status = 'active'`),
+  }),
+);
+
+export type SubscriptionRow = typeof subscriptions.$inferSelect;
+export type SubscriptionInsert = typeof subscriptions.$inferInsert;

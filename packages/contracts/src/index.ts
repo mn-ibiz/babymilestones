@@ -1418,6 +1418,23 @@ export const planPriceCreateSchema = z.object({
 });
 export type PlanPriceCreateInput = z.infer<typeof planPriceCreateSchema>;
 
+/** A plan a parent can subscribe to, for the service-page "Subscribe" list (P2-E02-S02). */
+export interface BookablePlan {
+  id: string;
+  name: string;
+  entitlementCount: number;
+  period: SubscriptionPeriod;
+  /** Current effective price in integer cents, or null when none is set. */
+  amountCents: number | null;
+}
+
+/** Parent subscribes a child to a plan (P2-E02-S02). */
+export const subscriptionCreateSchema = z.object({
+  planId: z.string().uuid("planId must be a valid id"),
+  childId: z.string().uuid("childId must be a valid id"),
+});
+export type SubscriptionCreateInput = z.infer<typeof subscriptionCreateSchema>;
+
 /* --- Service schedules / time-slots (P2-E01-S01) ------------------------- */
 
 /** HH:MM 24h wall-clock time (mirrors the `service_schedules` migration CHECK). */

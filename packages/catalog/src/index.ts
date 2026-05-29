@@ -44,6 +44,7 @@ export {
 export {
   SUBSCRIPTION_PERIODS,
   isSubscriptionPeriod,
+  addPeriod,
   PlanPriceOrderError,
   createPlan,
   updatePlan,

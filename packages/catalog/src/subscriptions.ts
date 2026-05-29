@@ -22,6 +22,29 @@ export function isSubscriptionPeriod(value: unknown): value is SubscriptionPerio
 }
 
 /**
+ * Advance a date by one subscription period (UTC calendar math): `week` = +7
+ * days, `month` = +1 calendar month, `term` ≈ +3 calendar months. Used for the
+ * current-period end at subscribe time (P2-E02-S02) and on renewal (P2-E02-S05).
+ */
+export function addPeriod(from: Date, period: SubscriptionPeriod): Date {
+  if (period === "week") {
+    const d = new Date(from.getTime());
+    d.setUTCDate(d.getUTCDate() + 7);
+    return d;
+  }
+  // Month / term: add calendar months, CLAMPING the day to the target month's
+  // last day so Jan 31 + 1 month → Feb 28/29 (not a March rollover).
+  const months = period === "month" ? 1 : 3;
+  const day = from.getUTCDate();
+  const target = new Date(from.getTime());
+  target.setUTCDate(1); // avoid overflow while shifting the month
+  target.setUTCMonth(target.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, lastDay));
+  return target;
+}
+
+/**
  * Raised by {@link setPlanPrice} when a new price's `effectiveFrom` is not
  * strictly after the current open price's — history is append-forward only.
  */

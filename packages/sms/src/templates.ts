@@ -18,6 +18,7 @@ export type SmsTemplateKey =
   | "payment.mpesa.failed"
   | "parent.data.export.ready"
   | "booking.confirmed"
+  | "subscription.confirmed"
   | "raw";
 
 /** Data bag passed to a template; renderers read the fields they need. */
@@ -56,6 +57,8 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
     `Your ${BRAND.name} data export is ready. Download (valid 7 days, one-time): ${str(d, "link")}`,
   "booking.confirmed": (d) =>
     `${str(d, "childName")} is booked for ${str(d, "serviceName")} on ${str(d, "date")} at ${str(d, "time")}. — ${BRAND.name}`,
+  "subscription.confirmed": (d) =>
+    `${str(d, "childName")} is subscribed to ${str(d, "planName")} (${str(d, "entitlement")} sessions). — ${BRAND.name}`,
   raw: (d) => str(d, "body"),
 };
 

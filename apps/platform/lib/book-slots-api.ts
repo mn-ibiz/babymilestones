@@ -1,9 +1,19 @@
 import type {
+  BookablePlan,
   BookableService,
   BookingConfirmation,
   ParentBooking,
   ServiceAvailability,
 } from "@bm/contracts";
+
+/** GET the active subscription plans for a service (P2-E02-S02). */
+export async function fetchServicePlans(serviceId: string): Promise<BookablePlan[]> {
+  const res = await fetch(`/parents/me/services/${encodeURIComponent(serviceId)}/plans`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Failed to load plans (${res.status})`);
+  return ((await res.json()) as { plans: BookablePlan[] }).plans;
+}
 
 /** GET the authed parent's slot bookings (P2-E01-S07). */
 export async function fetchParentBookings(): Promise<ParentBooking[]> {
@@ -71,6 +81,11 @@ export async function rescheduleBookingRequest(bookingId: string, newSlotId: str
   await postBookingAction(`/parents/me/bookings/${encodeURIComponent(bookingId)}/reschedule`, {
     newSlotId,
   });
+}
+
+/** Subscribe a child to a plan (P2-E02-S02). Throws {@link BookingError} (e.g. 402 insufficient funds). */
+export async function subscribeRequest(planId: string, childId: string): Promise<void> {
+  await postBookingAction("/parents/me/subscriptions", { planId, childId });
 }
 
 /** GET the active services the authed parent can browse + book (the `/book` list). */

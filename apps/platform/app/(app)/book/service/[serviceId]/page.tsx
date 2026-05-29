@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import type { AvailableSlot, Child, ServiceAvailability } from "@bm/contracts";
+import type { AvailableSlot, BookablePlan, Child, ServiceAvailability } from "@bm/contracts";
 import { fetchChildren } from "../../../../../lib/children-api";
-import { bookSlotRequest, fetchAvailability } from "../../../../../lib/book-slots-api";
+import {
+  bookSlotRequest,
+  fetchAvailability,
+  fetchServicePlans,
+  subscribeRequest,
+} from "../../../../../lib/book-slots-api";
 import { buildWeekGrid, slotState } from "../../../../../lib/book-slots";
 
 /**
@@ -30,6 +35,7 @@ export default function BookServicePage() {
   const [confirming, setConfirming] = useState<AvailableSlot | null>(null);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [plans, setPlans] = useState<BookablePlan[]>([]);
 
   const childName = useMemo(
     () => children.find((c) => c.id === childId)?.firstName ?? "your child",
@@ -63,6 +69,24 @@ export default function BookServicePage() {
     setFlash(null);
     void loadAvailability(childId);
   }, [childId, loadAvailability]);
+
+  useEffect(() => {
+    fetchServicePlans(serviceId)
+      .then(setPlans)
+      .catch(() => undefined); // plans are an optional add-on to the page
+  }, [serviceId]);
+
+  async function onSubscribe(planId: string) {
+    if (!childId) return;
+    setFlash(null);
+    try {
+      await subscribeRequest(planId, childId);
+      setFlash({ kind: "ok", text: "Subscribed — the period was charged to your wallet." });
+    } catch (e: unknown) {
+      // e.g. 402 "Insufficient wallet balance — top up to subscribe".
+      setFlash({ kind: "err", text: e instanceof Error ? e.message : "Subscribe failed" });
+    }
+  }
 
   async function confirmBooking() {
     if (!confirming || !childId) return;
@@ -150,6 +174,33 @@ export default function BookServicePage() {
             </button>
           </div>
         </div>
+      ) : null}
+
+      {plans.length > 0 ? (
+        <section className="mt-4 rounded border border-gray-200 p-3">
+          <h2 className="text-sm font-medium text-gray-700">Subscribe &amp; save</h2>
+          <ul className="mt-2 space-y-2">
+            {plans.map((p) => (
+              <li key={p.id} className="flex items-center justify-between text-sm">
+                <span>
+                  {p.name}
+                  <span className="ml-2 text-gray-500">
+                    {p.entitlementCount} / {p.period}
+                    {p.amountCents != null ? ` · KES ${(p.amountCents / 100).toFixed(0)}` : ""}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={p.amountCents == null}
+                  onClick={() => onSubscribe(p.id)}
+                  className="rounded bg-ink px-3 py-1 text-xs text-white disabled:opacity-50"
+                >
+                  Subscribe
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {availability && !availability.eligible ? (
