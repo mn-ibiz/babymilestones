@@ -1,17 +1,16 @@
 import type { LoyaltyAccountResponse } from "@bm/contracts";
-import { apiFetch } from "./auth-api";
 
 /**
- * Fetch the parent's loyalty account (P2-E05-S04): points balance, lifetime
- * earned/redeemed, history, and the redemption quote. Server component calls
- * this with the request cookie.
+ * Parent loyalty account client (P2-E05-S04). Dependency-free so it unit-tests
+ * without a DOM and never pulls server-only code into the Next bundle. Reads the
+ * authed parent's OWN loyalty snapshot (balance, lifetime earned/redeemed,
+ * history, redemption quote) from `GET /parents/me/loyalty`.
  */
-export async function fetchLoyaltyAccount(
-  cookie?: string,
-): Promise<LoyaltyAccountResponse> {
-  const res = await apiFetch("/parents/me/loyalty", { cookie });
+export async function fetchLoyaltyAccount(): Promise<LoyaltyAccountResponse> {
+  const res = await fetch("/parents/me/loyalty", { credentials: "include" });
   if (!res.ok) {
-    throw new Error(`loyalty account failed: ${res.status}`);
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `Failed to load loyalty points (${res.status})`);
   }
   return (await res.json()) as LoyaltyAccountResponse;
 }
