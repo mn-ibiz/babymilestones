@@ -479,6 +479,22 @@ export class DuplicateBookingError extends Error {
   }
 }
 
+/** The booking id is unknown, or the booking is not slot-based (reschedulable). */
+export class BookingNotFoundError extends Error {
+  constructor(public readonly bookingId: string) {
+    super(`Booking not found or not reschedulable: ${bookingId}`);
+    this.name = "BookingNotFoundError";
+  }
+}
+
+/** The target slot belongs to a different service than the booking. */
+export class ServiceMismatchError extends Error {
+  constructor() {
+    super("The new slot is for a different service");
+    this.name = "ServiceMismatchError";
+  }
+}
+
 export interface BookSlotInput {
   slotId: string;
   parentId: string;
@@ -592,6 +608,101 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
       startTime: slot.startTime,
       endTime: slot.endTime,
       amountCents,
+    };
+  });
+}
+
+/* --- Rescheduling a booking (P2-E01-S05) --------------------------------- */
+
+/** A slot's start instant in epoch ms (UTC wall-clock, matching the codebase). */
+export function slotStartUtcMs(slotDate: string, startTime: string): number {
+  return Date.parse(`${slotDate}T${startTime}:00.000Z`);
+}
+
+/**
+ * Whether a booking on `(slotDate, startTime)` may still be rescheduled at
+ * `nowMs`: allowed up to `cutoffHours` before the slot start (AC1). After that
+ * the online reschedule is refused (AC4).
+ */
+export function isWithinRescheduleCutoff(
+  slotDate: string,
+  startTime: string,
+  cutoffHours: number,
+  nowMs: number,
+): boolean {
+  return nowMs <= slotStartUtcMs(slotDate, startTime) - cutoffHours * 3_600_000;
+}
+
+export interface RescheduleResult {
+  bookingId: string;
+  oldSlotId: string;
+  newSlotId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+}
+
+/**
+ * Move a booking to a new slot (P2-E01-S05 AC2/AC3). One transaction: lock the
+ * target slot, verify it is the SAME service, has capacity, and the child isn't
+ * already booked there, then repoint the booking's `slot_id` (the pending invoice
+ * is untouched — the price is unchanged) and audit both slot ids. The cut-off
+ * (AC1/AC4) is enforced by the caller, which has the old slot + service context.
+ *
+ * Throws {@link BookingNotFoundError} / {@link SlotNotFoundError} /
+ * {@link ServiceMismatchError} / {@link SlotFullError} / {@link DuplicateBookingError}.
+ */
+export async function rescheduleBooking(
+  db: Database,
+  input: { bookingId: string; newSlotId: string; actor?: string | null; ip?: string | null },
+): Promise<RescheduleResult> {
+  return db.transaction(async (tx) => {
+    const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId));
+    if (!booking || !booking.slotId) throw new BookingNotFoundError(input.bookingId);
+
+    const [newSlot] = await tx
+      .select()
+      .from(sessionSlots)
+      .where(eq(sessionSlots.id, input.newSlotId))
+      .for("update");
+    if (!newSlot) throw new SlotNotFoundError(input.newSlotId);
+    if (newSlot.serviceId !== booking.serviceId) throw new ServiceMismatchError();
+
+    const counts = await bookingCountsBySlot(tx, [newSlot.id]);
+    if ((counts.get(newSlot.id) ?? 0) >= newSlot.capacity) throw new SlotFullError(newSlot.id);
+
+    const [dup] = await tx
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(and(eq(bookings.slotId, newSlot.id), eq(bookings.childId, booking.childId)));
+    if (dup) throw new DuplicateBookingError(newSlot.id, booking.childId);
+
+    const oldSlotId = booking.slotId;
+    await tx
+      .update(bookings)
+      .set({ slotId: newSlot.id, updatedAt: new Date() })
+      .where(eq(bookings.id, input.bookingId));
+
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "booking.rescheduled",
+      target: { table: "bookings", id: input.bookingId },
+      payload: {
+        old_slot_id: oldSlotId,
+        new_slot_id: newSlot.id,
+        child_id: booking.childId,
+        service_id: booking.serviceId,
+        ip: input.ip ?? undefined,
+      },
+    });
+
+    return {
+      bookingId: input.bookingId,
+      oldSlotId,
+      newSlotId: newSlot.id,
+      slotDate: newSlot.slotDate,
+      startTime: newSlot.startTime,
+      endTime: newSlot.endTime,
     };
   });
 }

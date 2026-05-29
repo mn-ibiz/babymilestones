@@ -71,6 +71,11 @@ export const services = pgTable("services", {
    */
   ageMinMonths: integer("age_min_months"),
   ageMaxMonths: integer("age_max_months"),
+  /**
+   * Hours before a booked slot's start that a parent may still reschedule online
+   * (P2-E01-S05). Default 2; after the cut-off the online move is refused.
+   */
+  rescheduleCutoffHours: integer("reschedule_cutoff_hours").notNull().default(2),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

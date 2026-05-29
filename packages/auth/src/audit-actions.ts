@@ -124,8 +124,8 @@ export const AUDIT_ACTION_CATALOGUE = {
   ],
   /** Daily DB backup lifecycle (X8-S03) — every run + prune is recorded. */
   backup: ["backup.run.succeeded", "backup.run.failed", "backup.run.pruned"],
-  /** Booking lifecycle (P2-E01) — a booking creates a pending invoice. */
-  booking: ["booking.created"],
+  /** Booking lifecycle (P2-E01) — create / reschedule a booking. */
+  booking: ["booking.created", "booking.rescheduled"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

@@ -1253,6 +1253,14 @@ const optionalAgeMonths = z
   .union([z.number().int("age must be a whole number of months").min(0, "age cannot be negative").max(AGE_MONTHS_MAX), z.null()])
   .optional();
 
+/** Reschedule cut-off in hours before the slot (P2-E01-S05). 0–168 (≤ a week). */
+const rescheduleCutoffField = z
+  .number()
+  .int("rescheduleCutoffHours must be a whole number of hours")
+  .min(0, "rescheduleCutoffHours cannot be negative")
+  .max(168, "rescheduleCutoffHours cannot exceed a week")
+  .optional();
+
 /** True when a child of `ageMonths` fits a service's `[min, max]` month range (null bounds = open). */
 export function slotFitsAge(
   ageMonths: number,
@@ -1276,6 +1284,7 @@ export const serviceCreateSchema = z
     taxTreatment: optionalTaxTreatmentCreate,
     ageMinMonths: optionalAgeMonths,
     ageMaxMonths: optionalAgeMonths,
+    rescheduleCutoffHours: rescheduleCutoffField,
   })
   .refine(
     (v) =>
@@ -1305,6 +1314,7 @@ export const serviceUpdateSchema = z
       .optional(),
     ageMinMonths: optionalAgeMonths,
     ageMaxMonths: optionalAgeMonths,
+    rescheduleCutoffHours: rescheduleCutoffField,
   })
   .refine(
     (v) =>
@@ -1314,7 +1324,8 @@ export const serviceUpdateSchema = z
       v.attributionRoleRequired !== null ||
       v.taxTreatment !== undefined ||
       v.ageMinMonths !== undefined ||
-      v.ageMaxMonths !== undefined,
+      v.ageMaxMonths !== undefined ||
+      v.rescheduleCutoffHours !== undefined,
     "at least one field is required",
   )
   .refine(
@@ -1486,6 +1497,12 @@ export const bookingCreateSchema = z.object({
   childId: z.string().uuid("childId must be a valid id"),
 });
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
+
+/** Reschedule a booking to a different slot (P2-E01-S05). */
+export const rescheduleBookingSchema = z.object({
+  newSlotId: z.string().uuid("newSlotId must be a valid id"),
+});
+export type RescheduleBookingInput = z.infer<typeof rescheduleBookingSchema>;
 
 /**
  * Reception books a slot on behalf of a walk-in (P2-E01-S04). `parentId` +

@@ -80,6 +80,8 @@ export interface CreateServiceInput {
   /** Optional age-eligibility range in months (P2-E01-S02 AC2). Null = unbounded. */
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
+  /** Reschedule cut-off in hours before the slot (P2-E01-S05). Defaults to 2. */
+  rescheduleCutoffHours?: number;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -94,6 +96,9 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       taxTreatment: input.taxTreatment ?? DEFAULT_TAX_TREATMENT,
       ageMinMonths: input.ageMinMonths ?? null,
       ageMaxMonths: input.ageMaxMonths ?? null,
+      ...(input.rescheduleCutoffHours !== undefined
+        ? { rescheduleCutoffHours: input.rescheduleCutoffHours }
+        : {}),
     })
     .returning();
   return row!;
@@ -110,6 +115,8 @@ export interface UpdateServiceInput {
   /** Age-eligibility range in months (P2-E01-S02). Null clears the bound. */
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
+  /** Reschedule cut-off in hours before the slot (P2-E01-S05). */
+  rescheduleCutoffHours?: number;
 }
 
 /**
@@ -128,6 +135,7 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
   if (patch.taxTreatment !== undefined) set.taxTreatment = patch.taxTreatment;
   if (patch.ageMinMonths !== undefined) set.ageMinMonths = patch.ageMinMonths;
   if (patch.ageMaxMonths !== undefined) set.ageMaxMonths = patch.ageMaxMonths;
+  if (patch.rescheduleCutoffHours !== undefined) set.rescheduleCutoffHours = patch.rescheduleCutoffHours;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;
 }

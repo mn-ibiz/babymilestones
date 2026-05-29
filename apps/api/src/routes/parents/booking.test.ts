@@ -8,6 +8,7 @@ import {
   createService,
   dayOfWeekIso,
   generateSlotsForSchedule,
+  listSchedules,
   listSlotsWithRemaining,
   setServicePrice,
 } from "@bm/catalog";
@@ -173,5 +174,84 @@ describe("parent slot booking (P2-E01-S03)", () => {
     expect((await book(parent, { slotId, childId }, false)).statusCode).toBe(403);
     const anon = await app.inject({ method: "POST", url: "/parents/me/bookings", payload: { slotId, childId } });
     expect(anon.statusCode).toBe(401);
+  });
+
+  /** Seed a priced service with two same-day windows; returns both slot ids. */
+  async function seedTwoSlots(slotDate = FUTURE) {
+    const svc = await createService(dbh.db, { name: "Soft Play", unit: "play" });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1500, effectiveFrom: "2026-01-01" });
+    const dow = dayOfWeekIso(slotDate);
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity: 5 });
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "11:00", endTime: "12:00", slotDurationMinutes: 60, capacity: 5 });
+    const sched = await listSchedules(dbh.db, { serviceId: svc.id });
+    for (const s of sched) await generateSlotsForSchedule(dbh.db, s, { fromDate: "2026-06-15", days: 7 });
+    const slots = (await listSlotsWithRemaining(dbh.db, { serviceId: svc.id })).filter((s) => s.slotDate === slotDate);
+    return { serviceId: svc.id, slotA: slots[0]!.id, slotB: slots[1]!.id };
+  }
+
+  const reschedule = (p: Parent, bookingId: string, newSlotId: string) =>
+    app.inject({
+      method: "POST",
+      url: `/parents/me/bookings/${bookingId}/reschedule`,
+      headers: { cookie: `${p.sessionCookie}; ${p.csrfCookie}`, "x-csrf-token": p.csrfToken },
+      payload: { newSlotId },
+    });
+
+  it("reschedules a booking to a new slot before the cut-off (AC1/AC2)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotA, slotB } = await seedTwoSlots();
+    const bookingId = (await book(parent, { slotId: slotA, childId })).json().bookingId as string;
+
+    const res = await reschedule(parent, bookingId, slotB);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().oldSlotId).toBe(slotA);
+    expect(res.json().newSlotId).toBe(slotB);
+  });
+
+  it("refuses an online reschedule after the cut-off → contact reception (AC4)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    // A slot today at 06:00 (now is 05:00): bookable, but inside the 2h cut-off.
+    const { slotA, slotB } = await seedTwoSlots("2026-06-15");
+    // seedTwoSlots made 09:00/11:00 today; book the 09:00 (4h out is fine to book),
+    // then make the cut-off bite by rescheduling a slot whose start is within 2h.
+    // Use a 06:00 slot instead: rebuild with an early window.
+    void slotA;
+    void slotB;
+    const svc = await createService(dbh.db, { name: "Early", unit: "play" });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1000, effectiveFrom: "2026-01-01" });
+    const dow = dayOfWeekIso("2026-06-15");
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "06:00", endTime: "07:00", slotDurationMinutes: 60, capacity: 5 });
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "08:00", endTime: "09:00", slotDurationMinutes: 60, capacity: 5 });
+    const sched = await listSchedules(dbh.db, { serviceId: svc.id });
+    for (const s of sched) await generateSlotsForSchedule(dbh.db, s, { fromDate: "2026-06-15", days: 1 });
+    const slots = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    const early = slots.find((s) => s.startTime === "06:00")!;
+    const later = slots.find((s) => s.startTime === "08:00")!;
+    const bookingId = (await book(parent, { slotId: early.id, childId })).json().bookingId as string;
+
+    const res = await reschedule(parent, bookingId, later.id);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/contact reception/i);
+  });
+
+  it("409s rescheduling into the same slot", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotA } = await seedTwoSlots();
+    const bookingId = (await book(parent, { slotId: slotA, childId })).json().bookingId as string;
+    const res = await reschedule(parent, bookingId, slotA);
+    expect(res.statusCode).toBe(409);
+  });
+
+  it("404s rescheduling another parent's booking", async () => {
+    const owner = await makeParent("+254712345678", "0712345678");
+    const other = await makeParent("+254712000099", "0712000099");
+    const childId = await addChild(owner.parentId);
+    const { slotA, slotB } = await seedTwoSlots();
+    const bookingId = (await book(owner, { slotId: slotA, childId })).json().bookingId as string;
+    const res = await reschedule(other, bookingId, slotB);
+    expect(res.statusCode).toBe(404);
   });
 });

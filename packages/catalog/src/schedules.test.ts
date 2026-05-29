@@ -6,6 +6,9 @@ import { createService, setServicePrice } from "./services.js";
 import {
   bookSlot,
   DuplicateBookingError,
+  isWithinRescheduleCutoff,
+  rescheduleBooking,
+  ServiceMismatchError,
   ServicePriceMissingError,
   SlotFullError,
 } from "./schedules.js";
@@ -397,6 +400,83 @@ describe("bookSlot (P2-E01-S03)", () => {
     expect(audits).toHaveLength(1);
     expect(audits[0]!.targetId).toBe(res.bookingId);
     expect(audits[0]!.actorUserId).toBe(actor);
+  });
+});
+
+describe("rescheduleBooking (P2-E01-S05)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  const FROM = "2026-06-15";
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  it("isWithinRescheduleCutoff allows up to N hours before the slot (AC1/AC4)", () => {
+    const start = Date.parse("2026-06-15T10:00:00.000Z");
+    // 3h before with a 2h cut-off → still allowed; 1h before → too late.
+    expect(isWithinRescheduleCutoff("2026-06-15", "10:00", 2, start - 3 * 3_600_000)).toBe(true);
+    expect(isWithinRescheduleCutoff("2026-06-15", "10:00", 2, start - 1 * 3_600_000)).toBe(false);
+  });
+
+  async function seedTwoSlotService() {
+    const svc = await createService(dbh.db, { name: "Soft Play", unit: "play" });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1500, effectiveFrom: "2026-01-01" });
+    const dow = dayOfWeekIso(FROM);
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity: 5 });
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "11:00", endTime: "12:00", slotDurationMinutes: 60, capacity: 1 });
+    const sched = await listSchedules(dbh.db, { serviceId: svc.id });
+    for (const s of sched) await generateSlotsForSchedule(dbh.db, s, { fromDate: FROM, days: 1 });
+    const slots = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    return { serviceId: svc.id, slotA: slots[0]!.id, slotB: slots[1]!.id };
+  }
+
+  async function seedChild(phone: string) {
+    const [u] = await dbh.db.insert(users).values({ phone, pinHash: "x" }).returning();
+    const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
+    const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Zo", dateOfBirth: "2024-01-15" }).returning();
+    return { parentId: p!.id, childId: c!.id };
+  }
+
+  it("moves a booking to a new slot in one transaction + audits both ids (AC2/AC3)", async () => {
+    const { serviceId, slotA, slotB } = await seedTwoSlotService();
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId: slotA, parentId, childId });
+
+    const res = await rescheduleBooking(dbh.db, { bookingId: booked.bookingId, newSlotId: slotB, actor: "00000000-0000-0000-0000-0000000000aa" });
+    expect(res.oldSlotId).toBe(slotA);
+    expect(res.newSlotId).toBe(slotB);
+
+    const slots = await listSlotsWithRemaining(dbh.db, { serviceId });
+    expect(slots.find((s) => s.id === slotA)!.bookedCount).toBe(0);
+    expect(slots.find((s) => s.id === slotB)!.bookedCount).toBe(1);
+
+    const audits = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "booking.rescheduled"));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.payload).toMatchObject({ old_slot_id: slotA, new_slot_id: slotB });
+  });
+
+  it("rejects a move to a full slot (AC2)", async () => {
+    const { slotA, slotB } = await seedTwoSlotService(); // slotB capacity 1
+    const a = await seedChild("+254712000001");
+    const b = await seedChild("+254712000002");
+    await bookSlot(dbh.db, { slotId: slotB, parentId: b.parentId, childId: b.childId }); // fill slotB
+    const booked = await bookSlot(dbh.db, { slotId: slotA, parentId: a.parentId, childId: a.childId });
+    await expect(rescheduleBooking(dbh.db, { bookingId: booked.bookingId, newSlotId: slotB })).rejects.toBeInstanceOf(SlotFullError);
+  });
+
+  it("rejects a move to a slot of a different service", async () => {
+    const first = await seedTwoSlotService();
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId: first.slotA, parentId, childId });
+    // A second, unrelated service + slot.
+    const svc2 = await createService(dbh.db, { name: "Other", unit: "talent" });
+    await setServicePrice(dbh.db, { serviceId: svc2.id, amountCents: 1000, effectiveFrom: "2026-01-01" });
+    const sched2 = await createSchedule(dbh.db, { serviceId: svc2.id, dayOfWeek: dayOfWeekIso(FROM), startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity: 5 });
+    await generateSlotsForSchedule(dbh.db, sched2, { fromDate: FROM, days: 1 });
+    const [other] = await listSlotsWithRemaining(dbh.db, { serviceId: svc2.id });
+    await expect(rescheduleBooking(dbh.db, { bookingId: booked.bookingId, newSlotId: other!.id })).rejects.toBeInstanceOf(ServiceMismatchError);
   });
 });
 

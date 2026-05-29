@@ -1,14 +1,24 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
-import { children, parents, users, type Database } from "@bm/db";
+import { bookings, children, parents, users, type Database } from "@bm/db";
 import { validateSession, CSRF_HEADER_NAME } from "@bm/auth";
-import { ageInMonths, bookingCreateSchema, slotFitsAge, type BookingConfirmation } from "@bm/contracts";
+import {
+  ageInMonths,
+  bookingCreateSchema,
+  rescheduleBookingSchema,
+  slotFitsAge,
+  type BookingConfirmation,
+} from "@bm/contracts";
 import {
   bookSlot,
+  BookingNotFoundError,
   DuplicateBookingError,
   getService,
   getSlotWithRemaining,
   isSlotPast,
+  isWithinRescheduleCutoff,
+  rescheduleBooking,
+  ServiceMismatchError,
   ServicePriceMissingError,
   SlotFullError,
   SlotNotFoundError,
@@ -143,4 +153,92 @@ export function registerParentBooking(app: FastifyInstance, deps: BookingRoutesD
     };
     return reply.code(201).send(body);
   });
+
+  // Reschedule a booking to a new slot (P2-E01-S05). Allowed up to the service's
+  // cut-off before the current slot; after that, refer to reception (AC1/AC4).
+  app.post(
+    "/parents/me/bookings/:bookingId/reschedule",
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const auth = await validateSession(
+        { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+        { sessions, resolveUser },
+      );
+      if (!auth.ok) return reply.code(auth.status).send({ error: auth.error });
+      const [profile] = await db.select().from(parents).where(eq(parents.userId, auth.user.id));
+      if (!profile) return reply.code(404).send({ error: "Parent profile not found" });
+
+      const { bookingId } = req.params as { bookingId: string };
+      const parsed = rescheduleBookingSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        return reply.code(400).send({ error: first?.message ?? "Invalid input", field: first?.path[0] });
+      }
+      const { newSlotId } = parsed.data;
+
+      const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+      if (!booking || booking.parentId !== profile.id || !booking.slotId) {
+        return reply.code(404).send({ error: "Booking not found" });
+      }
+      if (newSlotId === booking.slotId) {
+        return reply.code(409).send({ error: "That booking is already in this slot" });
+      }
+
+      const oldSlot = await getSlotWithRemaining(db, booking.slotId);
+      const service = booking.serviceId ? await getService(db, booking.serviceId) : null;
+      if (!oldSlot || !service) return reply.code(404).send({ error: "Booking not found" });
+
+      const now = clock();
+      if (
+        !isWithinRescheduleCutoff(
+          oldSlot.slotDate,
+          oldSlot.startTime,
+          service.rescheduleCutoffHours,
+          now.getTime(),
+        )
+      ) {
+        return reply
+          .code(409)
+          .send({ error: "Too late to reschedule online — please contact reception" });
+      }
+
+      const newSlot = await getSlotWithRemaining(db, newSlotId);
+      if (!newSlot) return reply.code(404).send({ error: "Slot not found" });
+      const today = now.toISOString().slice(0, 10);
+      const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+      if (isSlotPast(newSlot.slotDate, newSlot.endTime, today, nowMinutes)) {
+        return reply.code(409).send({ error: "That slot has already passed" });
+      }
+
+      try {
+        const result = await rescheduleBooking(db, {
+          bookingId,
+          newSlotId,
+          actor: auth.user.id,
+          ip: req.ip,
+        });
+        return reply.code(200).send({
+          bookingId: result.bookingId,
+          oldSlotId: result.oldSlotId,
+          newSlotId: result.newSlotId,
+          slotDate: result.slotDate,
+          startTime: result.startTime,
+          endTime: result.endTime,
+        });
+      } catch (err) {
+        if (err instanceof SlotFullError) {
+          return reply.code(409).send({ error: "Slot just filled — please pick another time" });
+        }
+        if (err instanceof DuplicateBookingError) {
+          return reply.code(409).send({ error: "This child is already booked in that slot" });
+        }
+        if (err instanceof ServiceMismatchError) {
+          return reply.code(422).send({ error: "The new slot is for a different service" });
+        }
+        if (err instanceof BookingNotFoundError || err instanceof SlotNotFoundError) {
+          return reply.code(404).send({ error: "Not found" });
+        }
+        throw err;
+      }
+    },
+  );
 }
