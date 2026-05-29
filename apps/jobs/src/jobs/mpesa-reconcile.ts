@@ -9,11 +9,17 @@ import {
 import { applyTopup } from "@bm/wallet";
 import { StubSmsSender, type SmsSender } from "@bm/sms";
 import type { StkQueryInput, StkQueryResult } from "@bm/payments";
+import { logger as defaultLogger } from "../logger.js";
 import type { Job } from "../registry.js";
 
 /** Just the `stkQuery` slice of the M-Pesa adapter the cron needs (mockable). */
 export interface MpesaQuerier {
   stkQuery(input: StkQueryInput): Promise<StkQueryResult>;
+}
+
+/** Minimal structured-logger shape the cron needs (the shared jobs logger fits). */
+export interface MpesaReconcileLogger {
+  info: (obj: Record<string, unknown>, msg?: string) => void;
 }
 
 export interface MpesaReconcileJobDeps {
@@ -22,6 +28,8 @@ export interface MpesaReconcileJobDeps {
   mpesa: MpesaQuerier;
   /** SMS sender for the failure notification (AC4). Defaults to the DB stub. */
   sms?: SmsSender;
+  /** Structured logger for the per-run recovered count (P3-E06-S05 AC2). */
+  logger?: MpesaReconcileLogger;
   /** Clock injection for deterministic windows in tests. */
   now?: () => Date;
 }
@@ -57,10 +65,14 @@ const EXPIRE_AFTER_MS = 15 * 60_000;
 export function createMpesaReconcileJob(deps: MpesaReconcileJobDeps): Job {
   const now = deps.now ?? (() => new Date());
   const sms = deps.sms ?? new StubSmsSender(deps.db);
+  const log = deps.logger ?? defaultLogger;
 
   return {
     name: "mpesa-reconcile",
     intervalMs: 60_000,
+    // AC1 (P3-E06-S05): registered under the framework at a 60s cadence.
+    cron: "* * * * *",
+    onFailure: "retry-next-tick",
     run: async () => {
       const at = now();
       const reconcileCutoff = new Date(at.getTime() - RECONCILE_AFTER_MS);
@@ -78,9 +90,15 @@ export function createMpesaReconcileJob(deps: MpesaReconcileJobDeps): Job {
           ),
         );
 
+      // P3-E06-S05 AC2: count what this run recovered (credited) vs failed/expired.
+      let recovered = 0;
+      let failed = 0;
+      let expired = 0;
+
       for (const request of candidates) {
         if (request.updatedAt < expireCutoff) {
           await expire(deps.db, request, at);
+          expired += 1;
           continue;
         }
 
@@ -94,11 +112,19 @@ export function createMpesaReconcileJob(deps: MpesaReconcileJobDeps): Job {
 
         if (result.status === "success") {
           await reconcileSuccess(deps.db, request, at);
+          recovered += 1;
         } else if (result.status === "failed") {
           await reconcileFailure(deps.db, request, result, sms, at);
+          failed += 1;
         }
         // pending → leave for the next run.
       }
+
+      // AC2: log the count of recovered transactions (and failed/expired) per run.
+      log.info(
+        { event: "payments.mpesa.reconcile", recovered, failed, expired, candidates: candidates.length },
+        `mpesa reconcile: recovered ${recovered} transaction(s)`,
+      );
     },
   };
 }
