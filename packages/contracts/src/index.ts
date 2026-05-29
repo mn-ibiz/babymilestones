@@ -1528,6 +1528,24 @@ export const receptionBookingCreateSchema = z.object({
 });
 export type ReceptionBookingCreateInput = z.infer<typeof receptionBookingCreateSchema>;
 
+/** One row in the parent's bookings list (P2-E01-S07). */
+export interface ParentBooking {
+  bookingId: string;
+  serviceId: string;
+  serviceName: string;
+  childId: string;
+  childName: string;
+  slotId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  status: "confirmed" | "cancelled";
+  /** The slot is in the past (ended). */
+  isPast: boolean;
+  /** Eligible for an online reschedule/cancel: confirmed, future, before the cut-off. */
+  canModify: boolean;
+}
+
 /** Successful booking confirmation returned to the parent (P2-E01-S03). */
 export interface BookingConfirmation {
   bookingId: string;

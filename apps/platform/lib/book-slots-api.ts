@@ -1,4 +1,16 @@
-import type { BookableService, BookingConfirmation, ServiceAvailability } from "@bm/contracts";
+import type {
+  BookableService,
+  BookingConfirmation,
+  ParentBooking,
+  ServiceAvailability,
+} from "@bm/contracts";
+
+/** GET the authed parent's slot bookings (P2-E01-S07). */
+export async function fetchParentBookings(): Promise<ParentBooking[]> {
+  const res = await fetch("/parents/me/bookings", { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to load bookings (${res.status})`);
+  return ((await res.json()) as { bookings: ParentBooking[] }).bookings;
+}
 
 /** Read the CSRF double-submit cookie the client echoes on mutating calls. */
 function readCsrfToken(): string {
@@ -34,6 +46,31 @@ export async function bookSlotRequest(
     throw new BookingError(res.status, err.error ?? `Booking failed (${res.status})`);
   }
   return (await res.json()) as BookingConfirmation;
+}
+
+async function postBookingAction(url: string, body?: unknown): Promise<void> {
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new BookingError(res.status, err.error ?? `Request failed (${res.status})`);
+  }
+}
+
+/** Cancel a booking (P2-E01-S06). Throws {@link BookingError} on a non-2xx (e.g. past cut-off). */
+export async function cancelBookingRequest(bookingId: string): Promise<void> {
+  await postBookingAction(`/parents/me/bookings/${encodeURIComponent(bookingId)}/cancel`);
+}
+
+/** Reschedule a booking to a new slot (P2-E01-S05). Throws {@link BookingError} on a non-2xx. */
+export async function rescheduleBookingRequest(bookingId: string, newSlotId: string): Promise<void> {
+  await postBookingAction(`/parents/me/bookings/${encodeURIComponent(bookingId)}/reschedule`, {
+    newSlotId,
+  });
 }
 
 /** GET the active services the authed parent can browse + book (the `/book` list). */

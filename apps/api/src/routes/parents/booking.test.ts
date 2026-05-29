@@ -300,4 +300,38 @@ describe("parent slot booking (P2-E01-S03)", () => {
     const bookingId = (await book(owner, { slotId, childId })).json().bookingId as string;
     expect((await cancel(other, bookingId)).statusCode).toBe(404);
   });
+
+  it("lists the parent's bookings with status + modifiability (P2-E01-S07)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotId } = await seedSlot(); // a FUTURE slot
+    await book(parent, { slotId, childId });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/parents/me/bookings",
+      headers: { cookie: parent.sessionCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const list = res.json().bookings as Array<{
+      slotId: string;
+      status: string;
+      isPast: boolean;
+      canModify: boolean;
+      childName: string;
+      serviceName: string;
+    }>;
+    expect(list).toHaveLength(1);
+    expect(list[0]!.slotId).toBe(slotId);
+    expect(list[0]!.status).toBe("confirmed");
+    expect(list[0]!.isPast).toBe(false);
+    expect(list[0]!.canModify).toBe(true); // future + before cut-off
+    expect(list[0]!.childName).toBe("Zola");
+    expect(list[0]!.serviceName).toBe("Soft Play");
+  });
+
+  it("404s the bookings list when unauthenticated", async () => {
+    const res = await app.inject({ method: "GET", url: "/parents/me/bookings" });
+    expect(res.statusCode).toBe(401);
+  });
 });

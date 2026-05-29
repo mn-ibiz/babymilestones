@@ -18,7 +18,16 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE_NAME = "bm_session";
 
 /** Path prefixes that never require a session. */
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/book", "/_next", "/favicon.ico"];
+const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/_next", "/favicon.ico"];
+
+/**
+ * The WhatsApp-ad deep-link funnel (P1-E12-S03) at `/book/<unit>` is the ONLY
+ * public `/book*` route — it must render for logged-out ad clicks. The authed
+ * booking surfaces (`/book` listing, `/book/service/<id>`, `/bookings`) are NOT
+ * public and must NOT be swept in by a `/book` prefix match (a `startsWith`
+ * would also catch `/bookings`). Match the single-segment deep-link exactly.
+ */
+const DEEP_LINK_RE = /^\/book\/[^/]+$/u;
 
 /**
  * Exact public marketing routes in the `(public)` route group: the home page
@@ -43,6 +52,7 @@ const PUBLIC_EXACT_PATHS = new Set([
  */
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
+  if (DEEP_LINK_RE.test(pathname)) return true;
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 

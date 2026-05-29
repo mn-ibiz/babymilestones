@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { eq } from "drizzle-orm";
-import { bookings, children, parents, users, type Database } from "@bm/db";
+import { asc, eq } from "drizzle-orm";
+import { bookings, children, parents, services, sessionSlots, users, type Database } from "@bm/db";
 import { validateSession, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   ageInMonths,
@@ -8,6 +8,7 @@ import {
   rescheduleBookingSchema,
   slotFitsAge,
   type BookingConfirmation,
+  type ParentBooking,
 } from "@bm/contracts";
 import {
   bookSlot,
@@ -60,6 +61,65 @@ export function registerParentBooking(app: FastifyInstance, deps: BookingRoutesD
   const resolveUser = makeResolveUser(db);
   const sender: SmsSender = deps.sms ?? new StubSmsSender(db);
   const clock = deps.now ?? (() => new Date());
+
+  // The parent's slot bookings for the dashboard list (P2-E01-S07). Read-only.
+  app.get("/parents/me/bookings", async (req: FastifyRequest, reply: FastifyReply) => {
+    const auth = await validateSession(
+      { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+      { sessions, resolveUser },
+    );
+    if (!auth.ok) return reply.code(auth.status).send({ error: auth.error });
+    const [profile] = await db.select().from(parents).where(eq(parents.userId, auth.user.id));
+    if (!profile) return reply.code(404).send({ error: "Parent profile not found" });
+
+    const rows = await db
+      .select({
+        bookingId: bookings.id,
+        status: bookings.status,
+        childId: children.id,
+        childFirstName: children.firstName,
+        childLastName: children.lastName,
+        serviceId: services.id,
+        serviceName: services.name,
+        rescheduleCutoffHours: services.rescheduleCutoffHours,
+        slotId: sessionSlots.id,
+        slotDate: sessionSlots.slotDate,
+        startTime: sessionSlots.startTime,
+        endTime: sessionSlots.endTime,
+      })
+      .from(bookings)
+      .innerJoin(sessionSlots, eq(bookings.slotId, sessionSlots.id))
+      .innerJoin(children, eq(bookings.childId, children.id))
+      .innerJoin(services, eq(bookings.serviceId, services.id))
+      .where(eq(bookings.parentId, profile.id))
+      .orderBy(asc(sessionSlots.slotDate), asc(sessionSlots.startTime));
+
+    const now = clock();
+    const today = now.toISOString().slice(0, 10);
+    const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const bookingsList: ParentBooking[] = rows.map((r) => {
+      const isPast = isSlotPast(r.slotDate, r.endTime, today, nowMinutes);
+      const canModify =
+        r.status === "confirmed" &&
+        !isPast &&
+        isWithinRescheduleCutoff(r.slotDate, r.startTime, r.rescheduleCutoffHours, now.getTime());
+      return {
+        bookingId: r.bookingId,
+        serviceId: r.serviceId,
+        serviceName: r.serviceName,
+        childId: r.childId,
+        childName: `${r.childFirstName}${r.childLastName ? ` ${r.childLastName}` : ""}`,
+        slotId: r.slotId,
+        slotDate: r.slotDate,
+        startTime: r.startTime,
+        endTime: r.endTime,
+        status: r.status === "cancelled" ? "cancelled" : "confirmed",
+        isPast,
+        canModify,
+      };
+    });
+    return reply.code(200).send({ bookings: bookingsList });
+  });
 
   app.post("/parents/me/bookings", async (req: FastifyRequest, reply: FastifyReply) => {
     const auth = await validateSession(

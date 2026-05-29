@@ -29,6 +29,13 @@ export default function HomePage() {
         >
           <span className="text-base font-medium">Book a session</span>
         </Link>
+        {/* Bookings list (P2-E01-S07) — upcoming / today / past + reschedule/cancel. */}
+        <Link
+          href="/bookings"
+          className="rounded-lg border border-ink/10 bg-surface p-4 text-ink hover:bg-ink/5"
+        >
+          <span className="text-base font-medium">My bookings</span>
+        </Link>
       </div>
     </div>
   );
