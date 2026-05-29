@@ -344,6 +344,9 @@ importers:
 
   packages/wallet:
     dependencies:
+      '@bm/catalog':
+        specifier: workspace:*
+        version: link:../catalog
       '@bm/contracts':
         specifier: workspace:*
         version: link:../contracts

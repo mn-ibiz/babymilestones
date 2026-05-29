@@ -217,7 +217,7 @@ development_status:
   # Epic 23 — Attribution & Commission Ledger  (P3-E01)
   epic-23: ready-for-dev
   23-1-per-staff-commission-rate-with-effective-dating: ready-for-dev  # P3-E01-S01
-  23-2-commission-line-recorded-on-every-attributed-booking: ready-for-dev  # P3-E01-S02
+  23-2-commission-line-recorded-on-every-attributed-booking: done  # P3-E01-S02
   23-3-monthly-commission-run-scheduled-job: ready-for-dev  # P3-E01-S03
   23-4-ad-hoc-commission-calculation-e-g-on-the-15th: ready-for-dev  # P3-E01-S04
   23-5-commission-payout-export-csv: ready-for-dev  # P3-E01-S05

@@ -14,7 +14,7 @@ import {
   type Database,
 } from "@bm/db";
 import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
-import { debit, DoubleCheckInError } from "@bm/wallet";
+import { debit, DoubleCheckInError, recordBookingCommission } from "@bm/wallet";
 import {
   attendanceBulkCheckInSchema,
   attendanceCheckInSchema,
