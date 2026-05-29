@@ -1368,6 +1368,56 @@ export const servicePriceCreateSchema = z.object({
 });
 export type ServicePriceCreateInput = z.infer<typeof servicePriceCreateSchema>;
 
+/* --- Subscription plans (P2-E02-S01) ------------------------------------- */
+
+/** Billing/entitlement periods a subscription plan may use. */
+export const SUBSCRIPTION_PERIODS = ["week", "month", "term"] as const;
+export type SubscriptionPeriod = (typeof SUBSCRIPTION_PERIODS)[number];
+
+export const PLAN_NAME_MAX = 120;
+/** Bookings granted per period: at least 1, sane ceiling. */
+export const ENTITLEMENT_MIN = 1;
+export const ENTITLEMENT_MAX = 1000;
+
+const entitlementField = z
+  .number({ message: "entitlementCount is required" })
+  .int("entitlementCount must be a whole number")
+  .min(ENTITLEMENT_MIN, "entitlementCount must be at least 1")
+  .max(ENTITLEMENT_MAX, "entitlementCount is too large");
+
+/**
+ * Create a subscription plan (P2-E02-S01 AC1). The service id comes from the
+ * route path. Price is set separately (effective-dated, AC3).
+ */
+export const planCreateSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(PLAN_NAME_MAX),
+  entitlementCount: entitlementField,
+  period: z.enum(SUBSCRIPTION_PERIODS, { message: "period must be week, month or term" }),
+});
+export type PlanCreateInput = z.infer<typeof planCreateSchema>;
+
+/** Update a plan (AC2). Partial patch; at least one field required. */
+export const planUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1, "name is required").max(PLAN_NAME_MAX).optional(),
+    entitlementCount: entitlementField.optional(),
+    period: z.enum(SUBSCRIPTION_PERIODS, { message: "period must be week, month or term" }).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "at least one field is required");
+export type PlanUpdateInput = z.infer<typeof planUpdateSchema>;
+
+/** Set a new effective-dated plan price (AC3). Amount is integer cents, non-negative. */
+export const planPriceCreateSchema = z.object({
+  amountCents: z
+    .number({ message: "Amount is required" })
+    .int("amountCents must be integer cents")
+    .min(SERVICE_PRICE_MIN_CENTS, "amountCents cannot be negative")
+    .max(SERVICE_PRICE_MAX_CENTS, "amountCents is too large"),
+  effectiveFrom: serviceDateSchema,
+});
+export type PlanPriceCreateInput = z.infer<typeof planPriceCreateSchema>;
+
 /* --- Service schedules / time-slots (P2-E01-S01) ------------------------- */
 
 /** HH:MM 24h wall-clock time (mirrors the `service_schedules` migration CHECK). */
