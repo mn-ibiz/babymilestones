@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@bm/db/testing";
-import { auditOutbox, bookings, children, invoices, parents, sessionSlots, users } from "@bm/db";
+import { auditOutbox, bookings, children, invoices, parents, sessionSlots, subscriptions, users } from "@bm/db";
 import { createService, setServicePrice } from "./services.js";
+import { createPlan } from "./subscriptions.js";
 import {
   bookSlot,
   BookingAlreadyCancelledError,
@@ -406,6 +407,74 @@ describe("bookSlot (P2-E01-S03)", () => {
   });
 });
 
+describe("bookSlot deducts subscription entitlement first (P2-E02-S03)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  const FROM = "2026-06-15";
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  async function seedChild(phone: string) {
+    const [u] = await dbh.db.insert(users).values({ phone, pinHash: "x" }).returning();
+    const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
+    const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Z", dateOfBirth: "2024-01-15" }).returning();
+    return { parentId: p!.id, childId: c!.id };
+  }
+
+  /** A priced service with two same-day windows + a subscription for the child. */
+  async function seed(entitlement: number) {
+    const svc = await createService(dbh.db, { name: "Play", unit: "play" });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1500, effectiveFrom: "2026-01-01" });
+    const dow = dayOfWeekIso(FROM);
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity: 5 });
+    await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dow, startTime: "11:00", endTime: "12:00", slotDurationMinutes: 60, capacity: 5 });
+    for (const s of await listSchedules(dbh.db, { serviceId: svc.id })) {
+      await generateSlotsForSchedule(dbh.db, s, { fromDate: FROM, days: 1 });
+    }
+    const slots = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    const { parentId, childId } = await seedChild("+254712000001");
+    const plan = await createPlan(dbh.db, { serviceId: svc.id, name: "P", entitlementCount: entitlement, period: "month" });
+    await dbh.db.insert(subscriptions).values({
+      parentId,
+      childId,
+      planId: plan.id,
+      currentPeriodStart: new Date("2026-01-01T00:00:00Z"),
+      currentPeriodEnd: new Date("2026-12-31T00:00:00Z"),
+      status: "active",
+      entitlementRemaining: entitlement,
+    });
+    return { serviceId: svc.id, slotA: slots[0]!.id, slotB: slots[1]!.id, parentId, childId, planId: plan.id };
+  }
+
+  it("consumes entitlement (no wallet charge) when a matching subscription exists (AC1/AC3)", async () => {
+    const { slotA, parentId, childId, planId } = await seed(2);
+    const res = await bookSlot(dbh.db, { slotId: slotA, parentId, childId });
+    expect(res.paidVia).toBe("subscription");
+    expect(res.amountCents).toBe(0);
+    // Entitlement decremented; the invoice is a settled 0 (no money owed).
+    const [sub] = await dbh.db.select().from(subscriptions).where(eq(subscriptions.planId, planId));
+    expect(sub!.entitlementRemaining).toBe(1);
+    const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, res.invoiceId));
+    expect(inv!.status).toBe("settled");
+    expect(inv!.amountDue).toBe(0);
+  });
+
+  it("falls back to wallet pay-as-you-go when entitlement is exhausted (AC2/AC3)", async () => {
+    const { slotA, slotB, parentId, childId } = await seed(1);
+    const first = await bookSlot(dbh.db, { slotId: slotA, parentId, childId });
+    expect(first.paidVia).toBe("subscription");
+    // Entitlement now 0 → next booking is wallet pay-as-you-go (pending invoice at price).
+    const second = await bookSlot(dbh.db, { slotId: slotB, parentId, childId });
+    expect(second.paidVia).toBe("wallet");
+    expect(second.amountCents).toBe(1500);
+    const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, second.invoiceId));
+    expect(inv!.status).toBe("pending");
+  });
+});
+
 describe("rescheduleBooking (P2-E01-S05)", () => {
   let dbh: Awaited<ReturnType<typeof createTestDb>>;
   const FROM = "2026-06-15";
@@ -536,6 +605,33 @@ describe("cancelBooking (P2-E01-S06)", () => {
     const [fee] = await dbh.db.select().from(invoices).where(eq(invoices.id, res.feeInvoiceId!));
     expect(fee!.status).toBe("pending");
     expect(fee!.amountDue).toBe(500);
+  });
+
+  it("refunds subscription entitlement when a subscription booking is cancelled (P2-E02-S03)", async () => {
+    const svc = await createService(dbh.db, { name: "Play", unit: "play" });
+    const sched = await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dayOfWeekIso(FROM), startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity: 5 });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: FROM, days: 1 });
+    const [slot] = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    const { parentId, childId } = await seedChild("+254712000099");
+    const plan = await createPlan(dbh.db, { serviceId: svc.id, name: "P", entitlementCount: 3, period: "month" });
+    await dbh.db.insert(subscriptions).values({
+      parentId,
+      childId,
+      planId: plan.id,
+      currentPeriodStart: new Date("2026-01-01T00:00:00Z"),
+      currentPeriodEnd: new Date("2026-12-31T00:00:00Z"),
+      status: "active",
+      entitlementRemaining: 3,
+    });
+
+    const booked = await bookSlot(dbh.db, { slotId: slot!.id, parentId, childId });
+    expect(booked.paidVia).toBe("subscription");
+    let [sub] = await dbh.db.select().from(subscriptions).where(eq(subscriptions.planId, plan.id));
+    expect(sub!.entitlementRemaining).toBe(2); // consumed
+
+    await cancelBooking(dbh.db, { bookingId: booked.bookingId });
+    [sub] = await dbh.db.select().from(subscriptions).where(eq(subscriptions.planId, plan.id));
+    expect(sub!.entitlementRemaining).toBe(3); // refunded
   });
 
   it("rejects cancelling an already-cancelled booking", async () => {

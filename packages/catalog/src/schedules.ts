@@ -5,6 +5,8 @@ import {
   invoices,
   serviceSchedules,
   sessionSlots,
+  subscriptionPlans,
+  subscriptions,
   type Database,
   type ServiceScheduleRow,
   type SessionSlotRow,
@@ -523,8 +525,10 @@ export interface BookSlotResult {
   slotDate: string;
   startTime: string;
   endTime: string;
-  /** The service price snapshotted onto the invoice + booking (AC3). */
+  /** Amount charged: the service price for wallet bookings, 0 for subscription (AC3). */
   amountCents: number;
+  /** Whether the booking consumed subscription entitlement or wallet (P2-E02-S03 AC3). */
+  paidVia: "wallet" | "subscription";
 }
 
 /**
@@ -575,13 +579,55 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
     const counts = await bookingCountsBySlot(tx, [slot.id]);
     if ((counts.get(slot.id) ?? 0) >= slot.capacity) throw new SlotFullError(slot.id);
 
-    const price = await resolveServicePriceAt(tx, slot.serviceId, slot.slotDate);
-    if (!price) throw new ServicePriceMissingError(slot.serviceId);
-    const amountCents = price.amountCents;
+    // P2-E02-S03: consume subscription entitlement FIRST. Find a matching active
+    // subscription for this child whose plan covers the slot's service and whose
+    // current period contains the slot, with entitlement left. Lock the
+    // candidate rows so the decrement is race-safe.
+    const slotInstantMs = slotStartUtcMs(slot.slotDate, slot.startTime);
+    const candidates = await tx
+      .select()
+      .from(subscriptions)
+      .where(and(eq(subscriptions.childId, input.childId), eq(subscriptions.status, "active")))
+      .for("update");
+    let matched: (typeof candidates)[number] | null = null;
+    for (const s of candidates) {
+      if (s.entitlementRemaining <= 0) continue;
+      // Half-open period [start, end) — matches the price model + avoids a
+      // double-coverage seam at exactly the renewal boundary.
+      if (slotInstantMs < s.currentPeriodStart.getTime() || slotInstantMs >= s.currentPeriodEnd.getTime()) {
+        continue;
+      }
+      const [plan] = await tx.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, s.planId));
+      if (plan && plan.serviceId === slot.serviceId) {
+        matched = s;
+        break;
+      }
+    }
+
+    let amountCents: number;
+    let invoiceStatus: string;
+    let paidVia: "wallet" | "subscription";
+    if (matched) {
+      // Entitlement covers it: decrement, no wallet charge, settled 0-invoice (AC1).
+      await tx
+        .update(subscriptions)
+        .set({ entitlementRemaining: matched.entitlementRemaining - 1, updatedAt: new Date() })
+        .where(eq(subscriptions.id, matched.id));
+      amountCents = 0;
+      invoiceStatus = "settled";
+      paidVia = "subscription";
+    } else {
+      // Wallet pay-as-you-go fallback (AC2): the usual pending invoice.
+      const price = await resolveServicePriceAt(tx, slot.serviceId, slot.slotDate);
+      if (!price) throw new ServicePriceMissingError(slot.serviceId);
+      amountCents = price.amountCents;
+      invoiceStatus = "pending";
+      paidVia = "wallet";
+    }
 
     const [invoice] = await tx
       .insert(invoices)
-      .values({ parentId: input.parentId, amountDue: amountCents, serviceId: slot.serviceId, status: "pending" })
+      .values({ parentId: input.parentId, amountDue: amountCents, serviceId: slot.serviceId, status: invoiceStatus })
       .returning();
     const [booking] = await tx
       .insert(bookings)
@@ -591,11 +637,11 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
         serviceId: slot.serviceId,
         slotId: slot.id,
         invoiceId: invoice!.id,
-        // Staff attribution (P2-E01-S04) — null + "" for an unattributed self-book.
-        // The rate snapshot is the service price at booking time.
         staffId: input.staffId ?? null,
         staffNameSnapshot: input.staffNameSnapshot ?? "",
         staffRateSnapshot: amountCents,
+        paidVia,
+        subscriptionId: matched ? matched.id : null,
       })
       .returning();
 
@@ -610,6 +656,8 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
         service_id: slot.serviceId,
         invoice_id: invoice!.id,
         amount_cents: amountCents,
+        paid_via: paidVia,
+        subscription_id: matched?.id,
         ip: input.ip ?? undefined,
       },
     });
@@ -622,6 +670,7 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
       startTime: slot.startTime,
       endTime: slot.endTime,
       amountCents,
+      paidVia,
     };
   });
 }
@@ -765,6 +814,15 @@ export async function cancelBooking(
       .update(bookings)
       .set({ status: "cancelled", updatedAt: new Date() })
       .where(eq(bookings.id, input.bookingId));
+
+    // Refund the consumed subscription entitlement (P2-E02-S03): a cancelled
+    // subscription booking returns its unit to the (still-active) subscription.
+    if (booking.paidVia === "subscription" && booking.subscriptionId) {
+      await tx
+        .update(subscriptions)
+        .set({ entitlementRemaining: sql`${subscriptions.entitlementRemaining} + 1`, updatedAt: new Date() })
+        .where(and(eq(subscriptions.id, booking.subscriptionId), eq(subscriptions.status, "active")));
+    }
 
     // Void the booking's invoice only while still pending (AC1). A settled
     // invoice is left intact — a refund (P1-E03-S06) is the path for that.

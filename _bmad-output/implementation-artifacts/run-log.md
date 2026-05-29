@@ -85,3 +85,4 @@ STORY 16-6-parent-or-reception-cancels-a-booking | RESULT done | fixed=3 | defer
 STORY 16-7-bookings-list-on-parent-dashboard | RESULT done | fixed=4 | deferred=0 | reason=none  (P2-E01-S07; code-review: public-path fix, truthful label, past-order, reload-error) — EPIC 16 COMPLETE
 STORY 17-1-subscription-plan-catalogue | RESULT done | fixed=2 | deferred=0 | reason=none  (P2-E02-S01; code-review: restored price-range CHECK + composite index for service-pattern parity)
 STORY 17-2-parent-subscribes-to-a-plan | RESULT done | fixed=3 | deferred=1 | reason=none  (P2-E02-S02; code-review: HIGH atomicity fix (subscription-first + active-uniq), addPeriod clamp; loyalty-earn deferred to P2-E05)
+STORY 17-3-bookings-deduct-subscription-entitlement-first | RESULT done | fixed=2 | deferred=0 | reason=none  (P2-E02-S03; code-review: entitlement refund-on-cancel + half-open period; concurrency verified)

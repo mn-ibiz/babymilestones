@@ -49,6 +49,14 @@ export const bookings = pgTable(
      * seat without deleting history. CHECK-constrained in migration 0045.
      */
     status: text("status").notNull().default("confirmed"),
+    /**
+     * How the booking was paid (P2-E02-S03): `wallet` (default — pay-as-you-go
+     * pending invoice) or `subscription` (entitlement consumed; zero settled
+     * invoice). CHECK-constrained in migration 0048.
+     */
+    paidVia: text("paid_via").notNull().default("wallet"),
+    /** Subscription whose entitlement this booking consumed (P2-E02-S03); null for wallet. */
+    subscriptionId: uuid("subscription_id"),
     /** A visit is created already checked-in (AC3) — set at confirm time. */
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
