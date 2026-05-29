@@ -186,6 +186,51 @@ async function loadLines(
   return rows;
 }
 
+export interface CommissionRunPreview {
+  periodStart: Date;
+  periodEnd: Date;
+  totalCents: number;
+  lines: Array<{ staffId: string; staffNameSnapshot: string; amountCents: number }>;
+}
+
+/**
+ * Preview a commission run over a date range WITHOUT persisting anything
+ * (P3-E01-S04 AC1). Same net-per-staff aggregation over UNCLAIMED entries as
+ * {@link createCommissionRun} — so the preview matches what a confirm would
+ * produce — but it claims nothing and writes no rows. Read-only (not audited).
+ */
+export async function previewCommissionRun(
+  db: Executor,
+  input: { periodStart: Date; periodEnd: Date },
+): Promise<CommissionRunPreview> {
+  const grouped = await db
+    .select({
+      staffId: commissionLedger.staffId,
+      net: sql<string>`COALESCE(SUM(${commissionLedger.amountCents}), 0)`,
+    })
+    .from(commissionLedger)
+    .where(
+      and(
+        isNull(commissionLedger.runId),
+        gte(commissionLedger.occurredAt, input.periodStart),
+        lt(commissionLedger.occurredAt, input.periodEnd),
+      ),
+    )
+    .groupBy(commissionLedger.staffId);
+
+  const lines: CommissionRunPreview["lines"] = [];
+  let total = 0;
+  for (const g of grouped) {
+    const amount = Number(g.net);
+    if (amount <= 0) continue;
+    const [s] = await db.select({ name: staff.displayName }).from(staff).where(eq(staff.id, g.staffId));
+    lines.push({ staffId: g.staffId, staffNameSnapshot: s?.name ?? "(unknown)", amountCents: amount });
+    total += amount;
+  }
+  lines.sort((a, b) => a.staffNameSnapshot.localeCompare(b.staffNameSnapshot));
+  return { periodStart: input.periodStart, periodEnd: input.periodEnd, totalCents: total, lines };
+}
+
 /**
  * The half-open `[start, end)` of the calendar month PRIOR to `at`, in UTC
  * (P3-E01-S03 AC2). E.g. at 2026-07-01T02:00Z → [2026-06-01, 2026-07-01). Pure +

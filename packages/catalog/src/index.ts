@@ -52,9 +52,11 @@ export {
 
 export {
   createCommissionRun,
+  previewCommissionRun,
   priorMonthPeriod,
   type CreateCommissionRunInput,
   type CommissionRunResult,
+  type CommissionRunPreview,
 } from "./commission-run.js";
 
 export {
