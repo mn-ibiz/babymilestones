@@ -32,6 +32,7 @@ import type { PaystackRouteConfig } from "./routes/payments/paystack/init.js";
 import { registerCashRoutes } from "./routes/payments/cash/index.js";
 import { registerBankRoutes } from "./routes/payments/bank/index.js";
 import { registerReceptionRoutes } from "./routes/reception/index.js";
+import { registerPosRoutes } from "./routes/pos/index.js";
 import { registerTreasuryRoutes } from "./routes/treasury/index.js";
 import { registerReceiptRoutes } from "./routes/receipts/index.js";
 import { registerHealthRoutes, type ReadinessCheck } from "./routes/health.js";
@@ -270,6 +271,17 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // synchronously and pushes the M-Pesa/Paystack rails when their wiring is
     // present (a method whose rail is unwired returns 503).
     registerReceptionRoutes(app, {
+      db,
+      sessions: deps.sessions,
+      mpesa: mpesa ?? undefined,
+      paystack: paystack ?? undefined,
+      now: deps.now ? () => new Date(deps.now!()) : undefined,
+    });
+
+    // P2-E04-S02/S04: In-store POS — product catalogue read (always on) + sale
+    // payment. Cash + wallet settle synchronously; the M-Pesa/Paystack rails
+    // activate only when their wiring is present (shared with the top-up rails).
+    registerPosRoutes(app, {
       db,
       sessions: deps.sessions,
       mpesa: mpesa ?? undefined,

@@ -148,6 +148,13 @@ export const AUDIT_ACTION_CATALOGUE = {
     "attendance.checked_out",
     "observation.anonymised",
   ],
+  /** In-store POS sales (P2-E04-S04) + end-of-day cash-up (P2-E04-S05). */
+  pos: [
+    "pos.sale.initiated",
+    "pos.sale.paid",
+    "pos.sale.failed",
+    "pos.cashup.closed",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

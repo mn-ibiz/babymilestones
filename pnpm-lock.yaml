@@ -183,6 +183,9 @@ importers:
 
   apps/pos:
     dependencies:
+      '@bm/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@bm/observability':
         specifier: workspace:*
         version: link:../../packages/observability

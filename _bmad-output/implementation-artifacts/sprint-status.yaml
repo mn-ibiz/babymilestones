@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (EPIC 18 (Pickup Auth & Free-Text Observations) dev+review COMPLETE 5/5: pickup CRUD, attendant check-in (attendances table + wallet debit), pickup hand-off (observations + receipt + SMS), parent observations feed, 24-month anonymisation cron. Each story TDD'd + adversarially code-reviewed + all findings fixed (18 fixes total). Migrations 0052–0054. Full suite green 17/17 packages, typecheck+lint 34/34. 18-1..18-5 = done (post-dev 10-agent code review: 5 fixes + 4 tests))
+last_updated: 2026-05-30 (EPIC 19 (POS App / in-store mode) dev+review COMPLETE 5/5: POS app scaffold + SSO role-gate + tablet layout; product catalogue read (products table + RBAC `product` resource + scan/search); cart + line/overall discounts + per-line VAT + Pay-step stock check; payment (cash/M-Pesa STK/Paystack/wallet) → receipt + stock decrement + SMS + cart clear; end-of-day cash-up → variance + reason gate + reconciliation-feed write (P1-E06). Each story TDD'd + adversarially code-reviewed (Blind/Edge/Auditor) + findings fixed (28 patches total). Migrations 0055–0058. Shared POS pricing extracted to @bm/contracts. Full suite green 17/17 packages, typecheck+lint 17/17. 19-1..19-5 = done. EPIC 18 prior: 18-1..18-5 done, migrations 0052–0054.)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -185,12 +185,12 @@ development_status:
   epic-18-retrospective: optional
 
   # Epic 19 — POS App (in-store mode)  (P2-E04)
-  epic-19: in-progress
-  19-1-pos-app-scaffold-auth: in-progress  # P2-E04-S01
-  19-2-product-catalogue-read-for-pos: ready-for-dev  # P2-E04-S02
-  19-3-cart-line-discounts-overall-discount: ready-for-dev  # P2-E04-S03
-  19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet: ready-for-dev  # P2-E04-S04
-  19-5-end-of-day-cash-up: ready-for-dev  # P2-E04-S05
+  epic-19: done
+  19-1-pos-app-scaffold-auth: done  # P2-E04-S01
+  19-2-product-catalogue-read-for-pos: done  # P2-E04-S02
+  19-3-cart-line-discounts-overall-discount: done  # P2-E04-S03
+  19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet: done  # P2-E04-S04
+  19-5-end-of-day-cash-up: done  # P2-E04-S05
   epic-19-retrospective: optional
 
   # Epic 20 — Loyalty Redemption UI + Engine  (P2-E05)

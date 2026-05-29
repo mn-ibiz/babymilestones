@@ -32,6 +32,7 @@ export const RESOURCES = [
   "refund",
   "receipt",
   "service",
+  "product",
   "float",
   "reconciliation",
   "user",
@@ -71,6 +72,8 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "create", resource: "payment" },
     { action: "read", resource: "receipt" },
     { action: "read", resource: "service" },
+    // P2-E04-S02: read the product catalogue at the POS (scan/search, price+stock).
+    { action: "read", resource: "product" },
     // P1-E02-S02: register a walk-in parent (staff-initiated account creation).
     { action: "create", resource: "user" },
   ],
@@ -80,11 +83,15 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "create", resource: "payment" },
     { action: "create", resource: "receipt" },
     { action: "read", resource: "receipt" },
+    // P2-E04-S02: read the product catalogue at the POS (scan/search, price+stock).
+    { action: "read", resource: "product" },
   ],
   // Packer: read-only operational view (no money handling).
   packer: [
     { action: "read", resource: "service" },
     { action: "read", resource: "receipt" },
+    // P2-E04-S02: read the product catalogue at the POS.
+    { action: "read", resource: "product" },
   ],
   // Accountant: read-heavy across financial resources + reports.
   accountant: [

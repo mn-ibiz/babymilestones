@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * POS tablet-first base (P2-E04-S01 AC3). The POS runs on an in-store tablet in
+ * landscape; the numbers here mirror `lib/layout.ts`
+ * (TABLET_MIN_WIDTH=768, MIN_TOUCH_TARGET_PX=48) — keep them in sync.
+ */
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    /* Prevent the on-screen keyboard / rubber-banding from shifting the till. */
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+@layer components {
+  /* Large touch targets for fast, in-store taps (AC3). */
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* The till canvas is laid out for landscape >= 768px (AC3). */
+  .pos-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-width: 768px;
+  }
+
+  /* The printable receipt is hidden on screen and revealed only when printing (AC6). */
+  #pos-receipt-print {
+    display: none;
+  }
+}
+
+/* Print to the default printer: show only the receipt block (AC6). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #pos-receipt-print,
+  #pos-receipt-print * {
+    visibility: visible;
+  }
+  #pos-receipt-print {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 12px;
+    font-family: monospace;
+  }
+}

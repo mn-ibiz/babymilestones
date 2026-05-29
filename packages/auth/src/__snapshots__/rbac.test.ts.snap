@@ -107,6 +107,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
   },
   {
     "action": "read",
+    "resource": "product",
+    "role": "cashier",
+  },
+  {
+    "action": "read",
     "resource": "receipt",
     "role": "cashier",
   },
@@ -114,6 +119,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
     "action": "read",
     "resource": "wallet",
     "role": "cashier",
+  },
+  {
+    "action": "read",
+    "resource": "product",
+    "role": "packer",
   },
   {
     "action": "read",
@@ -148,6 +158,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
   {
     "action": "create",
     "resource": "user",
+    "role": "reception",
+  },
+  {
+    "action": "read",
+    "resource": "product",
     "role": "reception",
   },
   {

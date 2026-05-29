@@ -42,6 +42,15 @@ export {
 } from "./staff.js";
 
 export {
+  PRODUCT_SEARCH_MIN_QUERY,
+  PRODUCT_SEARCH_LIMIT,
+  createProduct,
+  findProductByCode,
+  searchProductsByName,
+  type CreateProductInput,
+} from "./products.js";
+
+export {
   SUBSCRIPTION_PERIODS,
   isSubscriptionPeriod,
   addPeriod,

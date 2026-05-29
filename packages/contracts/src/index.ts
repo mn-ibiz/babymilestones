@@ -247,6 +247,49 @@ export interface ParentSearchResponse {
   results: ParentSearchResult[];
 }
 
+// ---------------------------------------------------------------------------
+// POS product catalogue read (P2-E04-S02)
+// ---------------------------------------------------------------------------
+
+/** Barcode-scanner / keyed-code lookup request — exact SKU or barcode (AC1). */
+export const posProductLookupQuerySchema = z.object({
+  code: z.string().trim().min(1, "A product code is required").max(100, "Code is too long"),
+});
+export type PosProductLookupQueryInput = z.infer<typeof posProductLookupQuerySchema>;
+
+/** Name search request (AC2) — debounced client-side; the API trims + min-length gates. */
+export const posProductSearchQuerySchema = z.object({
+  q: z.string().trim().min(1, "A search query is required").max(100, "Query is too long"),
+});
+export type PosProductSearchQueryInput = z.infer<typeof posProductSearchQuerySchema>;
+
+/**
+ * A product as the POS sees it (P2-E04-S02). Price is integer cents (KES * 100);
+ * `inStock` is the derived `stockQty > 0` flag the UI uses to grey out and block
+ * an out-of-stock product at checkout (AC3). `taxTreatment` rides along so the
+ * cart (S03) can compute per-line tax the same way as services.
+ */
+export interface PosProduct {
+  id: string;
+  sku: string;
+  barcode: string | null;
+  name: string;
+  priceCents: number;
+  stockQty: number;
+  inStock: boolean;
+  taxTreatment: "vat_inclusive" | "vat_exclusive" | "vat_exempt" | "zero_rated";
+}
+
+/** Lookup response: the matched product, or null when no active product matches. */
+export interface PosProductLookupResponse {
+  product: PosProduct | null;
+}
+
+/** Search response: the matched products (out-of-stock included, greyed by the UI). */
+export interface PosProductSearchResponse {
+  products: PosProduct[];
+}
+
 /**
  * Reception parent-profile header summary (P1-E05-S02 AC1). All the financial
  * facts about a parent in one shot so the front desk never has to dig: full name,
@@ -2350,3 +2393,113 @@ export function parseSettingValue(
 // WhatsApp deep-link + UTM acquisition attribution (P1-E12-S03)
 // ---------------------------------------------------------------------------
 export * from "./utm.js";
+
+// ---------------------------------------------------------------------------
+// POS pricing math (P2-E04) — shared by the API (authoritative) + the POS cart
+// ---------------------------------------------------------------------------
+export * from "./pricing.js";
+
+// ---------------------------------------------------------------------------
+// POS payment / sale (P2-E04-S04)
+// ---------------------------------------------------------------------------
+
+/** The four POS payment methods (AC1). */
+export const POS_SALE_METHODS = ["cash", "mpesa", "paystack", "wallet"] as const;
+export type PosSaleMethod = (typeof POS_SALE_METHODS)[number];
+
+/** Receipt series for in-store POS sales. */
+export const POS_RECEIPT_SERIES = "POS-2026";
+
+/** Overall-discount wire schema (mirrors the {@link OverallDiscount} union). */
+export const overallDiscountSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }),
+  z.object({ kind: z.literal("pct"), value: z.number().min(0).max(100) }),
+  z.object({ kind: z.literal("kes"), valueCents: z.number().int().min(0) }),
+]);
+
+/** One requested sale line — product id + quantity + per-line discount %. */
+export const posSaleLineSchema = z.object({
+  productId: z.string().uuid("Invalid product id"),
+  qty: z.number().int().positive("Quantity must be at least 1").max(1000, "Quantity is too large"),
+  lineDiscountPct: z.number().min(0).max(100).default(0),
+});
+export type PosSaleLineInput = z.infer<typeof posSaleLineSchema>;
+
+/**
+ * Create-sale request (P2-E04-S04). The server recomputes all money from the DB
+ * product prices — `lines` carry only ids/qty/discount, never client prices.
+ * `customerPhone` is required for `mpesa` (STK target) and `wallet` (parent
+ * lookup); `cashTenderedCents` is required for `cash` (change calculation).
+ */
+export const posSaleRequestSchema = z.object({
+  method: z.enum(POS_SALE_METHODS),
+  lines: z.array(posSaleLineSchema).min(1, "A sale needs at least one line"),
+  overallDiscount: overallDiscountSchema.default({ kind: "none" }),
+  customerPhone: z.string().optional(),
+  cashTenderedCents: z.number().int().min(0).optional(),
+  /** Per-attempt idempotency key — a replayed create returns the existing sale. */
+  idempotencyKey: z.string().uuid().optional(),
+});
+export type PosSaleRequest = z.infer<typeof posSaleRequestSchema>;
+
+export type PosSaleStatus = "pending" | "paid" | "failed" | "cancelled";
+
+/**
+ * Create-sale / confirm-sale / status response. `status` drives the cashier UI:
+ * `paid` shows the receipt (+ change for cash); `pending` shows the live panel
+ * (M-Pesa STK / Paystack) keyed by `checkoutRequestId` / `authorizationUrl`;
+ * `failed` shows `failureReason` (AC7).
+ */
+export interface PosSaleResponse {
+  saleId: string;
+  status: PosSaleStatus;
+  method: PosSaleMethod;
+  totalCents: number;
+  /** Cash only — change due (tendered − total) and the drawer instruction (AC2). */
+  changeCents?: number;
+  drawerMessage?: string;
+  /** M-Pesa only — the STK checkout handle to poll (AC3). */
+  checkoutRequestId?: string;
+  /** Paystack only — the hosted-checkout URL to open / show as a QR (AC4). */
+  authorizationUrl?: string | null;
+  /** Set once paid — the human receipt number. */
+  receiptNumber?: string;
+  /** Set when failed — a distinct, human reason (AC7). */
+  failureReason?: string;
+}
+
+// ---------------------------------------------------------------------------
+// POS end-of-day cash-up (P2-E04-S05)
+// ---------------------------------------------------------------------------
+
+/** A cash variance over this (KES 500) requires a reason (AC3). */
+export const POS_CASHUP_VARIANCE_THRESHOLD_CENTS = 50_000;
+
+/** True when |variance| exceeds the threshold, so a reason is mandatory (AC3). */
+export function cashupReasonRequired(varianceCents: number): boolean {
+  return Math.abs(varianceCents) > POS_CASHUP_VARIANCE_THRESHOLD_CENTS;
+}
+
+/** Expected takings by method since the cashier's last cash-up (AC1). */
+export interface PosCashupExpected {
+  expectedCashCents: number;
+  expectedMpesaCents: number;
+  expectedPaystackCents: number;
+}
+
+/** Close-the-till request (AC2/AC3): the counted cash + an optional reason. */
+export const posCashupRequestSchema = z.object({
+  countedCashCents: z.number().int().min(0, "Counted cash cannot be negative"),
+  reason: z.string().trim().max(500).optional(),
+});
+export type PosCashupRequest = z.infer<typeof posCashupRequestSchema>;
+
+/** Cash-up result: the expected sums, the counted cash, and the computed variance. */
+export interface PosCashupResponse extends PosCashupExpected {
+  id: string;
+  countedCashCents: number;
+  varianceCents: number;
+  reason: string | null;
+  /** The reconciliation adjustment posted for a non-zero variance (P1-E06). */
+  reconciliationAdjustmentId: string | null;
+}
