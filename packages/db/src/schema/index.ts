@@ -4,6 +4,7 @@ export * from "./audit.js";
 export * from "./users.js";
 export * from "./parents.js";
 export * from "./children.js";
+export * from "./child-pickup-authorisations.js";
 export * from "./wallets.js";
 export * from "./wallet-ledger.js";
 export * from "./invoices.js";

@@ -4,6 +4,7 @@ import type { SessionStore } from "@bm/auth";
 import type { ExportStorage } from "@bm/export";
 import { registerParentProfile } from "./profile.js";
 import { registerParentChildren } from "./children.js";
+import { registerParentPickups } from "./pickups.js";
 import { registerReceptionWalkIn } from "./walkin.js";
 import { registerReceptionCheckIn } from "./checkin.js";
 import { registerParentExports } from "./exports.js";
@@ -36,6 +37,7 @@ export interface ParentRoutesDeps extends ParentsDeps {
 export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDeps): void {
   registerParentProfile(app, deps);
   registerParentChildren(app, deps);
+  registerParentPickups(app, deps);
   registerReceptionWalkIn(app, deps);
   registerReceptionCheckIn(app, deps);
   registerParentExports(app, {

@@ -176,8 +176,8 @@ development_status:
   epic-17-retrospective: optional
 
   # Epic 18 — Pickup Authorisation & Free-Text Observations  (P2-E03)
-  epic-18: ready-for-dev
-  18-1-authorised-pickup-list-per-child: ready-for-dev  # P2-E03-S01
+  epic-18: in-progress
+  18-1-authorised-pickup-list-per-child: done  # P2-E03-S01
   18-2-attendant-check-in-screen: ready-for-dev  # P2-E03-S02
   18-3-pickup-handoff-with-free-text-observations: ready-for-dev  # P2-E03-S03
   18-4-observations-feed-in-parent-s-account: ready-for-dev  # P2-E03-S04

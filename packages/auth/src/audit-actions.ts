@@ -140,6 +140,8 @@ export const AUDIT_ACTION_CATALOGUE = {
     "subscription.cancel_reversed",
     "subscription.cancelled",
   ],
+  /** Authorised pickup list per child (P2-E03-S01) — create / edit / delete. */
+  pickup: ["pickup.created", "pickup.updated", "pickup.deleted"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

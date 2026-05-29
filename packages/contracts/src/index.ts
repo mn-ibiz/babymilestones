@@ -727,6 +727,65 @@ export function ageInMonths(dateOfBirth: string | Date, asOf: Date = new Date())
   return months < 0 ? 0 : months;
 }
 
+// ---------------------------------------------------------------------------
+// Authorised pickup list per child (P2-E03-S01)
+// ---------------------------------------------------------------------------
+
+/** Max length for a pickup person's free-text fields (name / relationship). */
+export const PICKUP_TEXT_MAX = 120;
+/** Max length for a pickup person's phone + photo URL. */
+export const PICKUP_PHONE_MAX = 32;
+export const PICKUP_PHOTO_URL_MAX = 2048;
+
+/** Trim then collapse an empty optional string to null. */
+const optionalPickupText = z
+  .union([z.string(), z.null()])
+  .optional()
+  .transform((v) => (v ?? "").trim())
+  .transform((v) => (v === "" ? null : v));
+
+/**
+ * Add / edit an authorised pickup (P2-E03-S01 AC1). Required: `name`, `phone`,
+ * `relationship`; optional `photoUrl` (collapses to null). `childId` is never
+ * accepted from the client — it is taken from the route + ownership-checked
+ * against the session parent. The same shape backs create + edit so every AC
+ * field round-trips.
+ */
+export const pickupAuthorisationSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(PICKUP_TEXT_MAX, `Name must be ${PICKUP_TEXT_MAX} characters or fewer`),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Phone is required")
+    .max(PICKUP_PHONE_MAX, `Phone must be ${PICKUP_PHONE_MAX} characters or fewer`),
+  relationship: z
+    .string()
+    .trim()
+    .min(1, "Relationship is required")
+    .max(PICKUP_TEXT_MAX, `Relationship must be ${PICKUP_TEXT_MAX} characters or fewer`),
+  photoUrl: optionalPickupText.refine(
+    (v) => v === null || v.length <= PICKUP_PHOTO_URL_MAX,
+    `Photo URL must be ${PICKUP_PHOTO_URL_MAX} characters or fewer`,
+  ),
+});
+export type PickupAuthorisationInput = z.infer<typeof pickupAuthorisationSchema>;
+
+/** A persisted authorised pickup as returned by the API (read back for edit). */
+export interface PickupAuthorisation {
+  id: string;
+  childId: string;
+  name: string;
+  phone: string;
+  relationship: string;
+  photoUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * AC3: the profile-completion banner shows until the profile is "complete".
  * Complete = a profile row exists with both required names. Pure so it can be
