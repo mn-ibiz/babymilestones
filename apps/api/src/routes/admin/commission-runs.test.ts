@@ -13,6 +13,7 @@ import {
   users,
 } from "@bm/db";
 import { InMemorySessionStore, staffUserSeed } from "@bm/auth";
+import { createCommissionRun } from "@bm/catalog";
 import { buildApp } from "../../app.js";
 
 /**
@@ -20,6 +21,9 @@ import { buildApp } from "../../app.js";
  * real staff sessions (+ CSRF). Covers preview (AC1), confirm → ad_hoc run (AC2),
  * and that a later monthly run excludes the already-run period (AC3).
  */
+let phoneSeq = 0;
+const nextPhone = () => `+25471${String(3_000_000 + phoneSeq++).padStart(7, "0")}`;
+
 describe("Ad-hoc commission run admin API (P3-E01-S04)", () => {
   let dbh: TestDb;
   let app: ReturnType<typeof buildApp>;
@@ -53,10 +57,10 @@ describe("Ad-hoc commission run admin API (P3-E01-S04)", () => {
 
   async function seedJune(name: string, amountCents: number, day = 10) {
     const [s] = await dbh.db.insert(staff).values({ displayName: name, role: "stylist" }).returning();
-    const [u] = await dbh.db.insert(users).values({ phone: `+2547${Math.floor(Math.random() * 1e8)}`, pinHash: "x" }).returning();
+    const [u] = await dbh.db.insert(users).values({ phone: nextPhone(), pinHash: "x" }).returning();
     const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
     const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Z", dateOfBirth: "2024-01-15" }).returning();
-    const [inv] = await dbh.db.insert(invoices).values({ parentId: p!.id, amountDue: 0, serviceId: null, status: "paid" }).returning();
+    const [inv] = await dbh.db.insert(invoices).values({ parentId: p!.id, amountDue: 0, serviceId: null, status: "settled" }).returning();
     const [b] = await dbh.db
       .insert(bookings)
       .values({ parentId: p!.id, childId: c!.id, serviceId: null, staffId: s!.id, staffNameSnapshot: name, staffRateSnapshot: 0, invoiceId: inv!.id })
@@ -122,7 +126,6 @@ describe("Ad-hoc commission run admin API (P3-E01-S04)", () => {
     expect(adhoc.json().run.totalCents).toBe(1500);
 
     // Month-end run over all of June must exclude the claimed 1500.
-    const { createCommissionRun } = await import("@bm/catalog");
     const monthly = await createCommissionRun(dbh.db, {
       kind: "monthly",
       periodStart: new Date("2026-06-01T00:00:00Z"),
@@ -156,6 +159,7 @@ describe("Ad-hoc commission run admin API (P3-E01-S04)", () => {
       periodStart: "2026-06-01T00:00:00Z",
       periodEnd: "2026-07-01T00:00:00Z",
     });
+    expect(created.statusCode).toBe(201);
     const runId = created.json().run.id as string;
 
     const list = await req("GET", "/admin/commission-runs", creds);

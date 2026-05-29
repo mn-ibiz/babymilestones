@@ -66,3 +66,16 @@ export function runLabel(run: CommissionRun): string {
 export function isAwaitingPayout(run: CommissionRun): boolean {
   return run.paidOutAt === null;
 }
+
+/** The payout-CSV download URL for a run (S05 AC1). */
+export function payoutCsvUrl(baseUrl: string, runId: string): string {
+  return `${baseUrl}/admin/commission-runs/${runId}/export.csv`;
+}
+
+/**
+ * Whether the "Mark paid out" action should be offered for a run (S05 AC3): only
+ * a run that has lines (total > 0) and is not already paid out can be marked.
+ */
+export function canMarkPaid(run: CommissionRun): boolean {
+  return run.paidOutAt === null && run.totalCents > 0;
+}

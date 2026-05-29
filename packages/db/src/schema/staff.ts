@@ -27,6 +27,8 @@ export const staff = pgTable(
     displayName: text("display_name").notNull(),
     /** One of the attribution-role taxonomy values — CHECK-constrained in migration 0030. */
     role: text("role").$type<AttributionRole>().notNull(),
+    /** Phone for the commission payout export / M-Pesa B2C (P3-E01-S05). Nullable. */
+    phone: text("phone"),
     /** Soft on/off — inactive staff are not offered for new attributions. */
     active: boolean("active").notNull().default(true),
     /** When the member was retired (set alongside active=false); null while active. */

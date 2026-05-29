@@ -54,9 +54,12 @@ export {
   createCommissionRun,
   previewCommissionRun,
   priorMonthPeriod,
+  buildPayoutCsv,
+  PAYOUT_CSV_COLUMNS,
   type CreateCommissionRunInput,
   type CommissionRunResult,
   type CommissionRunPreview,
+  type PayoutRow,
 } from "./commission-run.js";
 
 export {

@@ -15,7 +15,7 @@ import {
 export function CommissionRunsClient() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [preview, setPreview] = useState<CommissionRunPreview | null>(null);
 
   function onPreview(e: React.FormEvent) {

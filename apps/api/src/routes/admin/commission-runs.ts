@@ -4,6 +4,7 @@ import {
   audit,
   commissionRunLines,
   commissionRuns,
+  staff,
   users,
   type Database,
 } from "@bm/db";
@@ -16,7 +17,8 @@ import {
   type Resource,
   type PermissionPrincipal,
 } from "@bm/auth";
-import { createCommissionRun, previewCommissionRun } from "@bm/catalog";
+import { buildPayoutCsv, createCommissionRun, previewCommissionRun, type PayoutRow } from "@bm/catalog";
+import { inArray } from "drizzle-orm";
 import type { SessionStore } from "@bm/auth";
 import type { AdminDeps } from "./index.js";
 
@@ -153,6 +155,75 @@ export function registerCommissionRuns(app: FastifyInstance, deps: AdminDeps): v
       run: serializeRun(run),
       lines: lines.map((l) => ({ staffId: l.staffId, staffNameSnapshot: l.staffNameSnapshot, amountCents: l.amountCents })),
     });
+  });
+
+  // Download the payout CSV for a run (S05 AC1) — staff name, phone, amount,
+  // reference (M-Pesa B2C feed). Guarded `commission.export`-equivalent via the
+  // export-capable `read report` roles; the download itself is audited (AC2).
+  app.get("/admin/commission-runs/:id/export.csv", async (req, reply) => {
+    const actor = await authorize(req, reply, "read", "report");
+    if (!actor) return reply;
+    const { id } = req.params as { id: string };
+    const [run] = await db.select().from(commissionRuns).where(eq(commissionRuns.id, id));
+    if (!run) return reply.code(404).send({ error: "Commission run not found" });
+
+    const lines = await db.select().from(commissionRunLines).where(eq(commissionRunLines.runId, id));
+    // Resolve current phone per staff (snapshot the name from the line — payout
+    // history must not rewrite if the staff is later renamed).
+    const staffIds = [...new Set(lines.map((l) => l.staffId))];
+    const phoneById = new Map<string, string>();
+    if (staffIds.length) {
+      for (const s of await db.select({ id: staff.id, phone: staff.phone }).from(staff).where(inArray(staff.id, staffIds))) {
+        phoneById.set(s.id, s.phone ?? "");
+      }
+    }
+    const rows: PayoutRow[] = lines.map((l) => ({
+      staffName: l.staffNameSnapshot,
+      phone: phoneById.get(l.staffId) ?? "",
+      amountCents: l.amountCents,
+      // Reference ties the payout back to (run, staff) for reconciliation.
+      reference: `COMM-${id.slice(0, 8)}-${l.staffId.slice(0, 8)}`,
+    }));
+    const csv = buildPayoutCsv(rows);
+
+    await audit(db, {
+      actor: actor.id,
+      action: auditAction("commission.run.export"),
+      target: { table: "commission_runs", id },
+      payload: { line_count: rows.length, total_cents: run.totalCents, bytes: csv.length, ip: req.ip },
+    });
+    return reply
+      .code(200)
+      .header("content-type", "text/csv; charset=utf-8")
+      .header("content-disposition", `attachment; filename="commission-run-${id}.csv"`)
+      .send(csv);
+  });
+
+  // Mark a run paid out after the admin confirms the external payout (S05 AC3).
+  // Admin-gated (`manage service`); idempotent (a second mark is a no-op); audited.
+  app.post("/admin/commission-runs/:id/mark-paid", async (req, reply) => {
+    const actor = await authorize(req, reply, "manage", "service");
+    if (!actor) return reply;
+    const { id } = req.params as { id: string };
+    const [run] = await db.select().from(commissionRuns).where(eq(commissionRuns.id, id));
+    if (!run) return reply.code(404).send({ error: "Commission run not found" });
+    if (run.paidOutAt) {
+      return reply.code(200).send({ run: serializeRun(run), alreadyPaid: true });
+    }
+    const paidOutAt = new Date();
+    const [updated] = await db
+      .update(commissionRuns)
+      .set({ paidOutAt })
+      // Conditional on still-null so a concurrent mark does not double-audit.
+      .where(eq(commissionRuns.id, id))
+      .returning();
+    await audit(db, {
+      actor: actor.id,
+      action: auditAction("commission.run.paid_out"),
+      target: { table: "commission_runs", id },
+      payload: { paid_out_at: paidOutAt.toISOString(), total_cents: run.totalCents, ip: req.ip },
+    });
+    return reply.code(200).send({ run: serializeRun(updated!), alreadyPaid: false });
   });
 }
 

@@ -20,6 +20,9 @@ import { recordBookingCommission, reverseBookingCommission } from "./commission-
  * (AC4), refund reversal (AC2), and the unattributed / no-rate skips.
  */
 const BOOKED_AT = new Date("2026-02-15T10:00:00.000Z");
+const ACTOR = "00000000-0000-0000-0000-000000000001";
+let phoneSeq = 0;
+const nextPhone = () => `+25471${String(2_000_000 + phoneSeq++).padStart(7, "0")}`;
 
 describe("commission hook (P3-E01-S02)", () => {
   let dbh: TestDb;
@@ -31,10 +34,10 @@ describe("commission hook (P3-E01-S02)", () => {
   });
 
   async function seedBooking(opts: { attributed?: boolean; priceCents?: number; rate?: string } = {}) {
-    const [u] = await dbh.db.insert(users).values({ phone: "+254712300001", pinHash: "x" }).returning();
+    const [u] = await dbh.db.insert(users).values({ phone: nextPhone(), pinHash: "x" }).returning();
     const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
     const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Z", dateOfBirth: "2024-01-15" }).returning();
-    const [inv] = await dbh.db.insert(invoices).values({ parentId: p!.id, amountDue: 0, serviceId: null, status: "paid" }).returning();
+    const [inv] = await dbh.db.insert(invoices).values({ parentId: p!.id, amountDue: 0, serviceId: null, status: "settled" }).returning();
     let staffId: string | null = null;
     if (opts.attributed !== false) {
       const [s] = await dbh.db.insert(staff).values({ displayName: "Asha", role: "stylist" }).returning();
@@ -61,7 +64,7 @@ describe("commission hook (P3-E01-S02)", () => {
 
   it("writes one accrual = price × rate at booking time, in integer cents (AC1/AC3)", async () => {
     const { bookingId, staffId } = await seedBooking({ priceCents: 10000, rate: "12.50" });
-    const res = await recordBookingCommission(dbh.db, { bookingId, postedBy: "actor-1" });
+    const res = await recordBookingCommission(dbh.db, { bookingId, postedBy: ACTOR });
     expect(res.entry).not.toBeNull();
     expect(res.entry!.amountCents).toBe(1250); // 12.5% of 100.00
     expect(res.entry!.staffId).toBe(staffId);
@@ -99,7 +102,7 @@ describe("commission hook (P3-E01-S02)", () => {
   it("reverses the accrual with a signed-opposite append-only row on refund (AC2/AC4)", async () => {
     const { bookingId } = await seedBooking({ priceCents: 10000, rate: "12.50" });
     const accrual = await recordBookingCommission(dbh.db, { bookingId });
-    const rev = await reverseBookingCommission(dbh.db, { bookingId, postedBy: "actor-1" });
+    const rev = await reverseBookingCommission(dbh.db, { bookingId, postedBy: ACTOR });
     expect(rev.entry).not.toBeNull();
     expect(rev.entry!.amountCents).toBe(-1250);
     expect(rev.entry!.source).toBe("refund_reversal");

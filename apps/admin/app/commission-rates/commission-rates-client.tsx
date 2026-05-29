@@ -17,7 +17,7 @@ export function CommissionRatesClient() {
     effectiveFrom: "",
     reason: "",
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -186,6 +186,46 @@ async function loadLines(
   return rows;
 }
 
+/** The payout CSV column order (P3-E01-S05 AC1). Stable — tests assert it. */
+export const PAYOUT_CSV_COLUMNS = ["staff_name", "phone", "amount", "reference"] as const;
+
+/** Escape a CSV field per RFC 4180 (quote if it contains , " or newline). */
+function csvField(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** Format integer cents as a plain decimal amount ("150000" → "1500.00"). */
+function amountField(cents: number): string {
+  const neg = cents < 0;
+  const abs = Math.abs(cents);
+  const body = `${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+  return neg ? `-${body}` : body;
+}
+
+/** One payout CSV row: staff name, phone, amount, reference (M-Pesa B2C feed). */
+export interface PayoutRow {
+  staffName: string;
+  phone: string;
+  amountCents: number;
+  reference: string;
+}
+
+/**
+ * Build the payout CSV for a commission run (P3-E01-S05 AC1). Pure: takes the
+ * resolved rows (name, phone, amount, reference) and renders RFC-4180 CSV with a
+ * stable header. Amounts are integer cents rendered as a decimal; a missing
+ * phone is a blank field (the line is still emitted). Exported for unit testing.
+ */
+export function buildPayoutCsv(rows: PayoutRow[]): string {
+  const lines: string[] = [PAYOUT_CSV_COLUMNS.join(",")];
+  for (const r of rows) {
+    lines.push(
+      [csvField(r.staffName), csvField(r.phone), amountField(r.amountCents), csvField(r.reference)].join(","),
+    );
+  }
+  return lines.join("\r\n") + "\r\n";
+}
+
 export interface CommissionRunPreview {
   periodStart: Date;
   periodEnd: Date;

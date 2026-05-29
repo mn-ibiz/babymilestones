@@ -43,6 +43,15 @@ export type { RecentTransaction, RecentTransactionsOptions } from "./recent.js";
 // Per-day-per-account reconciliation export read model (P1-E06-S04).
 export { reconciliationExportRows } from "./reconciliation-export.js";
 
+// Commission accrual + refund reversal hook (P3-E01-S02).
+export {
+  recordBookingCommission,
+  reverseBookingCommission,
+  type CommissionExecutor,
+  type RecordBookingCommissionResult,
+  type ReverseBookingCommissionResult,
+} from "./commission-hook.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 

@@ -4,6 +4,8 @@ import {
   formatCents,
   runLabel,
   isAwaitingPayout,
+  payoutCsvUrl,
+  canMarkPaid,
   type CommissionRun,
 } from "./commission-runs";
 
@@ -41,5 +43,15 @@ describe("commission-run display helpers (P3-E01-S04/S05)", () => {
     expect(isAwaitingPayout(run)).toBe(true);
     expect(isAwaitingPayout({ ...run, paidOutAt: "2026-06-16T00:00:00.000Z" })).toBe(false);
     expect(runLabel({ ...run, paidOutAt: "2026-06-16T00:00:00.000Z" })).toContain("PAID OUT");
+  });
+
+  it("builds the payout CSV download URL (AC1)", () => {
+    expect(payoutCsvUrl("http://x", "r1")).toBe("http://x/admin/commission-runs/r1/export.csv");
+  });
+
+  it("offers mark-paid only for an unpaid run with a positive total (AC3)", () => {
+    expect(canMarkPaid(run)).toBe(true);
+    expect(canMarkPaid({ ...run, paidOutAt: "2026-06-16T00:00:00.000Z" })).toBe(false);
+    expect(canMarkPaid({ ...run, totalCents: 0 })).toBe(false);
   });
 });

@@ -20,10 +20,10 @@ async function seedLedger(
   opts: { staffId: string; amountCents: number; occurredAt: Date; source?: "booking" | "refund_reversal" },
 ) {
   // Minimal booking graph to satisfy FKs.
-  const [u] = await dbh.db.insert(users).values({ phone: `+2547${Math.floor(Math.random() * 1e8)}`, pinHash: "x" }).returning();
+  const [u] = await dbh.db.insert(users).values({ phone: nextPhone(), pinHash: "x" }).returning();
   const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
   const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Z", dateOfBirth: "2024-01-15" }).returning();
-  const [inv] = await dbh.db.insert(invoices).values({ parentId: p!.id, amountDue: 0, serviceId: null, status: "paid" }).returning();
+  const [inv] = await dbh.db.insert(invoices).values({ parentId: p!.id, amountDue: 0, serviceId: null, status: "settled" }).returning();
   const [b] = await dbh.db
     .insert(bookings)
     .values({ parentId: p!.id, childId: c!.id, serviceId: null, staffId: opts.staffId, staffNameSnapshot: "x", staffRateSnapshot: 0, invoiceId: inv!.id })
