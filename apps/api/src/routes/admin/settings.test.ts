@@ -200,4 +200,39 @@ describe("Settings admin API (P1-E10-S04)", () => {
       expect(rows[0]!.targetId).toBe("receipt_branding");
     });
   });
+
+  describe("eTIMS enable flag (P5-E02-S03)", () => {
+    it("lists the eTIMS section in the index (AC1)", async () => {
+      const res = await req("GET", "/admin/settings", admin);
+      const body = res.json() as { sections: { key: string }[] };
+      expect(body.sections.map((s) => s.key)).toContain("etims");
+    });
+
+    it("defaults to disabled when unset (AC2 — production unaffected)", async () => {
+      const res = await req("GET", "/admin/settings/etims", admin);
+      expect(res.statusCode).toBe(200);
+      expect((res.json() as { value: { enabled: boolean } }).value).toEqual({ enabled: false });
+    });
+
+    it("enabling the flag persists it and audits etims.flag.changed (AC3)", async () => {
+      const put = await req("PUT", "/admin/settings/etims", admin, { enabled: true });
+      expect(put.statusCode).toBe(200);
+      expect((put.json() as { value: { enabled: boolean } }).value.enabled).toBe(true);
+
+      const flag = await dbh.db
+        .select()
+        .from(auditOutbox)
+        .where(eq(auditOutbox.action, "etims.flag.changed"));
+      expect(flag).toHaveLength(1);
+      expect((flag[0]!.payload as { enabled: boolean }).enabled).toBe(true);
+    });
+
+    it("rolls back cleanly by flipping the flag off again (AC4)", async () => {
+      await req("PUT", "/admin/settings/etims", admin, { enabled: true });
+      const off = await req("PUT", "/admin/settings/etims", admin, { enabled: false });
+      expect(off.statusCode).toBe(200);
+      const get = await req("GET", "/admin/settings/etims", admin);
+      expect((get.json() as { value: { enabled: boolean } }).value.enabled).toBe(false);
+    });
+  });
 });

@@ -2274,7 +2274,7 @@ export function auditLogEventsToCsv(events: readonly AuditLogEvent[]): string {
  * provider config and float accounts — are NOT listed here; the Settings area
  * links to those existing surfaces instead of storing them.
  */
-export const SETTING_KEYS = ["loyalty", "branding", "receipt_branding"] as const;
+export const SETTING_KEYS = ["loyalty", "branding", "receipt_branding", "etims"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
 /** Narrow an arbitrary string to a known general-settings section key. */

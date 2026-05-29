@@ -129,6 +129,13 @@ export function registerAdminSettings(app: FastifyInstance, deps: AdminSettingsD
         kind: "general",
         accessible: true,
       },
+      {
+        key: "etims",
+        label: "eTIMS (KRA) receipts",
+        href: "/settings/etims",
+        kind: "general",
+        accessible: true,
+      },
     ];
   }
 
@@ -183,6 +190,17 @@ export function registerAdminSettings(app: FastifyInstance, deps: AdminSettingsD
       target: { table: "settings", id: key },
       payload: { key, value: parsed.value, ip: req.ip },
     });
+
+    // P5-E02-S03 (AC3): a dedicated audit for the eTIMS enable-flag change, so
+    // the on/off rollback is traceable beyond the generic settings.update row.
+    if (key === "etims") {
+      await audit(db, {
+        actor: actor.id,
+        action: "etims.flag.changed",
+        target: { table: "settings", id: key },
+        payload: { enabled: (parsed.value as { enabled?: boolean }).enabled === true, ip: req.ip },
+      });
+    }
 
     return reply.code(200).send({
       key,
