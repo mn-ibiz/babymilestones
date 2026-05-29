@@ -1,0 +1,177 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { createTestDb } from "@bm/db/testing";
+import { auditOutbox, children, invoices, parents, smsOutbox, users } from "@bm/db";
+import { InMemorySessionStore, hashPin } from "@bm/auth";
+import {
+  createSchedule,
+  createService,
+  dayOfWeekIso,
+  generateSlotsForSchedule,
+  listSlotsWithRemaining,
+  setServicePrice,
+} from "@bm/catalog";
+import { buildApp } from "../../app.js";
+
+/**
+ * P2-E01-S03 — parent books a slot. Integration via app.inject with a fixed
+ * clock (2026-06-15 05:00Z). Covers booking + pending invoice (AC2/AC3), the
+ * full-slot rejection (AC4), eligibility (AC1), the SMS-stub confirmation (AC5),
+ * and the past-slot / ownership / auth guards.
+ */
+const FIXED = Date.parse("2026-06-15T05:00:00.000Z");
+const FUTURE = "2026-06-18";
+
+describe("parent slot booking (P2-E01-S03)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  let app: ReturnType<typeof buildApp>;
+
+  async function makeParent(phone: string, rawPhone: string) {
+    const [u] = await dbh.db.insert(users).values({ phone, pinHash: await hashPin("1357") }).returning();
+    const [p] = await dbh.db
+      .insert(parents)
+      .values({ userId: u!.id, firstName: "Amina", lastName: "Otieno" })
+      .returning();
+    const login = await app.inject({ method: "POST", url: "/auth/login", payload: { phone: rawPhone, pin: "1357" } });
+    const cookies = login.headers["set-cookie"] as string[];
+    const sessionCookie = cookies.find((c) => c.startsWith("bm_session="))!.split(";")[0]!;
+    const csrfCookie = cookies.find((c) => c.startsWith("bm_csrf="))!.split(";")[0]!;
+    return { userId: u!.id, parentId: p!.id, sessionCookie, csrfCookie, csrfToken: login.json().csrfToken as string };
+  }
+  type Parent = Awaited<ReturnType<typeof makeParent>>;
+
+  async function addChild(parentId: string, dateOfBirth = "2024-01-01") {
+    const [c] = await dbh.db.insert(children).values({ parentId, firstName: "Zola", dateOfBirth }).returning();
+    return c!.id;
+  }
+
+  /** Seed a priced service + a slot; returns ids. `slotDate`/window control past-ness + age. */
+  async function seedSlot(opts: {
+    slotDate?: string;
+    startTime?: string;
+    endTime?: string;
+    capacity?: number;
+    ageMaxMonths?: number | null;
+    priced?: boolean;
+  } = {}) {
+    const slotDate = opts.slotDate ?? FUTURE;
+    const svc = await createService(dbh.db, {
+      name: "Soft Play",
+      unit: "play",
+      ageMaxMonths: opts.ageMaxMonths ?? null,
+    });
+    if (opts.priced !== false) {
+      await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1500, effectiveFrom: "2026-01-01" });
+    }
+    const sched = await createSchedule(dbh.db, {
+      serviceId: svc.id,
+      dayOfWeek: dayOfWeekIso(slotDate),
+      startTime: opts.startTime ?? "09:00",
+      endTime: opts.endTime ?? "10:00",
+      slotDurationMinutes: 60,
+      capacity: opts.capacity ?? 5,
+    });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: "2026-06-15", days: 7 });
+    const slots = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    const slot = slots.find((s) => s.slotDate === slotDate)!;
+    return { serviceId: svc.id, slotId: slot.id };
+  }
+
+  beforeEach(async () => {
+    dbh = await createTestDb();
+    app = buildApp({ db: dbh.db, sessions: new InMemorySessionStore(), now: () => FIXED });
+  });
+  afterEach(async () => {
+    await app.close();
+    await dbh.close();
+  });
+
+  const book = (p: Parent, body: Record<string, unknown>, csrf = true) =>
+    app.inject({
+      method: "POST",
+      url: "/parents/me/bookings",
+      headers: {
+        cookie: csrf ? `${p.sessionCookie}; ${p.csrfCookie}` : p.sessionCookie,
+        ...(csrf ? { "x-csrf-token": p.csrfToken } : {}),
+      },
+      payload: body,
+    });
+
+  it("books a slot, creates a pending invoice, sends SMS, audits (AC2/AC3/AC5)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotId } = await seedSlot();
+
+    const res = await book(parent, { slotId, childId });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.amountCents).toBe(1500);
+
+    const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, body.invoiceId));
+    expect(inv!.status).toBe("pending");
+    expect(inv!.amountDue).toBe(1500);
+
+    const sms = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "booking.confirmed"));
+    expect(sms).toHaveLength(1);
+    expect(sms[0]!.body).toContain("Zola");
+
+    const audits = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "booking.created"));
+    expect(audits).toHaveLength(1);
+  });
+
+  it("returns 409 'Slot just filled' when the last seat is gone (AC4)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childA = await addChild(parent.parentId);
+    const childB = await addChild(parent.parentId);
+    const { slotId } = await seedSlot({ capacity: 1 });
+    const first = await book(parent, { slotId, childId: childA });
+    expect(first.statusCode).toBe(201);
+    const second = await book(parent, { slotId, childId: childB });
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error).toMatch(/just filled/i);
+  });
+
+  it("returns 409 when the same child is already booked in the slot", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotId } = await seedSlot({ capacity: 5 });
+    expect((await book(parent, { slotId, childId })).statusCode).toBe(201);
+    const dup = await book(parent, { slotId, childId });
+    expect(dup.statusCode).toBe(409);
+    expect(dup.json().error).toMatch(/already booked/i);
+  });
+
+  it("returns 422 when the child is not age-eligible (AC1)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId, "2024-01-01"); // ~29 months
+    const { slotId } = await seedSlot({ ageMaxMonths: 12 });
+    const res = await book(parent, { slotId, childId });
+    expect(res.statusCode).toBe(422);
+  });
+
+  it("returns 409 when the slot has already passed", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotId } = await seedSlot({ slotDate: "2026-06-15", startTime: "03:00", endTime: "04:00" });
+    const res = await book(parent, { slotId, childId });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it("returns 404 for a child the parent does not own", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const other = await makeParent("+254712000099", "0712000099");
+    const otherChild = await addChild(other.parentId);
+    const { slotId } = await seedSlot();
+    const res = await book(parent, { slotId, childId: otherChild });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("rejects without CSRF (403) and unauthenticated (401)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotId } = await seedSlot();
+    expect((await book(parent, { slotId, childId }, false)).statusCode).toBe(403);
+    const anon = await app.inject({ method: "POST", url: "/parents/me/bookings", payload: { slotId, childId } });
+    expect(anon.statusCode).toBe(401);
+  });
+});

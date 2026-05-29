@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@bm/db/testing";
-import { bookings, children, invoices, parents, sessionSlots, users } from "@bm/db";
-import { createService } from "./services.js";
+import { auditOutbox, bookings, children, invoices, parents, sessionSlots, users } from "@bm/db";
+import { createService, setServicePrice } from "./services.js";
+import {
+  bookSlot,
+  DuplicateBookingError,
+  ServicePriceMissingError,
+  SlotFullError,
+} from "./schedules.js";
 import {
   addDaysIso,
   createSchedule,
@@ -296,6 +302,101 @@ describe("remaining-capacity read model (P2-E01-S01 AC3)", () => {
 
   it("getSlotWithRemaining returns null for an unknown slot", async () => {
     expect(await getSlotWithRemaining(dbh.db, "00000000-0000-0000-0000-000000000000")).toBeNull();
+  });
+});
+
+describe("bookSlot (P2-E01-S03)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  const FROM = "2026-06-15";
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  async function seedChild(phone: string) {
+    const [u] = await dbh.db.insert(users).values({ phone, pinHash: "x" }).returning();
+    const [p] = await dbh.db
+      .insert(parents)
+      .values({ userId: u!.id, firstName: "Amina", lastName: "Otieno" })
+      .returning();
+    const [c] = await dbh.db
+      .insert(children)
+      .values({ parentId: p!.id, firstName: "Zola", dateOfBirth: "2024-01-15" })
+      .returning();
+    return { parentId: p!.id, childId: c!.id };
+  }
+
+  async function seedSlot(capacity: number, withPrice = true) {
+    const svc = await createService(dbh.db, { name: "Soft Play", unit: "play" });
+    if (withPrice) {
+      await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1500, effectiveFrom: "2026-01-01" });
+    }
+    const sched = await createSchedule(dbh.db, {
+      serviceId: svc.id,
+      dayOfWeek: dayOfWeekIso(FROM),
+      startTime: "09:00",
+      endTime: "10:00",
+      slotDurationMinutes: 60,
+      capacity,
+    });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: FROM, days: 1 });
+    const [slot] = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    return { serviceId: svc.id, slotId: slot!.id };
+  }
+
+  it("creates a pending invoice + booking at the snapshotted price (AC2/AC3)", async () => {
+    const { slotId, serviceId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    const res = await bookSlot(dbh.db, { slotId, parentId, childId });
+    expect(res.amountCents).toBe(1500);
+    expect(res.serviceId).toBe(serviceId);
+
+    const [slot] = await listSlotsWithRemaining(dbh.db, { serviceId });
+    expect(slot!.bookedCount).toBe(1);
+    expect(slot!.remainingCapacity).toBe(4);
+  });
+
+  it("rejects the booking when the slot is full (AC4 — last seat)", async () => {
+    const { slotId } = await seedSlot(1);
+    const a = await seedChild("+254712000001");
+    const b = await seedChild("+254712000002");
+    await bookSlot(dbh.db, { slotId, parentId: a.parentId, childId: a.childId });
+    await expect(bookSlot(dbh.db, { slotId, parentId: b.parentId, childId: b.childId })).rejects.toBeInstanceOf(
+      SlotFullError,
+    );
+  });
+
+  it("rejects a booking for a service with no effective price (AC3)", async () => {
+    const { slotId } = await seedSlot(5, false);
+    const { parentId, childId } = await seedChild("+254712000001");
+    await expect(bookSlot(dbh.db, { slotId, parentId, childId })).rejects.toBeInstanceOf(
+      ServicePriceMissingError,
+    );
+  });
+
+  it("rejects booking the same child into the same slot twice (one seat per child)", async () => {
+    const { slotId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    await bookSlot(dbh.db, { slotId, parentId, childId });
+    await expect(bookSlot(dbh.db, { slotId, parentId, childId })).rejects.toBeInstanceOf(
+      DuplicateBookingError,
+    );
+  });
+
+  it("writes a booking.created audit row atomically with the booking (AC5)", async () => {
+    const { slotId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    const actor = "00000000-0000-0000-0000-000000000abc";
+    const res = await bookSlot(dbh.db, { slotId, parentId, childId, actor });
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "booking.created"));
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.targetId).toBe(res.bookingId);
+    expect(audits[0]!.actorUserId).toBe(actor);
   });
 });
 

@@ -17,6 +17,7 @@ export type SmsTemplateKey =
   | "wallet.refund"
   | "payment.mpesa.failed"
   | "parent.data.export.ready"
+  | "booking.confirmed"
   | "raw";
 
 /** Data bag passed to a template; renderers read the fields they need. */
@@ -53,6 +54,8 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
     `Your M-Pesa top-up of KES ${str(d, "amountKes")} could not be completed. No money was deducted. Please try again.`,
   "parent.data.export.ready": (d) =>
     `Your ${BRAND.name} data export is ready. Download (valid 7 days, one-time): ${str(d, "link")}`,
+  "booking.confirmed": (d) =>
+    `${str(d, "childName")} is booked for ${str(d, "serviceName")} on ${str(d, "date")} at ${str(d, "time")}. — ${BRAND.name}`,
   raw: (d) => str(d, "body"),
 };
 

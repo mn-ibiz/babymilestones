@@ -1478,6 +1478,28 @@ export interface ServiceAvailability {
   slots: AvailableSlot[];
 }
 
+/* --- Booking a slot (P2-E01-S03) ----------------------------------------- */
+
+/** Book a slot for one of the parent's children. Both ids come from the body. */
+export const bookingCreateSchema = z.object({
+  slotId: z.string().uuid("slotId must be a valid id"),
+  childId: z.string().uuid("childId must be a valid id"),
+});
+export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
+
+/** Successful booking confirmation returned to the parent (P2-E01-S03). */
+export interface BookingConfirmation {
+  bookingId: string;
+  invoiceId: string;
+  slotId: string;
+  serviceId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  /** Service price snapshotted onto the pending invoice (AC3), integer KES cents. */
+  amountCents: number;
+}
+
 /* --- Staff data records (P1-E07-S03) ------------------------------------- */
 
 /** Max length of a staff display name. */

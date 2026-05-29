@@ -158,7 +158,7 @@ development_status:
   epic-16: in-progress
   16-1-time-slot-model-and-capacity-for-services: done  # P2-E01-S01
   16-2-parent-browses-available-slots-for-a-service: done  # P2-E01-S02
-  16-3-parent-books-a-slot-creates-pending-invoice: ready-for-dev  # P2-E01-S03
+  16-3-parent-books-a-slot-creates-pending-invoice: done  # P2-E01-S03
   16-4-reception-books-on-behalf-of-a-walk-in: ready-for-dev  # P2-E01-S04
   16-5-parent-reschedules-a-booking: ready-for-dev  # P2-E01-S05
   16-6-parent-or-reception-cancels-a-booking: ready-for-dev  # P2-E01-S06

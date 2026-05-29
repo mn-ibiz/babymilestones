@@ -1,12 +1,15 @@
 import { and, asc, eq, gte, inArray, isNotNull, lte, notInArray, sql } from "drizzle-orm";
 import {
+  audit,
   bookings,
+  invoices,
   serviceSchedules,
   sessionSlots,
+  type Database,
   type ServiceScheduleRow,
   type SessionSlotRow,
 } from "@bm/db";
-import type { Executor } from "./services.js";
+import { resolveServicePriceAt, type Executor } from "./services.js";
 
 /**
  * P2-E01-S01 — time-slot model + capacity for services.
@@ -436,5 +439,154 @@ export async function browseServiceSlots(
   return slots.map((s) => {
     const isPast = isSlotPast(s.slotDate, s.endTime, opts.today, opts.nowMinutes);
     return { ...s, isPast, available: !isPast && s.remainingCapacity > 0 };
+  });
+}
+
+/* --- Booking a slot (P2-E01-S03) ----------------------------------------- */
+
+/** The slot id is unknown. */
+export class SlotNotFoundError extends Error {
+  constructor(public readonly slotId: string) {
+    super(`Slot not found: ${slotId}`);
+    this.name = "SlotNotFoundError";
+  }
+}
+
+/** The slot is already at capacity — the seat was taken (AC4). */
+export class SlotFullError extends Error {
+  constructor(public readonly slotId: string) {
+    super(`Slot is full: ${slotId}`);
+    this.name = "SlotFullError";
+  }
+}
+
+/** The service has no price effective at the slot date — it cannot be booked. */
+export class ServicePriceMissingError extends Error {
+  constructor(public readonly serviceId: string) {
+    super(`No effective price for service: ${serviceId}`);
+    this.name = "ServicePriceMissingError";
+  }
+}
+
+/** This child already holds a booking in this slot — one seat per child per slot. */
+export class DuplicateBookingError extends Error {
+  constructor(
+    public readonly slotId: string,
+    public readonly childId: string,
+  ) {
+    super(`Child ${childId} is already booked in slot ${slotId}`);
+    this.name = "DuplicateBookingError";
+  }
+}
+
+export interface BookSlotInput {
+  slotId: string;
+  parentId: string;
+  childId: string;
+  /** Acting user id for the audit row (null = system). */
+  actor?: string | null;
+  /** Request IP for the audit payload. */
+  ip?: string | null;
+}
+
+export interface BookSlotResult {
+  bookingId: string;
+  invoiceId: string;
+  serviceId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  /** The service price snapshotted onto the invoice + booking (AC3). */
+  amountCents: number;
+}
+
+/**
+ * Book a slot for a child (P2-E01-S03). Runs in a transaction that LOCKS the
+ * slot row (`SELECT … FOR UPDATE`) before counting current bookings, so two
+ * parents racing for the last seat are serialized: the first commits its
+ * booking, the second re-reads the now-full count and is rejected with
+ * {@link SlotFullError} (AC4). On success it snapshots the service's effective
+ * price (AC3) into a new pending invoice and the booking row, and increments the
+ * slot's occupancy by the booking insert itself (AC2 — capacity is computed from
+ * `bookings.slot_id`, never a stored counter).
+ *
+ * Throws {@link SlotNotFoundError} / {@link SlotFullError} /
+ * {@link ServicePriceMissingError} / {@link DuplicateBookingError}. Eligibility
+ * (age) + ownership are enforced by the caller, which has the child + service
+ * context.
+ *
+ * Concurrency note: correctness relies on READ COMMITTED (Postgres' default) —
+ * once the second booker acquires the slot's `FOR UPDATE` lock, its capacity +
+ * duplicate counts run on a fresh snapshot that sees the first booker's
+ * committed rows. The booking insert + audit + invoice all commit together, so a
+ * failed audit never leaves an un-audited booking (the outbox pattern).
+ */
+export async function bookSlot(db: Database, input: BookSlotInput): Promise<BookSlotResult> {
+  return db.transaction(async (tx) => {
+    const [slot] = await tx
+      .select()
+      .from(sessionSlots)
+      .where(eq(sessionSlots.id, input.slotId))
+      .for("update");
+    if (!slot) throw new SlotNotFoundError(input.slotId);
+
+    // One seat per child per slot — checked under the slot lock so concurrent
+    // duplicate attempts serialize (AC: a child can't take two seats in a slot).
+    const [existing] = await tx
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(and(eq(bookings.slotId, slot.id), eq(bookings.childId, input.childId)));
+    if (existing) throw new DuplicateBookingError(slot.id, input.childId);
+
+    const counts = await bookingCountsBySlot(tx, [slot.id]);
+    if ((counts.get(slot.id) ?? 0) >= slot.capacity) throw new SlotFullError(slot.id);
+
+    const price = await resolveServicePriceAt(tx, slot.serviceId, slot.slotDate);
+    if (!price) throw new ServicePriceMissingError(slot.serviceId);
+    const amountCents = price.amountCents;
+
+    const [invoice] = await tx
+      .insert(invoices)
+      .values({ parentId: input.parentId, amountDue: amountCents, serviceId: slot.serviceId, status: "pending" })
+      .returning();
+    const [booking] = await tx
+      .insert(bookings)
+      .values({
+        parentId: input.parentId,
+        childId: input.childId,
+        serviceId: slot.serviceId,
+        slotId: slot.id,
+        invoiceId: invoice!.id,
+        // No staff attribution on a parent self-booked slot; the rate snapshot is
+        // the service price at booking time (the booking's own price record).
+        staffNameSnapshot: "",
+        staffRateSnapshot: amountCents,
+      })
+      .returning();
+
+    // Audit inside the transaction (atomic with the booking — AC5 / outbox).
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "booking.created",
+      target: { table: "bookings", id: booking!.id },
+      payload: {
+        slot_id: slot.id,
+        child_id: input.childId,
+        service_id: slot.serviceId,
+        invoice_id: invoice!.id,
+        amount_cents: amountCents,
+        ip: input.ip ?? undefined,
+      },
+    });
+
+    return {
+      bookingId: booking!.id,
+      invoiceId: invoice!.id,
+      serviceId: slot.serviceId,
+      slotDate: slot.slotDate,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      amountCents,
+    };
   });
 }

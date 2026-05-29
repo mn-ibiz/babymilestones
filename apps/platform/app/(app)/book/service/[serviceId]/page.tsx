@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import type { Child, ServiceAvailability } from "@bm/contracts";
+import type { AvailableSlot, Child, ServiceAvailability } from "@bm/contracts";
 import { fetchChildren } from "../../../../../lib/children-api";
-import { fetchAvailability } from "../../../../../lib/book-slots-api";
+import { bookSlotRequest, fetchAvailability } from "../../../../../lib/book-slots-api";
 import { buildWeekGrid, slotState } from "../../../../../lib/book-slots";
 
 /**
@@ -27,6 +27,25 @@ export default function BookServicePage() {
   const [availability, setAvailability] = useState<ServiceAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<AvailableSlot | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const childName = useMemo(
+    () => children.find((c) => c.id === childId)?.firstName ?? "your child",
+    [children, childId],
+  );
+
+  const loadAvailability = useCallback(
+    (id: string) => {
+      setError(null);
+      setAvailability(null); // drop the prior child's grid while the refetch is in flight
+      return fetchAvailability(serviceId, id)
+        .then(setAvailability)
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load availability"));
+    },
+    [serviceId],
+  );
 
   useEffect(() => {
     fetchChildren()
@@ -40,12 +59,26 @@ export default function BookServicePage() {
 
   useEffect(() => {
     if (!childId) return;
-    setError(null);
-    setAvailability(null); // drop the prior child's grid while the refetch is in flight
-    fetchAvailability(serviceId, childId)
-      .then(setAvailability)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load availability"));
-  }, [serviceId, childId]);
+    setConfirming(null);
+    setFlash(null);
+    void loadAvailability(childId);
+  }, [childId, loadAvailability]);
+
+  async function confirmBooking() {
+    if (!confirming || !childId) return;
+    setBusy(true);
+    try {
+      await bookSlotRequest(confirming.id, childId);
+      setFlash({ kind: "ok", text: `Booked ${confirming.startTime} for ${childName}.` });
+    } catch (e: unknown) {
+      // Surfaces "Slot just filled — please pick another time" on a 409 (AC4).
+      setFlash({ kind: "err", text: e instanceof Error ? e.message : "Booking failed" });
+    } finally {
+      setConfirming(null);
+      setBusy(false);
+      void loadAvailability(childId); // refresh remaining capacity either way
+    }
+  }
 
   const week = useMemo(
     () => (availability ? buildWeekGrid(availability.slots, availability.windowStart) : []),
@@ -82,6 +115,43 @@ export default function BookServicePage() {
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
+      {flash ? (
+        <p
+          className={`mt-4 rounded p-3 text-sm ${
+            flash.kind === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+          }`}
+        >
+          {flash.text}
+        </p>
+      ) : null}
+
+      {confirming ? (
+        <div className="mt-4 rounded border border-emerald-300 bg-emerald-50 p-3 text-sm">
+          <p>
+            Book <strong>{confirming.startTime}</strong> on <strong>{confirming.slotDate}</strong> for{" "}
+            <strong>{childName}</strong>?
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={confirmBooking}
+              className="rounded bg-emerald-600 px-3 py-1 text-white disabled:opacity-50"
+            >
+              {busy ? "Booking…" : "Confirm"}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setConfirming(null)}
+              className="rounded border border-gray-300 px-3 py-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {availability && !availability.eligible ? (
         <p className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-800">
           This service isn’t available for your child’s age
@@ -103,28 +173,37 @@ export default function BookServicePage() {
                 ) : (
                   col.slots.map((s) => {
                     const state = slotState(s);
+                    const label = `${s.startTime}${state === "available" ? ` · ${s.remainingCapacity} left` : ""}`;
+                    if (state === "available") {
+                      return (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFlash(null);
+                              setConfirming(s);
+                            }}
+                            className="w-full rounded bg-emerald-50 px-2 py-1 text-left text-xs text-emerald-800 hover:bg-emerald-100"
+                            title={`${s.remainingCapacity} place${s.remainingCapacity === 1 ? "" : "s"} left`}
+                          >
+                            {label}
+                          </button>
+                        </li>
+                      );
+                    }
                     return (
                       <li
                         key={s.id}
-                        aria-disabled={state !== "available"}
+                        aria-disabled
                         className={[
                           "rounded px-2 py-1 text-xs",
-                          state === "available"
-                            ? "bg-emerald-50 text-emerald-800"
-                            : state === "full"
-                              ? "bg-gray-100 text-gray-400"
-                              : "bg-gray-50 text-gray-300 line-through",
+                          state === "full"
+                            ? "bg-gray-100 text-gray-400"
+                            : "bg-gray-50 text-gray-300 line-through",
                         ].join(" ")}
-                        title={
-                          state === "past"
-                            ? "This slot has passed"
-                            : state === "full"
-                              ? "This slot is full"
-                              : `${s.remainingCapacity} place${s.remainingCapacity === 1 ? "" : "s"} left`
-                        }
+                        title={state === "past" ? "This slot has passed" : "This slot is full"}
                       >
-                        {s.startTime}
-                        {state === "available" ? ` · ${s.remainingCapacity} left` : ""}
+                        {label}
                       </li>
                     );
                   })

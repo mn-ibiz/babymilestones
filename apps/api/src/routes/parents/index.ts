@@ -10,6 +10,7 @@ import { registerParentExports } from "./exports.js";
 import { registerParentStatement } from "./statement.js";
 import { registerParentWallet } from "./wallet.js";
 import { registerParentAvailability } from "./availability.js";
+import { registerParentBooking } from "./booking.js";
 
 export interface ParentsDeps {
   db: Database;
@@ -50,6 +51,11 @@ export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDep
   });
   registerParentWallet(app, { db: deps.db, sessions: deps.sessions });
   registerParentAvailability(app, {
+    db: deps.db,
+    sessions: deps.sessions,
+    now: deps.now ? () => new Date(deps.now!()) : undefined,
+  });
+  registerParentBooking(app, {
     db: deps.db,
     sessions: deps.sessions,
     now: deps.now ? () => new Date(deps.now!()) : undefined,
