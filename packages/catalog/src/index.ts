@@ -53,6 +53,10 @@ export {
   setPlanPrice,
   listPlanPrices,
   resolvePlanPriceAt,
+  pauseSubscription,
+  resumeSubscription,
+  SubscriptionNotFoundError,
+  SubscriptionStateError,
   type CreatePlanInput,
   type UpdatePlanInput,
 } from "./subscriptions.js";

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb } from "@bm/db/testing";
+import { children, parents, subscriptions, users } from "@bm/db";
 import { createService } from "./services.js";
 import {
   addPeriod,
@@ -8,10 +9,13 @@ import {
   isSubscriptionPeriod,
   listPlanPrices,
   listPlans,
+  pauseSubscription,
   PlanPriceOrderError,
   resolvePlanPriceAt,
+  resumeSubscription,
   setPlanPrice,
   SUBSCRIPTION_PERIODS,
+  SubscriptionStateError,
   updatePlan,
 } from "./subscriptions.js";
 
@@ -99,5 +103,68 @@ describe("subscription plans (P2-E02-S01)", () => {
     await expect(
       setPlanPrice(dbh.db, { planId: plan.id, amountCents: 4000, effectiveFrom: "2026-05-01" }),
     ).rejects.toBeInstanceOf(PlanPriceOrderError);
+  });
+});
+
+describe("subscription pause / resume (P2-E02-S04)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  async function seedSubscription() {
+    const svc = await createService(dbh.db, { name: "Play", unit: "play" });
+    const plan = await createPlan(dbh.db, { serviceId: svc.id, name: "P", entitlementCount: 8, period: "month" });
+    const [u] = await dbh.db.insert(users).values({ phone: "+254712000001", pinHash: "x" }).returning();
+    const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
+    const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Z", dateOfBirth: "2024-01-15" }).returning();
+    const [sub] = await dbh.db
+      .insert(subscriptions)
+      .values({
+        parentId: p!.id,
+        childId: c!.id,
+        planId: plan.id,
+        currentPeriodStart: new Date("2026-06-01T00:00:00Z"),
+        currentPeriodEnd: new Date("2026-07-01T00:00:00Z"),
+        status: "active",
+        entitlementRemaining: 5,
+      })
+      .returning();
+    return sub!.id;
+  }
+
+  it("pauses an active subscription, freezing entitlement (AC1)", async () => {
+    const id = await seedSubscription();
+    const paused = await pauseSubscription(dbh.db, { subscriptionId: id, now: new Date("2026-06-10T00:00:00Z") });
+    expect(paused.status).toBe("paused");
+    expect(paused.entitlementRemaining).toBe(5); // frozen
+    expect(paused.pausedAt).not.toBeNull();
+  });
+
+  it("rejects pausing a non-active subscription", async () => {
+    const id = await seedSubscription();
+    await pauseSubscription(dbh.db, { subscriptionId: id, now: new Date("2026-06-10T00:00:00Z") });
+    await expect(pauseSubscription(dbh.db, { subscriptionId: id })).rejects.toBeInstanceOf(SubscriptionStateError);
+  });
+
+  it("resume shifts period dates by the pause duration; entitlement carries over (AC3)", async () => {
+    const id = await seedSubscription();
+    await pauseSubscription(dbh.db, { subscriptionId: id, now: new Date("2026-06-10T00:00:00Z") });
+    const resumed = await resumeSubscription(dbh.db, { subscriptionId: id, now: new Date("2026-06-20T00:00:00Z") });
+    expect(resumed.status).toBe("active");
+    expect(resumed.pausedAt).toBeNull();
+    expect(resumed.entitlementRemaining).toBe(5); // carried over
+    // Paused 10 days → both period dates shift +10 days.
+    expect(resumed.currentPeriodStart.toISOString().slice(0, 10)).toBe("2026-06-11");
+    expect(resumed.currentPeriodEnd.toISOString().slice(0, 10)).toBe("2026-07-11");
+    expect(resumed.pauseHistory).toHaveLength(1);
+  });
+
+  it("rejects resuming a non-paused subscription", async () => {
+    const id = await seedSubscription();
+    await expect(resumeSubscription(dbh.db, { subscriptionId: id })).rejects.toBeInstanceOf(SubscriptionStateError);
   });
 });

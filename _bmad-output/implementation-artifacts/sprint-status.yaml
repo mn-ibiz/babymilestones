@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (17-3 entitlement-first booking DONE: bookSlot consumes subscription entitlement (race-safe) else wallet, paid_via + refund-on-cancel; code-reviewed + 2 fixes; full suite green. Epic-17: 3/6 done)
+last_updated: 2026-05-29 (17-4 pause/resume DONE: paused_at + pause_history, period shift on resume, parent + reception routes; code-reviewed + 4 fixes incl. HIGH double-charge fence; full suite green. Epic-17: 4/6 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -170,7 +170,7 @@ development_status:
   17-1-subscription-plan-catalogue: done  # P2-E02-S01
   17-2-parent-subscribes-to-a-plan: done  # P2-E02-S02
   17-3-bookings-deduct-subscription-entitlement-first: done  # P2-E02-S03
-  17-4-pause-freeze-and-resume-a-subscription: ready-for-dev  # P2-E02-S04
+  17-4-pause-freeze-and-resume-a-subscription: done  # P2-E02-S04
   17-5-renewal-dunning-state-machine: ready-for-dev  # P2-E02-S05
   17-6-cancel-subscription: ready-for-dev  # P2-E02-S06
   epic-17-retrospective: optional

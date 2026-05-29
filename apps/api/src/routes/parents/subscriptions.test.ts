@@ -125,4 +125,39 @@ describe("parent subscribes to a plan (P2-E02-S02)", () => {
     const res = await app.inject({ method: "POST", url: "/parents/me/subscriptions", payload: { planId: "x", childId: "y" } });
     expect(res.statusCode).toBe(401);
   });
+
+  const action = (p: Parent, subId: string, verb: "pause" | "resume") =>
+    app.inject({
+      method: "POST",
+      url: `/parents/me/subscriptions/${subId}/${verb}`,
+      headers: { cookie: `${p.session}; ${p.csrfCookie}`, "x-csrf-token": p.csrfToken },
+    });
+
+  it("pauses then resumes the subscription (P2-E02-S04 AC1/AC3)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    await topup(parent.walletId, 10_000);
+    const childId = await addChild(parent.parentId);
+    const planId = await seedPlan({ amountCents: 5000 });
+    const subId = (await subscribe(parent, { planId, childId })).json().subscriptionId as string;
+
+    const paused = await action(parent, subId, "pause");
+    expect(paused.statusCode).toBe(200);
+    expect(paused.json().status).toBe("paused");
+    // Double-pause is a state error (409).
+    expect((await action(parent, subId, "pause")).statusCode).toBe(409);
+
+    const resumed = await action(parent, subId, "resume");
+    expect(resumed.statusCode).toBe(200);
+    expect(resumed.json().status).toBe("active");
+  });
+
+  it("404s pausing another parent's subscription", async () => {
+    const owner = await makeParent("+254712345678", "0712345678");
+    const other = await makeParent("+254712000099", "0712000099");
+    await topup(owner.walletId, 10_000);
+    const childId = await addChild(owner.parentId);
+    const planId = await seedPlan();
+    const subId = (await subscribe(owner, { planId, childId })).json().subscriptionId as string;
+    expect((await action(other, subId, "pause")).statusCode).toBe(404);
+  });
 });

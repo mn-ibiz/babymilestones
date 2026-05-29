@@ -129,8 +129,8 @@ export const AUDIT_ACTION_CATALOGUE = {
   backup: ["backup.run.succeeded", "backup.run.failed", "backup.run.pruned"],
   /** Booking lifecycle (P2-E01) — create / reschedule / cancel a booking. */
   booking: ["booking.created", "booking.rescheduled", "booking.cancelled"],
-  /** Subscription lifecycle (P2-E02) — subscribe (more in S04–S06). */
-  subscription: ["subscription.created"],
+  /** Subscription lifecycle (P2-E02) — subscribe, pause/resume (cancel in S06). */
+  subscription: ["subscription.created", "subscription.paused", "subscription.resumed"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@bm/db/testing";
-import { auditOutbox, bookings, children, invoices, parents, smsOutbox, staff, users } from "@bm/db";
+import { auditOutbox, bookings, children, invoices, parents, smsOutbox, staff, subscriptions, users } from "@bm/db";
 import { InMemorySessionStore, staffUserSeed } from "@bm/auth";
 import {
+  createPlan,
   createSchedule,
   createService,
   dayOfWeekIso,
@@ -185,6 +186,32 @@ describe("reception walk-in booking (P2-E01-S04)", () => {
   it("401s the read endpoints when unauthenticated", async () => {
     const res = await app.inject({ method: "GET", url: "/reception/bookable-services" });
     expect(res.statusCode).toBe(401);
+  });
+
+  it("reception pauses a subscription (P2-E02-S04 AC1 — admin/Reception path)", async () => {
+    const creds = await login("+254712000001", "0712000001", "reception");
+    const { parentId, childId } = await walkIn();
+    const svc = await createService(dbh.db, { name: "Play", unit: "play" });
+    const plan = await createPlan(dbh.db, { serviceId: svc.id, name: "P", entitlementCount: 8, period: "month" });
+    const [sub] = await dbh.db
+      .insert(subscriptions)
+      .values({
+        parentId,
+        childId,
+        planId: plan.id,
+        currentPeriodStart: new Date("2026-01-01T00:00:00Z"),
+        currentPeriodEnd: new Date("2026-12-31T00:00:00Z"),
+        status: "active",
+        entitlementRemaining: 8,
+      })
+      .returning();
+    const res = await app.inject({
+      method: "POST",
+      url: `/reception/subscriptions/${sub!.id}/pause`,
+      headers: { cookie: creds.cookie, "x-csrf-token": creds.csrf },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status).toBe("paused");
   });
 
   it("403s the read endpoints for a role without 'create payment' (no PII leak)", async () => {

@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -102,16 +103,25 @@ export const subscriptions = pgTable(
     status: text("status").$type<SubscriptionStatus>().notNull().default("active"),
     /** Bookings left in the current period (>= 0). */
     entitlementRemaining: integer("entitlement_remaining").notNull(),
+    /** Start of the current pause (P2-E02-S04); null while active/cancelled. */
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    /** Closed pause intervals `[{ pausedAt, resumedAt }]` for audit/reporting. */
+    pauseHistory: jsonb("pause_history")
+      .$type<Array<{ pausedAt: string; resumedAt: string }>>()
+      .notNull()
+      .default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     parentIdIdx: index("subscriptions_parent_id_idx").on(t.parentId),
     childIdIdx: index("subscriptions_child_id_idx").on(t.childId),
-    // At most one ACTIVE subscription per (child, plan) — durable fence.
-    childPlanActiveUniq: uniqueIndex("subscriptions_child_plan_active_uniq")
+    // At most one LIVE (active or paused) subscription per (child, plan) — the
+    // durable fence + subscribe idempotency anchor. Paused subs still count, so
+    // re-subscribing (a second charge) is blocked until cancellation.
+    childPlanLiveUniq: uniqueIndex("subscriptions_child_plan_live_uniq")
       .on(t.childId, t.planId)
-      .where(sql`status = 'active'`),
+      .where(sql`status <> 'cancelled'`),
   }),
 );
 

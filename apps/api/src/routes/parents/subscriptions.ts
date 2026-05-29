@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import {
   audit,
   children,
@@ -17,7 +17,17 @@ import {
   subscriptionCreateSchema,
   type BookablePlan,
 } from "@bm/contracts";
-import { addPeriod, getPlan, getService, listPlans, resolvePlanPriceAt } from "@bm/catalog";
+import {
+  addPeriod,
+  getPlan,
+  getService,
+  listPlans,
+  pauseSubscription,
+  resolvePlanPriceAt,
+  resumeSubscription,
+  SubscriptionNotFoundError,
+  SubscriptionStateError,
+} from "@bm/catalog";
 import { debit } from "@bm/wallet";
 import { StubSmsSender, type SmsSender } from "@bm/sms";
 import type { ParentsDeps } from "./index.js";
@@ -117,7 +127,8 @@ export function registerParentSubscriptions(app: FastifyInstance, deps: Subscrip
       return reply.code(422).send({ error: "Child is not eligible for this plan" });
     }
 
-    // One active subscription per (child, plan).
+    // One LIVE subscription per (child, plan) — a paused one still counts (a
+    // re-subscribe would double-charge), so block until it's cancelled.
     const [existing] = await db
       .select({ id: subscriptions.id })
       .from(subscriptions)
@@ -125,7 +136,7 @@ export function registerParentSubscriptions(app: FastifyInstance, deps: Subscrip
         and(
           eq(subscriptions.childId, childId),
           eq(subscriptions.planId, planId),
-          eq(subscriptions.status, "active"),
+          ne(subscriptions.status, "cancelled"),
         ),
       );
     if (existing) return reply.code(409).send({ error: "Child is already subscribed to this plan" });
@@ -224,6 +235,73 @@ export function registerParentSubscriptions(app: FastifyInstance, deps: Subscrip
       currentPeriodEnd: subscription.currentPeriodEnd,
       amountCents: price.amountCents,
     });
+  });
+
+  /** Resolve the caller's parent profile id + user id, or reply + return null. */
+  async function requireParent(
+    req: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<{ parentId: string; userId: string } | null> {
+    const auth = await validateSession(
+      { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+      { sessions, resolveUser },
+    );
+    if (!auth.ok) {
+      reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    const [profile] = await db.select().from(parents).where(eq(parents.userId, auth.user.id));
+    if (!profile) {
+      reply.code(404).send({ error: "Parent profile not found" });
+      return null;
+    }
+    return { parentId: profile.id, userId: auth.user.id };
+  }
+
+  /** Verify the subscription belongs to this parent; reply 404 + return null if not. */
+  async function ownedSubscription(reply: FastifyReply, parentId: string, id: string) {
+    const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, id));
+    if (!sub || sub.parentId !== parentId) {
+      reply.code(404).send({ error: "Subscription not found" });
+      return null;
+    }
+    return sub;
+  }
+
+  // Pause (P2-E02-S04 AC1) — parent freezes their own subscription.
+  app.post("/parents/me/subscriptions/:id/pause", async (req: FastifyRequest, reply: FastifyReply) => {
+    const ctx = await requireParent(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    if (!(await ownedSubscription(reply, ctx.parentId, id))) return reply;
+    try {
+      const updated = await pauseSubscription(db, { subscriptionId: id, actor: ctx.userId, ip: req.ip, now: clock() });
+      return reply.code(200).send({ subscriptionId: updated.id, status: updated.status });
+    } catch (err) {
+      if (err instanceof SubscriptionStateError) return reply.code(409).send({ error: err.message });
+      if (err instanceof SubscriptionNotFoundError) return reply.code(404).send({ error: "Subscription not found" });
+      throw err;
+    }
+  });
+
+  // Resume (P2-E02-S04 AC3) — period dates shift by the pause duration.
+  app.post("/parents/me/subscriptions/:id/resume", async (req: FastifyRequest, reply: FastifyReply) => {
+    const ctx = await requireParent(req, reply);
+    if (!ctx) return reply;
+    const { id } = req.params as { id: string };
+    if (!(await ownedSubscription(reply, ctx.parentId, id))) return reply;
+    try {
+      const updated = await resumeSubscription(db, { subscriptionId: id, actor: ctx.userId, ip: req.ip, now: clock() });
+      return reply.code(200).send({
+        subscriptionId: updated.id,
+        status: updated.status,
+        currentPeriodEnd: updated.currentPeriodEnd,
+      });
+    } catch (err) {
+      if (err instanceof SubscriptionStateError) return reply.code(409).send({ error: err.message });
+      if (err instanceof SubscriptionNotFoundError) return reply.code(404).send({ error: "Subscription not found" });
+      throw err;
+    }
   });
 }
 

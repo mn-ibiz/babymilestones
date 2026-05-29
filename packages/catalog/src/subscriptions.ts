@@ -1,9 +1,12 @@
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import {
+  audit,
   subscriptionPlans,
   subscriptionPlanPrices,
+  subscriptions,
   type Database,
   type SubscriptionPeriod,
+  type SubscriptionRow,
 } from "@bm/db";
 import type { Executor } from "./services.js";
 
@@ -187,4 +190,108 @@ export async function resolvePlanPriceAt(db: Executor, planId: string, onDate: s
     if (fromOk && toOk) return row;
   }
   return null;
+}
+
+/* --- Pause / resume (P2-E02-S04) ----------------------------------------- */
+
+/** The subscription id is unknown. */
+export class SubscriptionNotFoundError extends Error {
+  constructor(public readonly subscriptionId: string) {
+    super(`Subscription not found: ${subscriptionId}`);
+    this.name = "SubscriptionNotFoundError";
+  }
+}
+
+/** The subscription is not in the state the operation requires. */
+export class SubscriptionStateError extends Error {
+  constructor(
+    public readonly expected: string,
+    public readonly actual: string,
+  ) {
+    super(`Subscription must be ${expected}, but is ${actual}`);
+    this.name = "SubscriptionStateError";
+  }
+}
+
+/**
+ * Pause a subscription (P2-E02-S04 AC1): `status='paused'`, anchor `pausedAt`.
+ * Entitlement is frozen (untouched), and the booking flow stops matching it (it
+ * only matches active subs) so bookings fall back to wallet pay-as-you-go (AC2).
+ * Throws when the subscription isn't currently active.
+ */
+export async function pauseSubscription(
+  db: Database,
+  input: { subscriptionId: string; actor?: string | null; ip?: string | null; now?: Date },
+): Promise<SubscriptionRow> {
+  const now = input.now ?? new Date();
+  return db.transaction(async (tx) => {
+    const [sub] = await tx
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, input.subscriptionId))
+      .for("update");
+    if (!sub) throw new SubscriptionNotFoundError(input.subscriptionId);
+    if (sub.status !== "active") throw new SubscriptionStateError("active", sub.status);
+    const [updated] = await tx
+      .update(subscriptions)
+      .set({ status: "paused", pausedAt: now, updatedAt: now })
+      .where(eq(subscriptions.id, sub.id))
+      .returning();
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "subscription.paused",
+      target: { table: "subscriptions", id: sub.id },
+      payload: { entitlement_remaining: sub.entitlementRemaining, ip: input.ip ?? undefined },
+    });
+    return updated!;
+  });
+}
+
+/**
+ * Resume a paused subscription (P2-E02-S04 AC3): shift both period dates forward
+ * by the pause duration (so paid-for time isn't lost), carry entitlement over,
+ * close the pause interval into `pauseHistory`, and set `status='active'`.
+ * Throws when the subscription isn't currently paused.
+ */
+export async function resumeSubscription(
+  db: Database,
+  input: { subscriptionId: string; actor?: string | null; ip?: string | null; now?: Date },
+): Promise<SubscriptionRow> {
+  const now = input.now ?? new Date();
+  return db.transaction(async (tx) => {
+    const [sub] = await tx
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, input.subscriptionId))
+      .for("update");
+    if (!sub) throw new SubscriptionNotFoundError(input.subscriptionId);
+    if (sub.status !== "paused" || !sub.pausedAt) throw new SubscriptionStateError("paused", sub.status);
+
+    const pauseMs = now.getTime() - sub.pausedAt.getTime();
+    const newStart = new Date(sub.currentPeriodStart.getTime() + pauseMs);
+    const newEnd = new Date(sub.currentPeriodEnd.getTime() + pauseMs);
+    const history = [
+      ...sub.pauseHistory,
+      { pausedAt: sub.pausedAt.toISOString(), resumedAt: now.toISOString() },
+    ];
+    const [updated] = await tx
+      .update(subscriptions)
+      .set({
+        status: "active",
+        pausedAt: null,
+        currentPeriodStart: newStart,
+        currentPeriodEnd: newEnd,
+        pauseHistory: history,
+        updatedAt: now,
+      })
+      .where(eq(subscriptions.id, sub.id))
+      .returning();
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "subscription.resumed",
+      target: { table: "subscriptions", id: sub.id },
+      payload: { pause_ms: pauseMs, ip: input.ip ?? undefined },
+    });
+    return updated!;
+  });
 }

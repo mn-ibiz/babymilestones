@@ -25,9 +25,13 @@ import {
   getStaff,
   isSlotPast,
   listServices,
+  pauseSubscription,
+  resumeSubscription,
   ServicePriceMissingError,
   SlotFullError,
   SlotNotFoundError,
+  SubscriptionNotFoundError,
+  SubscriptionStateError,
 } from "@bm/catalog";
 import { StubSmsSender, type SmsSender } from "@bm/sms";
 import type { ReceptionDeps } from "./index.js";
@@ -324,4 +328,27 @@ export function registerReceptionBooking(app: FastifyInstance, deps: ReceptionDe
       }
     },
   );
+
+  // Reception pause/resume of any subscription (P2-E02-S04 AC1 — admin/Reception).
+  for (const verb of ["pause", "resume"] as const) {
+    app.post(`/reception/subscriptions/:id/${verb}`, async (req: FastifyRequest, reply: FastifyReply) => {
+      const authResult = await validateSession(
+        { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+        { sessions, resolveUser },
+      );
+      if (!authResult.ok) return reply.code(authResult.status).send({ error: authResult.error });
+      const perm = guard(authResult.user);
+      if (!perm.ok) return reply.code(perm.status).send({ error: perm.error });
+      const { id } = req.params as { id: string };
+      try {
+        const op = verb === "pause" ? pauseSubscription : resumeSubscription;
+        const updated = await op(db, { subscriptionId: id, actor: authResult.user.id, ip: req.ip });
+        return reply.code(200).send({ subscriptionId: updated.id, status: updated.status });
+      } catch (err) {
+        if (err instanceof SubscriptionStateError) return reply.code(409).send({ error: err.message });
+        if (err instanceof SubscriptionNotFoundError) return reply.code(404).send({ error: "Subscription not found" });
+        throw err;
+      }
+    });
+  }
 }
