@@ -42,6 +42,15 @@ export {
 } from "./staff.js";
 
 export {
+  setCommissionRate,
+  resolveRateAt,
+  getOpenCommissionRate,
+  listCommissionRates,
+  commissionCents,
+  type SetCommissionRateInput,
+} from "./commission-rates.js";
+
+export {
   SUBSCRIPTION_PERIODS,
   isSubscriptionPeriod,
   addPeriod,

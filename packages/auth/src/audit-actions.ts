@@ -148,6 +148,16 @@ export const AUDIT_ACTION_CATALOGUE = {
     "attendance.checked_out",
     "observation.anonymised",
   ],
+  /** Attribution & commission ledger (P3-E01) — rate changes, ledger postings
+   * (incl. refund reversals), monthly/ad-hoc runs and the payout export/mark-paid. */
+  commission: [
+    "commission.rate.set",
+    "commission.ledger.posted",
+    "commission.ledger.reversed",
+    "commission.run.created",
+    "commission.run.export",
+    "commission.run.paid_out",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

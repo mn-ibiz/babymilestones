@@ -92,3 +92,17 @@ export async function listStaff(
     .where(filters.length === 1 ? filters[0] : and(...filters))
     .orderBy(desc(staff.createdAt));
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Per-staff commission rate with effective dating (P3-E01-S01). The rate logic
+// lives in `commission-rates.ts`; re-exported here so the staff surface carries
+// it (the story files this rate logic under the staff module).
+// ──────────────────────────────────────────────────────────────────────────
+export {
+  setCommissionRate,
+  resolveRateAt,
+  getOpenCommissionRate,
+  listCommissionRates,
+  commissionCents,
+  type SetCommissionRateInput,
+} from "./commission-rates.js";
