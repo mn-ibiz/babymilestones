@@ -59,6 +59,21 @@ export type {
   LoyaltyHistoryOptions,
 } from "./loyalty.js";
 
+// Configurable, effective-dated earn/redeem rates + conversions (P2-E05-S02).
+export {
+  getEffectiveRates,
+  setRate,
+  pointsForSpend,
+  kesForPoints,
+  DEFAULT_EARN_RATE,
+  DEFAULT_REDEEM_RATE,
+} from "./loyalty-rates.js";
+export type {
+  LoyaltyRateType,
+  EffectiveRates,
+  SetRateInput,
+} from "./loyalty-rates.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
