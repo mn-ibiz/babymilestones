@@ -3,6 +3,7 @@ import { parents, smsOutbox } from "@bm/db";
 import type { Database, Transaction } from "@bm/db";
 import { type SmsTemplateData, renderTemplate } from "./templates.js";
 import { getActiveTemplate, interpolateTemplate } from "./template-store.js";
+import { LiveSmsAdapter, type SmsTransport } from "./live.js";
 
 export { renderTemplate } from "./templates.js";
 export type { SmsTemplateData, SmsTemplateKey } from "./templates.js";
@@ -18,6 +19,12 @@ export {
 export type { PublicSmsTemplate, TemplateExecutor } from "./template-store.js";
 export { checkProviderUrlSafety, isSafeProviderUrl } from "./url-safety.js";
 export type { UrlSafetyResult, UrlSafetyReason } from "./url-safety.js";
+export { LiveSmsAdapter } from "./live.js";
+export type {
+  SmsTransport,
+  SmsTransportResponse,
+  LiveSmsAdapterOptions,
+} from "./live.js";
 export {
   createSmsConfig,
   updateSmsConfig,
@@ -115,22 +122,33 @@ export class StubSmsSender implements SmsSender {
 
 /** Provider selection config — the one place P5-E03 flips to go live (AC3). */
 export interface SmsConfig {
-  /** "stub" (default, launch) records to sms_outbox; "live" is wired in P5-E03. */
+  /** "stub" (default, launch) records to sms_outbox; "live" dispatches (P5-E03). */
   provider?: "stub" | "live";
+  /**
+   * Required when `provider === "live"`: the injected HTTP transport and the
+   * resolved API key. Omitting them on a live selection is a programming error
+   * (we never reach the network from defaults), so it throws rather than
+   * silently falling back to the stub and pretending to send.
+   */
+  live?: { transport: SmsTransport; apiKey: string };
 }
 
 /**
  * Bind the active sender behind the {@link SmsSender} interface (AC3). All
  * product code resolves its sender here, so the provider switch in P5-E03 is a
- * single config flag rather than a code change at every call site.
+ * single config flag rather than a code change at every call site. The DEFAULT
+ * is the stub — nothing sends a real SMS until a caller explicitly selects
+ * `provider: "live"` AND supplies the transport + key.
  */
 export function createSmsSender(db: SmsExecutor, config: SmsConfig = {}): SmsSender {
   switch (config.provider ?? "stub") {
     case "stub":
       return new StubSmsSender(db);
     case "live":
-      // P5-E03: construct the live provider adapter here behind the same seam.
-      throw new Error("@bm/sms: live provider not wired yet (P5-E03)");
+      if (!config.live) {
+        throw new Error("@bm/sms: live provider selected without transport + apiKey");
+      }
+      return new LiveSmsAdapter(db, config.live);
     default:
       return new StubSmsSender(db);
   }
