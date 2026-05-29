@@ -46,6 +46,7 @@ function serializeService(row: Awaited<ReturnType<typeof getService>>) {
     ageMinMonths: row.ageMinMonths,
     ageMaxMonths: row.ageMaxMonths,
     rescheduleCutoffHours: row.rescheduleCutoffHours,
+    cancellationFeeCents: row.cancellationFeeCents,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

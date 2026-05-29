@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNotNull, lte, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, notInArray, sql } from "drizzle-orm";
 import {
   audit,
   bookings,
@@ -327,13 +327,11 @@ export type SlotWithRemaining = SessionSlotRow & {
 /**
  * Count the bookings consuming each of the given slot ids.
  *
- * This counts every booking whose `slot_id` matches. The booking WRITE path is a
- * later story: the booking flow (P2-E01-S03) MUST enforce capacity inside a
- * transaction that locks the slot row (`SELECT … FOR UPDATE`) before inserting,
- * since `remaining_capacity` is computed, not stored. Cancellation
- * (P2-E01-S06) MUST clear the booking's `slot_id` (or this count must learn to
- * exclude cancelled bookings) so a released seat becomes bookable again — today
- * no cancellation path exists, so "bookings in slot" == "active bookings".
+ * Counts only ACTIVE bookings (status != 'cancelled') whose `slot_id` matches, so
+ * a cancelled booking (P2-E01-S06) frees its seat. The booking write path
+ * (P2-E01-S03) enforces capacity inside a transaction that locks the slot row
+ * (`SELECT … FOR UPDATE`) before inserting, since `remaining_capacity` is
+ * computed, not stored.
  */
 async function bookingCountsBySlot(
   db: Executor,
@@ -344,7 +342,8 @@ async function bookingCountsBySlot(
   const rows = await db
     .select({ slotId: bookings.slotId, n: sql<number>`count(*)::int` })
     .from(bookings)
-    .where(inArray(bookings.slotId, slotIds))
+    // Cancelled bookings (P2-E01-S06) free their seat — never count them.
+    .where(and(inArray(bookings.slotId, slotIds), ne(bookings.status, "cancelled")))
     .groupBy(bookings.slotId);
   for (const r of rows) {
     if (r.slotId) counts.set(r.slotId, Number(r.n));
@@ -495,6 +494,14 @@ export class ServiceMismatchError extends Error {
   }
 }
 
+/** The booking is already cancelled. */
+export class BookingAlreadyCancelledError extends Error {
+  constructor(public readonly bookingId: string) {
+    super(`Booking already cancelled: ${bookingId}`);
+    this.name = "BookingAlreadyCancelledError";
+  }
+}
+
 export interface BookSlotInput {
   slotId: string;
   parentId: string;
@@ -552,10 +559,17 @@ export async function bookSlot(db: Database, input: BookSlotInput): Promise<Book
 
     // One seat per child per slot — checked under the slot lock so concurrent
     // duplicate attempts serialize (AC: a child can't take two seats in a slot).
+    // A CANCELLED prior booking doesn't count, so the child may re-book the slot.
     const [existing] = await tx
       .select({ id: bookings.id })
       .from(bookings)
-      .where(and(eq(bookings.slotId, slot.id), eq(bookings.childId, input.childId)));
+      .where(
+        and(
+          eq(bookings.slotId, slot.id),
+          eq(bookings.childId, input.childId),
+          ne(bookings.status, "cancelled"),
+        ),
+      );
     if (existing) throw new DuplicateBookingError(slot.id, input.childId);
 
     const counts = await bookingCountsBySlot(tx, [slot.id]);
@@ -658,7 +672,10 @@ export async function rescheduleBooking(
 ): Promise<RescheduleResult> {
   return db.transaction(async (tx) => {
     const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId));
-    if (!booking || !booking.slotId) throw new BookingNotFoundError(input.bookingId);
+    // A missing, non-slot, or already-cancelled booking can't be rescheduled.
+    if (!booking || !booking.slotId || booking.status === "cancelled") {
+      throw new BookingNotFoundError(input.bookingId);
+    }
 
     const [newSlot] = await tx
       .select()
@@ -674,7 +691,13 @@ export async function rescheduleBooking(
     const [dup] = await tx
       .select({ id: bookings.id })
       .from(bookings)
-      .where(and(eq(bookings.slotId, newSlot.id), eq(bookings.childId, booking.childId)));
+      .where(
+        and(
+          eq(bookings.slotId, newSlot.id),
+          eq(bookings.childId, booking.childId),
+          ne(bookings.status, "cancelled"),
+        ),
+      );
     if (dup) throw new DuplicateBookingError(newSlot.id, booking.childId);
 
     const oldSlotId = booking.slotId;
@@ -703,6 +726,82 @@ export async function rescheduleBooking(
       slotDate: newSlot.slotDate,
       startTime: newSlot.startTime,
       endTime: newSlot.endTime,
+    };
+  });
+}
+
+/* --- Cancelling a booking (P2-E01-S06) ----------------------------------- */
+
+export interface CancelResult {
+  bookingId: string;
+  slotId: string | null;
+  /** The voided pending invoice id, or null if it wasn't pending. */
+  voidedInvoiceId: string | null;
+  /** A new pending fee invoice id when a cancellation fee applied, else null. */
+  feeInvoiceId: string | null;
+  feeCents: number;
+}
+
+/**
+ * Cancel a booking (P2-E01-S06). One transaction: mark the booking `cancelled`
+ * (freeing its slot seat — capacity excludes cancelled rows), void its still-
+ * pending invoice (AC1: set `void` + `amount_due = 0` so it leaves the parent's
+ * outstanding), optionally raise a pending cancellation-fee invoice (AC2), and
+ * audit (AC3). The cut-off / who-may-cancel policy is enforced by the caller.
+ *
+ * Throws {@link BookingNotFoundError} / {@link BookingAlreadyCancelledError}.
+ */
+export async function cancelBooking(
+  db: Database,
+  input: { bookingId: string; feeCents?: number; actor?: string | null; ip?: string | null },
+): Promise<CancelResult> {
+  const feeCents = input.feeCents ?? 0;
+  return db.transaction(async (tx) => {
+    const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId));
+    if (!booking) throw new BookingNotFoundError(input.bookingId);
+    if (booking.status === "cancelled") throw new BookingAlreadyCancelledError(input.bookingId);
+
+    await tx
+      .update(bookings)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(bookings.id, input.bookingId));
+
+    // Void the booking's invoice only while still pending (AC1). A settled
+    // invoice is left intact — a refund (P1-E03-S06) is the path for that.
+    const [voided] = await tx
+      .update(invoices)
+      .set({ status: "void", amountDue: 0 })
+      .where(and(eq(invoices.id, booking.invoiceId), eq(invoices.status, "pending")))
+      .returning({ id: invoices.id });
+
+    let feeInvoiceId: string | null = null;
+    if (feeCents > 0) {
+      const [fee] = await tx
+        .insert(invoices)
+        .values({ parentId: booking.parentId, amountDue: feeCents, serviceId: booking.serviceId, status: "pending" })
+        .returning({ id: invoices.id });
+      feeInvoiceId = fee!.id;
+    }
+
+    await audit(tx, {
+      actor: input.actor ?? null,
+      action: "booking.cancelled",
+      target: { table: "bookings", id: input.bookingId },
+      payload: {
+        slot_id: booking.slotId,
+        voided_invoice_id: voided?.id ?? null,
+        fee_cents: feeCents,
+        fee_invoice_id: feeInvoiceId,
+        ip: input.ip ?? undefined,
+      },
+    });
+
+    return {
+      bookingId: input.bookingId,
+      slotId: booking.slotId,
+      voidedInvoiceId: voided?.id ?? null,
+      feeInvoiceId,
+      feeCents,
     };
   });
 }

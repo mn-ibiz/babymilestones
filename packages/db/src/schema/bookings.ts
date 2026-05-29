@@ -43,6 +43,12 @@ export const bookings = pgTable(
      * remaining_capacity counts the bookings whose `slotId` matches it (AC3).
      */
     slotId: uuid("slot_id"),
+    /**
+     * Booking lifecycle (P2-E01-S06): `confirmed` (default) | `cancelled`. A
+     * cancelled booking is excluded from a slot's capacity count, freeing the
+     * seat without deleting history. CHECK-constrained in migration 0045.
+     */
+    status: text("status").notNull().default("confirmed"),
     /** A visit is created already checked-in (AC3) — set at confirm time. */
     checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

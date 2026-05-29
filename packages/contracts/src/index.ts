@@ -1253,6 +1253,14 @@ const optionalAgeMonths = z
   .union([z.number().int("age must be a whole number of months").min(0, "age cannot be negative").max(AGE_MONTHS_MAX), z.null()])
   .optional();
 
+/** Per-service cancellation fee in integer cents (P2-E01-S06). 0 = none. */
+const cancellationFeeField = z
+  .number()
+  .int("cancellationFeeCents must be integer cents")
+  .min(0, "cancellationFeeCents cannot be negative")
+  .max(SERVICE_PRICE_MAX_CENTS, "cancellationFeeCents is too large")
+  .optional();
+
 /** Reschedule cut-off in hours before the slot (P2-E01-S05). 0–168 (≤ a week). */
 const rescheduleCutoffField = z
   .number()
@@ -1285,6 +1293,7 @@ export const serviceCreateSchema = z
     ageMinMonths: optionalAgeMonths,
     ageMaxMonths: optionalAgeMonths,
     rescheduleCutoffHours: rescheduleCutoffField,
+    cancellationFeeCents: cancellationFeeField,
   })
   .refine(
     (v) =>
@@ -1315,6 +1324,7 @@ export const serviceUpdateSchema = z
     ageMinMonths: optionalAgeMonths,
     ageMaxMonths: optionalAgeMonths,
     rescheduleCutoffHours: rescheduleCutoffField,
+    cancellationFeeCents: cancellationFeeField,
   })
   .refine(
     (v) =>
@@ -1325,7 +1335,8 @@ export const serviceUpdateSchema = z
       v.taxTreatment !== undefined ||
       v.ageMinMonths !== undefined ||
       v.ageMaxMonths !== undefined ||
-      v.rescheduleCutoffHours !== undefined,
+      v.rescheduleCutoffHours !== undefined ||
+      v.cancellationFeeCents !== undefined,
     "at least one field is required",
   )
   .refine(

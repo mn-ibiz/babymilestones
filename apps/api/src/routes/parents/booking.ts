@@ -11,7 +11,9 @@ import {
 } from "@bm/contracts";
 import {
   bookSlot,
+  BookingAlreadyCancelledError,
   BookingNotFoundError,
+  cancelBooking,
   DuplicateBookingError,
   getService,
   getSlotWithRemaining,
@@ -236,6 +238,68 @@ export function registerParentBooking(app: FastifyInstance, deps: BookingRoutesD
         }
         if (err instanceof BookingNotFoundError || err instanceof SlotNotFoundError) {
           return reply.code(404).send({ error: "Not found" });
+        }
+        throw err;
+      }
+    },
+  );
+
+  // Cancel a booking (P2-E01-S06). Parent self-cancel is allowed up to the cut-off
+  // (full void, no fee, AC1); past the cut-off → contact reception (AC2 flow).
+  app.post(
+    "/parents/me/bookings/:bookingId/cancel",
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const auth = await validateSession(
+        { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+        { sessions, resolveUser },
+      );
+      if (!auth.ok) return reply.code(auth.status).send({ error: auth.error });
+      const [profile] = await db.select().from(parents).where(eq(parents.userId, auth.user.id));
+      if (!profile) return reply.code(404).send({ error: "Parent profile not found" });
+
+      const { bookingId } = req.params as { bookingId: string };
+      const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+      if (!booking || booking.parentId !== profile.id || !booking.slotId) {
+        return reply.code(404).send({ error: "Booking not found" });
+      }
+      if (booking.status === "cancelled") {
+        return reply.code(409).send({ error: "Booking is already cancelled" });
+      }
+
+      const oldSlot = await getSlotWithRemaining(db, booking.slotId);
+      const service = booking.serviceId ? await getService(db, booking.serviceId) : null;
+      if (!oldSlot || !service) return reply.code(404).send({ error: "Booking not found" });
+
+      const now = clock();
+      if (
+        !isWithinRescheduleCutoff(
+          oldSlot.slotDate,
+          oldSlot.startTime,
+          service.rescheduleCutoffHours,
+          now.getTime(),
+        )
+      ) {
+        return reply
+          .code(409)
+          .send({ error: "Too late to cancel online — please contact reception" });
+      }
+
+      try {
+        const result = await cancelBooking(db, {
+          bookingId,
+          feeCents: 0, // parent self-cancel before the cut-off is free (AC1)
+          actor: auth.user.id,
+          ip: req.ip,
+        });
+        return reply
+          .code(200)
+          .send({ bookingId: result.bookingId, status: "cancelled", voidedInvoiceId: result.voidedInvoiceId });
+      } catch (err) {
+        if (err instanceof BookingAlreadyCancelledError) {
+          return reply.code(409).send({ error: "Booking is already cancelled" });
+        }
+        if (err instanceof BookingNotFoundError) {
+          return reply.code(404).send({ error: "Booking not found" });
         }
         throw err;
       }

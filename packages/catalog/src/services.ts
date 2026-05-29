@@ -82,6 +82,8 @@ export interface CreateServiceInput {
   ageMaxMonths?: number | null;
   /** Reschedule cut-off in hours before the slot (P2-E01-S05). Defaults to 2. */
   rescheduleCutoffHours?: number;
+  /** Cancellation fee in integer cents (P2-E01-S06). Defaults to 0. */
+  cancellationFeeCents?: number;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -98,6 +100,9 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       ageMaxMonths: input.ageMaxMonths ?? null,
       ...(input.rescheduleCutoffHours !== undefined
         ? { rescheduleCutoffHours: input.rescheduleCutoffHours }
+        : {}),
+      ...(input.cancellationFeeCents !== undefined
+        ? { cancellationFeeCents: input.cancellationFeeCents }
         : {}),
     })
     .returning();
@@ -117,6 +122,8 @@ export interface UpdateServiceInput {
   ageMaxMonths?: number | null;
   /** Reschedule cut-off in hours before the slot (P2-E01-S05). */
   rescheduleCutoffHours?: number;
+  /** Cancellation fee in integer cents (P2-E01-S06). */
+  cancellationFeeCents?: number;
 }
 
 /**
@@ -136,6 +143,7 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
   if (patch.ageMinMonths !== undefined) set.ageMinMonths = patch.ageMinMonths;
   if (patch.ageMaxMonths !== undefined) set.ageMaxMonths = patch.ageMaxMonths;
   if (patch.rescheduleCutoffHours !== undefined) set.rescheduleCutoffHours = patch.rescheduleCutoffHours;
+  if (patch.cancellationFeeCents !== undefined) set.cancellationFeeCents = patch.cancellationFeeCents;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;
 }

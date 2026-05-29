@@ -5,6 +5,9 @@ import { auditOutbox, bookings, children, invoices, parents, sessionSlots, users
 import { createService, setServicePrice } from "./services.js";
 import {
   bookSlot,
+  BookingAlreadyCancelledError,
+  BookingNotFoundError,
+  cancelBooking,
   DuplicateBookingError,
   isWithinRescheduleCutoff,
   rescheduleBooking,
@@ -477,6 +480,95 @@ describe("rescheduleBooking (P2-E01-S05)", () => {
     await generateSlotsForSchedule(dbh.db, sched2, { fromDate: FROM, days: 1 });
     const [other] = await listSlotsWithRemaining(dbh.db, { serviceId: svc2.id });
     await expect(rescheduleBooking(dbh.db, { bookingId: booked.bookingId, newSlotId: other!.id })).rejects.toBeInstanceOf(ServiceMismatchError);
+  });
+});
+
+describe("cancelBooking (P2-E01-S06)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  const FROM = "2026-06-15";
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  async function seedSlot(capacity = 5) {
+    const svc = await createService(dbh.db, { name: "Soft Play", unit: "play" });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1500, effectiveFrom: "2026-01-01" });
+    const sched = await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dayOfWeekIso(FROM), startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: FROM, days: 1 });
+    const [slot] = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    return { serviceId: svc.id, slotId: slot!.id };
+  }
+  async function seedChild(phone: string) {
+    const [u] = await dbh.db.insert(users).values({ phone, pinHash: "x" }).returning();
+    const [p] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "A", lastName: "B" }).returning();
+    const [c] = await dbh.db.insert(children).values({ parentId: p!.id, firstName: "Z", dateOfBirth: "2024-01-15" }).returning();
+    return { parentId: p!.id, childId: c!.id };
+  }
+
+  it("frees the slot seat + voids the pending invoice + audits (AC1/AC3)", async () => {
+    const { serviceId, slotId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId, parentId, childId });
+    expect((await listSlotsWithRemaining(dbh.db, { serviceId }))[0]!.remainingCapacity).toBe(4);
+
+    const res = await cancelBooking(dbh.db, { bookingId: booked.bookingId, actor: "00000000-0000-0000-0000-0000000000aa" });
+    // Slot capacity restored.
+    expect((await listSlotsWithRemaining(dbh.db, { serviceId }))[0]!.remainingCapacity).toBe(5);
+    // Invoice voided.
+    const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, booked.invoiceId));
+    expect(inv!.status).toBe("void");
+    expect(inv!.amountDue).toBe(0);
+    expect(res.voidedInvoiceId).toBe(booked.invoiceId);
+    // Audited.
+    const audits = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "booking.cancelled"));
+    expect(audits).toHaveLength(1);
+  });
+
+  it("raises a pending fee invoice when a cancellation fee applies (AC2)", async () => {
+    const { slotId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId, parentId, childId });
+    const res = await cancelBooking(dbh.db, { bookingId: booked.bookingId, feeCents: 500 });
+    expect(res.feeInvoiceId).not.toBeNull();
+    const [fee] = await dbh.db.select().from(invoices).where(eq(invoices.id, res.feeInvoiceId!));
+    expect(fee!.status).toBe("pending");
+    expect(fee!.amountDue).toBe(500);
+  });
+
+  it("rejects cancelling an already-cancelled booking", async () => {
+    const { slotId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId, parentId, childId });
+    await cancelBooking(dbh.db, { bookingId: booked.bookingId });
+    await expect(cancelBooking(dbh.db, { bookingId: booked.bookingId })).rejects.toBeInstanceOf(
+      BookingAlreadyCancelledError,
+    );
+  });
+
+  it("lets the child re-book the same slot after cancelling (seat fully freed)", async () => {
+    const { slotId } = await seedSlot(1); // capacity 1 — the cancelled seat must free up
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId, parentId, childId });
+    await cancelBooking(dbh.db, { bookingId: booked.bookingId });
+    const rebooked = await bookSlot(dbh.db, { slotId, parentId, childId });
+    expect(rebooked.bookingId).not.toBe(booked.bookingId);
+  });
+
+  it("refuses to reschedule a cancelled booking", async () => {
+    const { serviceId, slotId } = await seedSlot(5);
+    const { parentId, childId } = await seedChild("+254712000001");
+    const booked = await bookSlot(dbh.db, { slotId, parentId, childId });
+    await cancelBooking(dbh.db, { bookingId: booked.bookingId });
+    // A second slot of the same service to move into.
+    const sched = await createSchedule(dbh.db, { serviceId, dayOfWeek: dayOfWeekIso(FROM), startTime: "14:00", endTime: "15:00", slotDurationMinutes: 60, capacity: 5 });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: FROM, days: 1 });
+    const other = (await listSlotsWithRemaining(dbh.db, { serviceId })).find((s) => s.startTime === "14:00")!;
+    await expect(rescheduleBooking(dbh.db, { bookingId: booked.bookingId, newSlotId: other.id })).rejects.toBeInstanceOf(
+      BookingNotFoundError,
+    );
   });
 });
 

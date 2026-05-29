@@ -76,6 +76,8 @@ export const services = pgTable("services", {
    * (P2-E01-S05). Default 2; after the cut-off the online move is refused.
    */
   rescheduleCutoffHours: integer("reschedule_cutoff_hours").notNull().default(2),
+  /** Cancellation fee in integer cents applied after the cut-off (P2-E01-S06). 0 = none. */
+  cancellationFeeCents: bigint("cancellation_fee_cents", { mode: "number" }).notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

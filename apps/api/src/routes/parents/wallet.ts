@@ -24,7 +24,7 @@ async function outstandingForParent(db: Database, parentId: string): Promise<num
   const [row] = await db
     .select({ owed: sql<string>`COALESCE(SUM(${invoices.amountDue}), 0)` })
     .from(invoices)
-    .where(and(eq(invoices.parentId, parentId), sql`${invoices.status} <> 'settled'`));
+    .where(and(eq(invoices.parentId, parentId), sql`${invoices.status} NOT IN ('settled', 'void')`));
   return Number(row?.owed ?? 0);
 }
 

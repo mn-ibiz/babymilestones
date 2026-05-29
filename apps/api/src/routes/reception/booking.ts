@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
-import { children, parents, users, type Database } from "@bm/db";
+import { bookings, children, parents, users, type Database } from "@bm/db";
 import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   ageInMonths,
@@ -14,7 +14,10 @@ import {
 } from "@bm/contracts";
 import {
   bookSlot,
+  BookingAlreadyCancelledError,
+  BookingNotFoundError,
   browseServiceSlots,
+  cancelBooking,
   checkBookingAttribution,
   DuplicateBookingError,
   getService,
@@ -273,4 +276,52 @@ export function registerReceptionBooking(app: FastifyInstance, deps: ReceptionDe
     };
     return reply.code(201).send(body);
   });
+
+  // Reception cancels a booking (P2-E01-S06 AC2 — admin discretion, any time).
+  // Applies the service's configured cancellation fee (zero by default).
+  app.post(
+    "/reception/bookings/:bookingId/cancel",
+    async (req: FastifyRequest, reply: FastifyReply) => {
+      const authResult = await validateSession(
+        { method: req.method, cookieHeader: req.headers.cookie ?? null, csrfHeader: csrfHeaderOf(req) },
+        { sessions, resolveUser },
+      );
+      if (!authResult.ok) return reply.code(authResult.status).send({ error: authResult.error });
+      const perm = guard(authResult.user);
+      if (!perm.ok) return reply.code(perm.status).send({ error: perm.error });
+
+      const { bookingId } = req.params as { bookingId: string };
+      const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+      if (!booking || !booking.slotId) return reply.code(404).send({ error: "Booking not found" });
+      if (booking.status === "cancelled") {
+        return reply.code(409).send({ error: "Booking is already cancelled" });
+      }
+      const service = booking.serviceId ? await getService(db, booking.serviceId) : null;
+      const feeCents = service?.cancellationFeeCents ?? 0;
+
+      try {
+        const result = await cancelBooking(db, {
+          bookingId,
+          feeCents,
+          actor: authResult.user.id,
+          ip: req.ip,
+        });
+        return reply.code(200).send({
+          bookingId: result.bookingId,
+          status: "cancelled",
+          voidedInvoiceId: result.voidedInvoiceId,
+          feeCents: result.feeCents,
+          feeInvoiceId: result.feeInvoiceId,
+        });
+      } catch (err) {
+        if (err instanceof BookingAlreadyCancelledError) {
+          return reply.code(409).send({ error: "Booking is already cancelled" });
+        }
+        if (err instanceof BookingNotFoundError) {
+          return reply.code(404).send({ error: "Booking not found" });
+        }
+        throw err;
+      }
+    },
+  );
 }

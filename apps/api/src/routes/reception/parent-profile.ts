@@ -64,7 +64,7 @@ export async function outstandingForParent(db: Database, parentId: string): Prom
   const [row] = await db
     .select({ owed: sql<string>`COALESCE(SUM(${invoices.amountDue}), 0)` })
     .from(invoices)
-    .where(and(eq(invoices.parentId, parentId), sql`${invoices.status} <> 'settled'`));
+    .where(and(eq(invoices.parentId, parentId), sql`${invoices.status} NOT IN ('settled', 'void')`));
   return Number(row?.owed ?? 0);
 }
 
@@ -105,7 +105,7 @@ export async function openInvoicesForParent(
       createdAt: invoices.createdAt,
     })
     .from(invoices)
-    .where(and(eq(invoices.parentId, parentId), sql`${invoices.status} <> 'settled'`))
+    .where(and(eq(invoices.parentId, parentId), sql`${invoices.status} NOT IN ('settled', 'void')`))
     .orderBy(asc(invoices.createdAt));
   return rows.map((r) => ({
     id: r.id,

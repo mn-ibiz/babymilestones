@@ -159,7 +159,7 @@ async function shapeResults(db: Database, matches: ParentMatch[]): Promise<Paren
           })
           .from(invoices)
           .where(
-            and(inArray(invoices.parentId, parentIds), sql`${invoices.status} <> 'settled'`),
+            and(inArray(invoices.parentId, parentIds), sql`${invoices.status} NOT IN ('settled', 'void')`),
           )
           .groupBy(invoices.parentId);
   const outstandingByParent = new Map(outstandingRows.map((r) => [r.parentId, Number(r.owed)]));

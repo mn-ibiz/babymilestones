@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-29 (16-5 reschedule DONE: per-service cut-off + atomic slot move + audit both ids; code-reviewed (4/4 ACs); full suite green. Epic-16: 5/7 done)
+last_updated: 2026-05-29 (16-6 cancel DONE: bookings.status frees capacity, invoice void, per-service fee; code-reviewed + 3 fixes incl. 2 HIGH (void leaked to outstanding; cancelled blocked re-book); full suite green. Epic-16: 6/7 done)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -161,7 +161,7 @@ development_status:
   16-3-parent-books-a-slot-creates-pending-invoice: done  # P2-E01-S03
   16-4-reception-books-on-behalf-of-a-walk-in: done  # P2-E01-S04
   16-5-parent-reschedules-a-booking: done  # P2-E01-S05
-  16-6-parent-or-reception-cancels-a-booking: ready-for-dev  # P2-E01-S06
+  16-6-parent-or-reception-cancels-a-booking: done  # P2-E01-S06
   16-7-bookings-list-on-parent-dashboard: ready-for-dev  # P2-E01-S07
   epic-16-retrospective: optional
 

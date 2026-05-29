@@ -254,4 +254,50 @@ describe("parent slot booking (P2-E01-S03)", () => {
     const res = await reschedule(other, bookingId, slotB);
     expect(res.statusCode).toBe(404);
   });
+
+  const cancel = (p: Parent, bookingId: string) =>
+    app.inject({
+      method: "POST",
+      url: `/parents/me/bookings/${bookingId}/cancel`,
+      headers: { cookie: `${p.sessionCookie}; ${p.csrfCookie}`, "x-csrf-token": p.csrfToken },
+    });
+
+  it("cancels before the cut-off → slot freed + invoice voided (AC1)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const { slotId } = await seedSlot();
+    const created = await book(parent, { slotId, childId });
+    const { bookingId, invoiceId } = created.json();
+
+    const res = await cancel(parent, bookingId);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status).toBe("cancelled");
+    const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, invoiceId));
+    expect(inv!.status).toBe("void");
+  });
+
+  it("refuses an online cancel after the cut-off → contact reception (AC2)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    // An early-today slot (06:00) is bookable at 05:00 but inside the 2h cut-off.
+    const svc = await createService(dbh.db, { name: "Early", unit: "play" });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 1000, effectiveFrom: "2026-01-01" });
+    const sched = await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dayOfWeekIso("2026-06-15"), startTime: "06:00", endTime: "07:00", slotDurationMinutes: 60, capacity: 5 });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: "2026-06-15", days: 1 });
+    const [slot] = await listSlotsWithRemaining(dbh.db, { serviceId: svc.id });
+    const bookingId = (await book(parent, { slotId: slot!.id, childId })).json().bookingId as string;
+
+    const res = await cancel(parent, bookingId);
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toMatch(/contact reception/i);
+  });
+
+  it("404s cancelling another parent's booking", async () => {
+    const owner = await makeParent("+254712345678", "0712345678");
+    const other = await makeParent("+254712000099", "0712000099");
+    const childId = await addChild(owner.parentId);
+    const { slotId } = await seedSlot();
+    const bookingId = (await book(owner, { slotId, childId })).json().bookingId as string;
+    expect((await cancel(other, bookingId)).statusCode).toBe(404);
+  });
 });

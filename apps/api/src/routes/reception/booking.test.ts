@@ -197,6 +197,26 @@ describe("reception walk-in booking (P2-E01-S04)", () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it("reception cancels a booking and applies the service cancellation fee (AC2)", async () => {
+    const creds = await login("+254712000001", "0712000001", "reception");
+    const { parentId, childId } = await walkIn();
+    const svc = await createService(dbh.db, { name: "Fee Svc", unit: "play", cancellationFeeCents: 700 });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 2000, effectiveFrom: "2026-01-01" });
+    const sched = await createSchedule(dbh.db, { serviceId: svc.id, dayOfWeek: dayOfWeekIso(FUTURE), startTime: "09:00", endTime: "10:00", slotDurationMinutes: 60, capacity: 5 });
+    await generateSlotsForSchedule(dbh.db, sched, { fromDate: TODAY, days: 14 });
+    const slot = (await listSlotsWithRemaining(dbh.db, { serviceId: svc.id })).find((s) => s.slotDate === FUTURE)!;
+    const bookingId = (await post(creds, { parentId, childId, slotId: slot.id })).json().bookingId as string;
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/reception/bookings/${bookingId}/cancel`,
+      headers: { cookie: creds.cookie, "x-csrf-token": creds.csrf },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().feeCents).toBe(700);
+    expect(res.json().feeInvoiceId).not.toBeNull();
+  });
+
   it("rejects attributing a booking to a retired (inactive) staff member", async () => {
     const creds = await login("+254712000001", "0712000001", "reception");
     const { parentId, childId } = await walkIn();
