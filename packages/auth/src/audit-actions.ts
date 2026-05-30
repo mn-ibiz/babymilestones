@@ -86,6 +86,7 @@ export const AUDIT_ACTION_CATALOGUE = {
     "sms.config.create",
     "sms.config.update",
     "sms.config.delete",
+    "sms.live.toggled",
     "catalog.service.create",
     "catalog.service.update",
     "catalog.service.price_change",

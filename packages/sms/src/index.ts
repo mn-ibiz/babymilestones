@@ -25,6 +25,7 @@ export type {
   SmsTransportResponse,
   LiveSmsAdapterOptions,
 } from "./live.js";
+export { SMS_LIVE_ENABLED_KEY, isSmsLiveEnabled, resolveSmsSender } from "./switch.js";
 export {
   createSmsConfig,
   updateSmsConfig,
