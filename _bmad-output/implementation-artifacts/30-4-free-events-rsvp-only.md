@@ -1,6 +1,6 @@
 # Story 30.4: Free events (RSVP only)
 
-Status: backlog
+Status: done
 
 > Canonical ID: P4-E05-S04 · Phase: P4 · Source: _bmad-output/planning-artifacts/stories/p4/P4-E05-S04.md
 
