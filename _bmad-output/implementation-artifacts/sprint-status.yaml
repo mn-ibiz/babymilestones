@@ -276,7 +276,7 @@ development_status:
   epic-29-retrospective: optional
 
   # Epic 30 — Events & Recital Ticketing  (P4-E05)
-  epic-30: in-progress
+  epic-30: done
   30-1-event-creation: done  # P4-E05-S01
   30-2-public-event-listing-detail-page: done  # P4-E05-S02
   30-3-ticket-purchase-with-guest-checkout: done  # P4-E05-S03
