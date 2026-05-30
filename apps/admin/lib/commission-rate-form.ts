@@ -14,6 +14,7 @@ export interface CommissionRateFormValues {
 }
 
 export interface CommissionRateFormErrors {
+  [key: string]: string | undefined;
   ratePercent?: string;
   effectiveFrom?: string;
 }

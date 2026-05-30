@@ -28,6 +28,7 @@ export interface CommissionRun {
 }
 
 export interface DateRangeErrors {
+  [key: string]: string | undefined;
   periodStart?: string;
   periodEnd?: string;
 }

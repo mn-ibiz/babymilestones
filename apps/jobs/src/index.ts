@@ -121,11 +121,13 @@ export function registerSmsRetryJob(
   deps: Parameters<typeof createSmsRetryJob>[0],
 ): void {
   register(createSmsRetryJob(deps));
+}
 /** Wire the monthly commission run (P3-E01-S03: 02:00 on the 1st). */
 export function registerCommissionRunJob(
   deps: Parameters<typeof createCommissionRunJob>[0],
 ): void {
   register(createCommissionRunJob(deps));
+}
 /** Wire the eTIMS retry / dead-letter worker (P5-E02-S02; 60s cadence). */
 export function registerEtimsRetryJob(
   deps: Parameters<typeof createEtimsRetryJob>[0],
