@@ -1,6 +1,6 @@
 # Story 28.1: Job framework: scheduling + observability
 
-Status: backlog
+Status: done
 
 > Canonical ID: P3-E06-S01 · Phase: P3 · Source: _bmad-output/planning-artifacts/stories/p3/P3-E06-S01.md
 
@@ -17,13 +17,13 @@ As ops, I want a single place jobs are defined, scheduled, and monitored.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement Job framework: scheduling + observability (AC: #1, #2, #3, #4)
-  - [ ] Satisfy AC#1: `apps/jobs` exposes a registry: name, schedule (cron expression), handler, on-failure policy.
-  - [ ] Satisfy AC#2: Each run logged: `job_runs` table with started_at, ended_at, status, error.
-  - [ ] Satisfy AC#3: Failed runs alert via Sentry.
-  - [ ] Satisfy AC#4: Manual "run now" available to super-admin from admin console.
-- [ ] Task 2: Tests (AC: all)
-  - [ ] Test-first with vitest (`pnpm test`); cover each AC (unit / integration / e2e as appropriate)
+- [x] Task 1: Implement Job framework: scheduling + observability (AC: #1, #2, #3, #4)
+  - [x] Satisfy AC#1: `apps/jobs` exposes a registry: name, schedule (cron expression), handler, on-failure policy.
+  - [x] Satisfy AC#2: Each run logged: `job_runs` table with started_at, ended_at, status, error.
+  - [x] Satisfy AC#3: Failed runs alert via Sentry.
+  - [x] Satisfy AC#4: Manual "run now" available to super-admin from admin console.
+- [x] Task 2: Tests (AC: all)
+  - [x] Test-first with vitest (`pnpm test`); cover each AC (unit / integration / e2e as appropriate)
 
 ## Dev Notes
 
@@ -43,14 +43,54 @@ Testing standards: vitest (`pnpm test`), TS strict, test-first. Migrations addit
 
 ### Agent Model Used
 
+claude-opus-4-8 (1M context)
+
 ### Debug Log References
+
+- `pnpm -C apps/jobs exec vitest run src/runner.test.ts` — 9 tests pass.
+- `pnpm -C apps/api exec vitest run src/routes/admin/jobs.test.ts` — 6 tests pass.
+- `pnpm -C apps/admin exec vitest run` includes the jobs page test (3 cases) — pass.
+- tsc --noEmit clean for packages/db, apps/jobs, apps/api, apps/admin.
 
 ### Completion Notes List
 
+- AC1 — `apps/jobs/src/registry.ts` `Job` now carries name, `cron` expression,
+  `intervalMs`, `onFailure` policy, and the handler; `schedule()` returns public
+  descriptors and `allJobs()` the live jobs. Existing crons declare cron + policy.
+- AC2 — new `job_runs` table (migration `0076_job_runs.sql` + drizzle schema
+  `job-runs.ts`). `runJob()` (apps/jobs/src/runner.ts) opens a `running` row
+  (started_at), then stamps ended_at + status (`success`|`failed`) + error.
+- AC3 — `runJob` forwards a thrown handler to an injected `JobTracker`
+  (`captureException`, the `@bm/observability` ErrorTracker shape → Sentry in
+  prod) and logs an error line. Handler errors are isolated (never rethrown);
+  `startScheduler` adds a per-job overlap guard.
+- AC4 — `apps/api/src/routes/admin/jobs.ts`: GET `/admin/jobs`, GET
+  `/admin/jobs/:name/runs`, POST `/admin/jobs/:name/run`, reserved to super-admin
+  via `can(role,"manage","role")`. Run-now records a `manual` `job_runs` row
+  (acting user) + a `job.run_now` audit entry; failures are isolated. Admin page
+  `app/(console)/jobs/page.tsx` lists jobs + a Run-now button; nav link added.
+- New audit action `job.run_now` (and `sms.retry.dead_lettered` for 28-4)
+  registered in the `@bm/auth` catalogue.
+- Migration note: `main` now ships `0058_pos_cashups.sql` from the POS session,
+  so this branch's job migrations were renumbered into Epic 28's reserved range —
+  `0076_job_runs.sql` (this story) and `0077_sms_outbox_retry.sql` (28-4). All
+  additive; the drizzle schema references table names, not filenames.
+- Fixed a duplicate `export * from "./job-runs.js"` in `packages/db/src/schema/index.ts`.
+
 ### File List
+
+- packages/db/migrations/0076_job_runs.sql (new)
+- packages/db/src/schema/job-runs.ts (new) + schema/index.ts (re-export)
+- apps/jobs/src/runner.ts + runner.test.ts (new)
+- apps/jobs/src/registry.ts (cron/onFailure/schedule/allJobs) + index.ts (exports)
+- apps/api/src/routes/admin/jobs.ts + jobs.test.ts (new) + admin/index.ts + app.ts (wire jobs)
+- apps/admin/app/(console)/jobs/page.tsx + page.test.tsx (new) + lib/nav.ts
+- packages/auth/src/audit-actions.ts (jobs category)
 
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-25 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+| 2026-05-30 | 1.0 | Job framework: registry + job_runs + runner/scheduler + Sentry alert + super-admin run-now (API + console) | claude-opus-4-8 |
+| 2026-05-30 | 1.1 | Renumbered migration 0058→0076 (POS 0058 collision); removed duplicate schema barrel export; story marked done | claude-opus-4-8 |

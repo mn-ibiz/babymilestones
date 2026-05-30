@@ -95,6 +95,10 @@ export function createAnonymiseObservationsJob(deps: AnonymiseObservationsJobDep
   return {
     name: "anonymise-observations",
     intervalMs: DAILY_MS,
+    // AC1 (P3-E06-S02): 02:00 daily. The single-worker scheduler runs off
+    // intervalMs; this is the canonical cron surfaced in the registry.
+    cron: "0 2 * * *",
+    onFailure: "retry-next-tick",
     run: async () => {
       const at = clock();
       const cutoff = subtractMonths(at, RETENTION_MONTHS);

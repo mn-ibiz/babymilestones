@@ -113,6 +113,12 @@ export interface AppDeps {
    * opens a real Redis connection from config defaults.
    */
   redisPing?: () => Promise<unknown>;
+  /**
+   * Background jobs the super-admin console can trigger manually (P3-E06-S01
+   * AC4). Wired from `apps/jobs` at boot; tests inject fakes. When omitted, the
+   * run-now endpoint exposes an empty registry (list still 200, run 404).
+   */
+  jobs?: { name: string; run: () => Promise<void> }[];
 }
 
 /** Build Paystack config from env (production). Returns null if not fully set. */
@@ -258,7 +264,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       enqueueStatement: deps.enqueueStatement,
       now,
     });
-    registerAdminRoutes(app, { db, sessions: deps.sessions });
+    registerAdminRoutes(app, { db, sessions: deps.sessions, jobs: deps.jobs });
 
     // Resolve provider wiring once (explicit deps in tests, env in production) so
     // both the parent-facing payment routes and the reception top-up rails (S03)

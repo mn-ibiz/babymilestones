@@ -90,6 +90,30 @@ describe("M-Pesa reconciliation cron (P1-E04-S03)", () => {
     expect(job.intervalMs).toBe(60_000);
   });
 
+  it("is registered under the framework: cron + on-failure policy (P3-E06-S05 AC1)", () => {
+    const { job } = makeJob({});
+    expect(job.cron).toBe("* * * * *");
+    expect(job.onFailure).toBe("retry-next-tick");
+  });
+
+  it("logs the count of recovered transactions per run (P3-E06-S05 AC2)", async () => {
+    // Two ripe pending requests that Daraja reports as success → 2 recovered.
+    await seedRequest({ checkoutRequestId: "rec_a", state: "STK_SENT", ageMs: 120_000 });
+    await seedRequest({ checkoutRequestId: "rec_b", state: "STK_SENT", ageMs: 120_000 });
+    const mpesa = fakeMpesa({ rec_a: "success", rec_b: "success" });
+    const logs: Array<Record<string, unknown>> = [];
+    const job = createMpesaReconcileJob({
+      db: dbh.db,
+      mpesa,
+      now: () => NOW,
+      logger: { info: (obj) => logs.push(obj) },
+    });
+    await job.run();
+    const summary = logs.find((l) => l.event === "payments.mpesa.reconcile");
+    expect(summary).toBeDefined();
+    expect(summary!.recovered).toBe(2);
+  });
+
   it("only picks up pending rows older than 90s (AC2)", async () => {
     await seedRequest({ checkoutRequestId: "fresh", state: "STK_SENT", ageMs: 30_000 });
     await seedRequest({ checkoutRequestId: "ripe", state: "STK_SENT", ageMs: 120_000 });

@@ -50,6 +50,17 @@ describe("subtractMonths", () => {
   });
 });
 
+describe("anonymise-observations registration (P3-E06-S02)", () => {
+  it("is scheduled 02:00 daily with the correct name + cron (AC1)", () => {
+    // A minimal stub db is fine — we only inspect the static descriptor.
+    const job = createAnonymiseObservationsJob({ db: {} as never });
+    expect(job.name).toBe("anonymise-observations");
+    expect(job.cron).toBe("0 2 * * *"); // AC1: 02:00 daily
+    expect(job.intervalMs).toBe(24 * 60 * 60 * 1000);
+    expect(job.onFailure).toBe("retry-next-tick");
+  });
+});
+
 describe("anonymise-observations cron (P2-E03-S05)", () => {
   let dbh: Awaited<ReturnType<typeof createTestDb>>;
   beforeEach(async () => {

@@ -8,6 +8,7 @@ import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
+import { createSmsRetryJob } from "./jobs/sms-retry.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -29,6 +30,23 @@ export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
+export { createSmsRetryJob, backoffMs, BACKOFF_MS, MAX_ATTEMPTS } from "./jobs/sms-retry.js";
+export type { SmsRetryJobDeps, SmsResend } from "./jobs/sms-retry.js";
+
+// P3-E06-S01: the job framework — runJob records each run in job_runs + alerts
+// on failure; startScheduler is the single-worker cron loop.
+export { runJob, startScheduler } from "./runner.js";
+export type {
+  RunnerDeps,
+  RunOptions,
+  RunResult,
+  SchedulerHandle,
+  JobTracker,
+  RunnerLogger,
+} from "./runner.js";
+// P3-E06-S01 AC1: the registry surface (name, schedule, on-failure policy).
+export { schedule, allJobs } from "./registry.js";
+export type { Job, JobDescriptor, OnFailurePolicy } from "./registry.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -81,11 +99,18 @@ export function registerSubscriptionRenewJob(
   register(createSubscriptionRenewJob(deps));
 }
 
-/** Wire the nightly 24-month observation anonymisation cron (P2-E03-S05). */
+/** Wire the nightly 24-month observation anonymisation cron (P2-E03-S05 / P3-E06-S02). */
 export function registerAnonymiseObservationsJob(
   deps: Parameters<typeof createAnonymiseObservationsJob>[0],
 ): void {
   register(createAnonymiseObservationsJob(deps));
+}
+
+/** Wire the SMS retry worker (P3-E06-S04: backoff retry + dead-letter). */
+export function registerSmsRetryJob(
+  deps: Parameters<typeof createSmsRetryJob>[0],
+): void {
+  register(createSmsRetryJob(deps));
 }
 
 export { logger } from "./logger.js";
