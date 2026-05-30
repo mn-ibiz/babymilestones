@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 /**
  * Background jobs console (P3-E06-S01 AC4). Super-admin only — the API guards the
