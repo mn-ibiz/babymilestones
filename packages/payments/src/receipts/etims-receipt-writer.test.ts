@@ -31,13 +31,16 @@ describe("eTIMS receipt writer adapter (P5-E02-S01)", () => {
   };
 
   const accepted: EtimsTransport = async () => ({
-    controlUnitNumber: "CU-0001",
-    cuInvoiceNumber: "INV-0001",
-    qrData: "https://etims.kra.test/qr/INV-0001",
+    status: 200,
+    json: async () => ({
+      controlUnitNumber: "CU-0001",
+      cuInvoiceNumber: "INV-0001",
+      qrData: "https://etims.kra.test/qr/INV-0001",
+    }),
   });
 
   async function seedService(): Promise<string> {
-    const [s] = await dbh.db.insert(services).values({ name: "Daycare", unit: "daycare" }).returning();
+    const [s] = await dbh.db.insert(services).values({ name: "Daycare", unit: "play" }).returning();
     return s!.id;
   }
 
@@ -142,6 +145,19 @@ describe("eTIMS receipt writer adapter (P5-E02-S01)", () => {
 
     const rows = await dbh.db.select().from(receipts);
     expect(rows).toHaveLength(0);
+  });
+
+  it("writes NO receipt when KRA returns a non-2xx status", async () => {
+    const serviceId = await seedService();
+    const rejected: EtimsTransport = async () => ({
+      status: 422,
+      json: async () => ({ controlUnitNumber: "", cuInvoiceNumber: "", qrData: "" }),
+    });
+    const writer = createEtimsReceiptWriter(CONFIG, { transport: rejected });
+    await expect(
+      writer.writeReceipt(dbh.db, payload({ lines: [{ serviceId, quantity: 1, unitPrice: 100, lineTax: 0, lineTotal: 100 }] })),
+    ).rejects.toBeInstanceOf(EtimsTransportError);
+    expect(await dbh.db.select().from(receipts)).toHaveLength(0);
   });
 
   it("validates the payload (rejects an empty receipt) before contacting KRA", async () => {

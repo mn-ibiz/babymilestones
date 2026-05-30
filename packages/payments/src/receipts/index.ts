@@ -111,6 +111,7 @@ export type {
   EtimsTransport,
   EtimsTransportRequestOptions,
   EtimsTransportResponse,
+  EtimsAcceptance,
   CreateEtimsWriterOptions,
 } from "./etims-receipt-writer.js";
 export {

@@ -72,11 +72,21 @@ export interface EtimsConfig {
   address?: string;
 }
 
-/** What KRA returns when it accepts an invoice — the fields stamped on the receipt. */
-export interface EtimsTransportResponse {
+/** The KRA acceptance fields, returned by the transport's JSON body. */
+export interface EtimsAcceptance {
   controlUnitNumber: string;
   cuInvoiceNumber: string;
   qrData: string;
+}
+
+/**
+ * A fetch-like transport response: an HTTP `status` plus a lazy `json()` that
+ * yields the {@link EtimsAcceptance} body. Modelled on `fetch`'s `Response` so
+ * the live transport is `globalThis.fetch` and tests pass a tiny fake.
+ */
+export interface EtimsTransportResponse {
+  status: number;
+  json: () => Promise<EtimsAcceptance>;
 }
 
 export interface EtimsTransportRequestOptions {
@@ -87,9 +97,9 @@ export interface EtimsTransportRequestOptions {
 }
 
 /**
- * Injected transport. Resolves with the KRA acceptance fields; REJECTS (throws)
- * on any failure — the adapter maps that to {@link EtimsTransportError} and
- * writes no receipt. The default (`defaultFetchTransport`) hits `globalThis.fetch`.
+ * Injected transport. Resolves with a fetch-like response; a non-2xx `status`
+ * OR a thrown error is mapped to {@link EtimsTransportError} and writes no
+ * receipt. The default (`defaultFetchTransport`) hits `globalThis.fetch`.
  */
 export type EtimsTransport = (
   invoice: EtimsInvoice,
@@ -106,8 +116,8 @@ export interface CreateEtimsWriterOptions {
  * importing this module never touches the network.
  */
 export function defaultFetchTransport(): EtimsTransport {
-  return async (invoice, options) => {
-    const res = await globalThis.fetch(`${options.baseUrl}/invoices`, {
+  return async (invoice, options) =>
+    globalThis.fetch(`${options.baseUrl}/invoices`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -116,16 +126,6 @@ export function defaultFetchTransport(): EtimsTransport {
       },
       body: JSON.stringify({ ...invoice, idempotencyKey: options.idempotencyKey }),
     });
-    if (!res.ok) {
-      throw new EtimsTransportError(`HTTP ${res.status}`);
-    }
-    const data = (await res.json()) as EtimsTransportResponse;
-    return {
-      controlUnitNumber: data.controlUnitNumber,
-      cuInvoiceNumber: data.cuInvoiceNumber,
-      qrData: data.qrData,
-    };
-  };
 }
 
 function assertConfig(config: EtimsConfig): void {
@@ -206,15 +206,19 @@ class LiveEtimsReceiptWriter implements ReceiptWriter {
     );
 
     // Register with KRA FIRST. Any failure throws and persists NOTHING — a clean
-    // slate for the retry queue (32-2). The transport rejects on failure; we
-    // normalise non-eTIMS errors to EtimsTransportError.
-    let kra: EtimsTransportResponse;
+    // slate for the retry queue (32-2). A non-2xx status or a thrown error both
+    // become EtimsTransportError.
+    let kra: EtimsAcceptance;
     try {
-      kra = await this.#transport(invoice, {
+      const res = await this.#transport(invoice, {
         idempotencyKey: invoiceNumber,
         apiKey: this.#config.apiKey,
         baseUrl: this.#config.baseUrl,
       });
+      if (res.status < 200 || res.status >= 300) {
+        throw new EtimsTransportError(`HTTP ${res.status}`);
+      }
+      kra = await res.json();
     } catch (err) {
       if (err instanceof EtimsTransportError) throw err;
       throw new EtimsTransportError(err instanceof Error ? err.message : String(err));

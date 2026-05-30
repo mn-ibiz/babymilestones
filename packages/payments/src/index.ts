@@ -105,6 +105,7 @@ export type {
   EtimsTransport,
   EtimsTransportRequestOptions,
   EtimsTransportResponse,
+  EtimsAcceptance,
   CreateEtimsWriterOptions,
   ResolveReceiptWriterOptions,
   EtimsWiring,
