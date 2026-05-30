@@ -2503,3 +2503,33 @@ export interface PosCashupResponse extends PosCashupExpected {
   /** The reconciliation adjustment posted for a non-zero variance (P1-E06). */
   reconciliationAdjustmentId: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Backup retention (P2-E06 — Decision 35)
+// ---------------------------------------------------------------------------
+// Admin-configurable policy for how many database backups we keep. Persisted as
+// one JSON row in the `settings` table under `BACKUP_RETENTION_SETTING_KEY`. The
+// pruner (21-2) reads the effective policy and never deletes the most-recent
+// successful backup, nor anything inside the grace window.
+export const backupRetentionPolicySchema = z.object({
+  // Recent daily backups to keep. At least one is always retained as a baseline
+  // recovery point.
+  dailyKeep: z.number().int().min(1),
+  // Monthly backups (the latest successful backup in each calendar month) to
+  // keep, beyond the daily set. 0 disables the monthly tier.
+  monthlyKeep: z.number().int().min(0),
+  // Grace window in days: any backup younger than this is never pruned,
+  // regardless of the keep counts.
+  graceDays: z.number().int().min(0),
+});
+export type BackupRetentionPolicy = z.infer<typeof backupRetentionPolicySchema>;
+
+/** Well-known `settings` key under which the retention policy is persisted. */
+export const BACKUP_RETENTION_SETTING_KEY = "backup.retention";
+
+/** Defaults applied when no policy has been saved (mirrors the fixed P1 window). */
+export const DEFAULT_BACKUP_RETENTION_POLICY: BackupRetentionPolicy = {
+  dailyKeep: 30,
+  monthlyKeep: 12,
+  graceDays: 7,
+};

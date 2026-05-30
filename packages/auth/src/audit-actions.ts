@@ -125,8 +125,15 @@ export const AUDIT_ACTION_CATALOGUE = {
     "wallet.statement.export.completed",
     "treasury.reconciliation.export",
   ],
-  /** Daily DB backup lifecycle (X8-S03) — every run + prune is recorded. */
-  backup: ["backup.run.succeeded", "backup.run.failed", "backup.run.pruned"],
+  /** Daily DB backup lifecycle (X8-S03) — every run + prune is recorded.
+   * `backup.retention.updated` (P2-E06-S01) records an admin changing the
+   * configurable retention policy. */
+  backup: [
+    "backup.run.succeeded",
+    "backup.run.failed",
+    "backup.run.pruned",
+    "backup.retention.updated",
+  ],
   /** Booking lifecycle (P2-E01) — create / reschedule / cancel a booking. */
   booking: ["booking.created", "booking.rescheduled", "booking.cancelled"],
   /** Subscription lifecycle (P2-E02) — subscribe, pause/resume, renew/dunning (cancel in S06). */
