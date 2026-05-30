@@ -14,6 +14,8 @@ export * from "./attendances.js";
 export * from "./observations.js";
 export * from "./events.js";
 export * from "./event-ticket-tiers.js";
+export * from "./ticket-orders.js";
+export * from "./tickets.js";
 export * from "./otp.js";
 export * from "./sms.js";
 export * from "./sms-config.js";
