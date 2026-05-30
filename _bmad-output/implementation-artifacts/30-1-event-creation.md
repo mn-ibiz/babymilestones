@@ -53,6 +53,7 @@ Testing standards: vitest (`pnpm test`), TS strict, test-first. Migrations addit
 
 ### Completion Notes
 - All tests green: api `events.test.ts` (6), `events-slug.test.ts` (7), admin `lib/events.test.ts` (4); `tsc --noEmit` clean for db, auth, contracts, api, admin.
+- Repair (2026-05-30): the committed `events.test.ts` imported a non-existent `createTestDatabase`/`TestDatabase` from `@bm/db/testing` (the real export is `createTestDb`/`TestDb`) and used a `sessions.set` pattern that does not exist on `InMemorySessionStore`, so the suite failed to load (6 skipped). Rewrote it to the known-good `plans.test.ts` pattern (PGlite `createTestDb` + `staffUserSeed` + real `/auth/staff/login` with CSRF). events.test.ts now 6/6; full apps/api suite 524/524; `tsc --noEmit` clean. Implementation (route, contracts EventDto/EventTicketTierDto, `event.*` audit group, app.ts wiring, migrations 0067/0068, schema) was already correct.
 
 ## Change Log
 
