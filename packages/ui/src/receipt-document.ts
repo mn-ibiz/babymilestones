@@ -33,6 +33,17 @@ export interface ReceiptBusinessDetails {
   phone: string;
   /** Optional KRA PIN line (filled once eTIMS adoption lands). */
   kraPin?: string | null;
+  /**
+   * VAT registration number recorded once in Settings → Tax (P5-E02-S04). Shown
+   * in the footer tax block when present.
+   */
+  vatRegistrationNumber?: string | null;
+  /**
+   * Registered business address recorded in Settings → Tax (P5-E02-S04). Shown
+   * in the footer tax block when present (distinct from the display
+   * `addressLines` header lines).
+   */
+  registeredAddress?: string | null;
 }
 
 /** Default business details — overridable by the caller/route. */
@@ -41,6 +52,8 @@ export const DEFAULT_BUSINESS_DETAILS: ReceiptBusinessDetails = {
   addressLines: ["Nairobi, Kenya"],
   phone: BRAND.supportPhone,
   kraPin: null,
+  vatRegistrationNumber: null,
+  registeredAddress: null,
 };
 
 /** One line on the full receipt. Money is integer cents. */

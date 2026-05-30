@@ -2316,11 +2316,28 @@ export const receiptBrandingSettingsSchema = z.object({
 });
 export type ReceiptBrandingSettings = z.infer<typeof receiptBrandingSettingsSchema>;
 
+/**
+ * eTIMS (KRA) settings (P5-E02). `enabled` is the runtime writer-swap flag
+ * (P5-E02-S03): OFF (default) keeps the LocalReceiptWriter, ON selects the live
+ * EtimsReceiptWriter. The tax-registration metadata (P5-E02-S04) — the company
+ * KRA PIN, VAT registration number and registered address — is recorded once
+ * here and printed in the receipt footer block. All metadata fields are optional
+ * (an unregistered business leaves them blank) and trimmed.
+ */
+export const etimsSettingsSchema = z.object({
+  enabled: z.boolean(),
+  pin: z.string().trim().max(20).optional(),
+  vatRegistrationNumber: z.string().trim().max(40).optional(),
+  registeredAddress: z.string().trim().max(240).optional(),
+});
+export type EtimsSettings = z.infer<typeof etimsSettingsSchema>;
+
 /** Per-key validator map: each general settings section to its payload schema. */
 export const SETTING_SCHEMAS = {
   loyalty: loyaltySettingsSchema,
   branding: brandingSettingsSchema,
   receipt_branding: receiptBrandingSettingsSchema,
+  etims: etimsSettingsSchema,
 } as const satisfies Record<SettingKey, z.ZodTypeAny>;
 
 /** Default payload for a general settings section before an admin first saves it. */
@@ -2328,6 +2345,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: z.infer<(typeof SETTING_SCHE
   loyalty: { earnRatePer100: 0, redeemValuePerPoint: 0 },
   branding: { storeName: "Baby Milestones", primaryColour: "#000000" },
   receipt_branding: { showLogo: false },
+  etims: { enabled: false },
 };
 
 /**
