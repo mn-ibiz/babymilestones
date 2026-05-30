@@ -97,8 +97,61 @@ export function formatReceiptNumber(series: string, sequenceNumber: number): str
   return `${series}-${String(sequenceNumber).padStart(6, "0")}`;
 }
 
-export { LocalReceiptWriter } from "./local-receipt-writer.js";
-export { EtimsReceiptWriter, EtimsNotImplementedError } from "./etims-receipt-writer.js";
+export { LocalReceiptWriter, ReceiptValidationError } from "./local-receipt-writer.js";
+export {
+  EtimsReceiptWriter,
+  EtimsNotImplementedError,
+  createEtimsReceiptWriter,
+  defaultFetchTransport,
+  EtimsConfigError,
+  EtimsTransportError,
+} from "./etims-receipt-writer.js";
+export type {
+  EtimsConfig,
+  EtimsTransport,
+  EtimsTransportRequestOptions,
+  EtimsTransportResponse,
+  EtimsAcceptance,
+  CreateEtimsWriterOptions,
+} from "./etims-receipt-writer.js";
+export {
+  STANDARD_VAT_RATE_BP,
+  computeLineVat,
+  buildEtimsInvoice,
+} from "./etims-payload.js";
+export type {
+  EtimsInvoice,
+  EtimsInvoiceItem,
+  EtimsInvoiceSeller,
+  BuildEtimsInvoiceOptions,
+} from "./etims-payload.js";
+export {
+  resolveReceiptWriter,
+  isEtimsEnabled,
+  ETIMS_SETTING_KEY,
+} from "./writer-selector.js";
+export type {
+  ResolveReceiptWriterOptions,
+  EtimsWiring,
+} from "./writer-selector.js";
+export {
+  etimsBackoffMs,
+  ETIMS_BACKOFF_CAP_MS,
+  ETIMS_BACKOFF_BASE_MS,
+  ETIMS_DEFAULT_MAX_ATTEMPTS,
+  enqueueEtimsSubmission,
+  claimDueEtimsSubmissions,
+  markEtimsSubmissionSent,
+  recordEtimsSubmissionFailure,
+  listDeadLetters,
+  requeueDeadLetter,
+} from "./etims-queue.js";
+export type {
+  EtimsQueueRow,
+  EnqueueEtimsInput,
+  ClaimDueInput,
+  RecordFailureResult,
+} from "./etims-queue.js";
 export {
   voidReceipt,
   AlreadyVoidedError,
@@ -110,17 +163,30 @@ export {
 
 import { LocalReceiptWriter } from "./local-receipt-writer.js";
 
-/** The default writer binding — local today, eTIMS swaps in at P5. */
-export const defaultReceiptWriter: ReceiptWriter = new LocalReceiptWriter();
+/**
+ * The default writer binding — local today, eTIMS swaps in at P5. Constructed
+ * lazily rather than at module-eval: `local-receipt-writer.ts` imports
+ * `formatReceiptNumber` back from THIS module, so an eager `new
+ * LocalReceiptWriter()` at import time can run before that module has finished
+ * initialising (a circular-import TDZ → "LocalReceiptWriter is not a
+ * constructor"). A lazy singleton defers construction to first use, once the
+ * whole graph is loaded.
+ */
+let _defaultReceiptWriter: ReceiptWriter | undefined;
+
+/** The default {@link ReceiptWriter} (local), constructed on first use. */
+export function getDefaultReceiptWriter(): ReceiptWriter {
+  return (_defaultReceiptWriter ??= new LocalReceiptWriter());
+}
 
 /**
  * Write a receipt through the default writer (AC1). Callers go through this
  * function rather than constructing rows directly, so adopting eTIMS is a
- * single-place swap of {@link defaultReceiptWriter}.
+ * single-place swap (see {@link getDefaultReceiptWriter} / {@link resolveReceiptWriter}).
  */
 export function writeReceipt(
   db: ReceiptWriterExecutor,
   payload: WriteReceiptPayload,
 ): Promise<Receipt> {
-  return defaultReceiptWriter.writeReceipt(db, payload);
+  return getDefaultReceiptWriter().writeReceipt(db, payload);
 }

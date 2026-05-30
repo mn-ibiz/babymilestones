@@ -10,6 +10,7 @@ import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 import { createSmsRetryJob } from "./jobs/sms-retry.js";
 import { createCommissionRunJob } from "./jobs/commission-run.js";
+import { createEtimsRetryJob } from "./jobs/etims-retry.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -50,6 +51,12 @@ export { schedule, allJobs } from "./registry.js";
 export type { Job, JobDescriptor, OnFailurePolicy } from "./registry.js";
 export { createCommissionRunJob } from "./jobs/commission-run.js";
 export type { CommissionRunJobDeps } from "./jobs/commission-run.js";
+export { createEtimsRetryJob } from "./jobs/etims-retry.js";
+export type {
+  EtimsRetryJobDeps,
+  EtimsResubmit,
+  EtimsRetryLogger,
+} from "./jobs/etims-retry.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -119,6 +126,11 @@ export function registerCommissionRunJob(
   deps: Parameters<typeof createCommissionRunJob>[0],
 ): void {
   register(createCommissionRunJob(deps));
+/** Wire the eTIMS retry / dead-letter worker (P5-E02-S02; 60s cadence). */
+export function registerEtimsRetryJob(
+  deps: Parameters<typeof createEtimsRetryJob>[0],
+): void {
+  register(createEtimsRetryJob(deps));
 }
 
 export { logger } from "./logger.js";

@@ -172,6 +172,14 @@ export const AUDIT_ACTION_CATALOGUE = {
     "commission.run.export",
     "commission.run.paid_out",
   ],
+  /** eTIMS (KRA) receipt integration (P5-E02). */
+  etims: [
+    "etims.submission.sent",
+    "etims.submission.dead_lettered",
+    "etims.submission.requeued",
+    "etims.flag.changed",
+    "etims.vat_metadata.updated",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

@@ -33,6 +33,17 @@ export interface ReceiptBusinessDetails {
   phone: string;
   /** Optional KRA PIN line (filled once eTIMS adoption lands). */
   kraPin?: string | null;
+  /**
+   * VAT registration number recorded once in Settings → Tax (P5-E02-S04). Shown
+   * in the footer tax block when present.
+   */
+  vatRegistrationNumber?: string | null;
+  /**
+   * Registered business address recorded in Settings → Tax (P5-E02-S04). Shown
+   * in the footer tax block when present (distinct from the display
+   * `addressLines` header lines).
+   */
+  registeredAddress?: string | null;
 }
 
 /** Default business details — overridable by the caller/route. */
@@ -41,6 +52,8 @@ export const DEFAULT_BUSINESS_DETAILS: ReceiptBusinessDetails = {
   addressLines: ["Nairobi, Kenya"],
   phone: BRAND.supportPhone,
   kraPin: null,
+  vatRegistrationNumber: null,
+  registeredAddress: null,
 };
 
 /** One line on the full receipt. Money is integer cents. */
@@ -196,6 +209,18 @@ export function renderReceiptA4(doc: ReceiptDocument): string {
     ? `<div class="kra">KRA PIN: ${escapeHtml(doc.business.kraPin)}</div>`
     : "";
 
+  // P5-E02-S04: VAT-registration footer block — each line emitted only when the
+  // metadata is present (so a bare receipt omits the block cleanly).
+  const vatFooterA4 = [
+    doc.business.vatRegistrationNumber
+      ? `VAT Reg No: ${escapeHtml(doc.business.vatRegistrationNumber)}`
+      : "",
+    doc.business.registeredAddress ? escapeHtml(doc.business.registeredAddress) : "",
+  ]
+    .filter(Boolean)
+    .map((line) => `  <div class="footer">${line}</div>`)
+    .join("\n");
+
   // Inline brand logo mark — a simple branded SVG badge, no external asset.
   const logo =
     `<svg class="logo" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">` +
@@ -264,7 +289,7 @@ export function renderReceiptA4(doc: ReceiptDocument): string {
       )}</td></tr>
     </tfoot>
   </table>
-  <div class="footer">Thank you for choosing ${escapeHtml(doc.business.name)}.</div>
+  <div class="footer">Thank you for choosing ${escapeHtml(doc.business.name)}.</div>${vatFooterA4 ? `\n${vatFooterA4}` : ""}
 </body>
 </html>`;
 }
@@ -304,6 +329,10 @@ export function renderReceiptThermal(doc: ReceiptDocument): string {
   for (const line of doc.business.addressLines) out.push(center(line));
   out.push(center(doc.business.phone));
   if (doc.business.kraPin) out.push(center(`KRA PIN: ${doc.business.kraPin}`));
+  // P5-E02-S04: VAT-registration footer lines (emitted only when present).
+  if (doc.business.vatRegistrationNumber)
+    out.push(center(`VAT Reg No: ${doc.business.vatRegistrationNumber}`));
+  if (doc.business.registeredAddress) out.push(center(doc.business.registeredAddress));
   out.push(rule);
   out.push(`Receipt: ${doc.displayNumber}`);
   out.push(`Date:    ${dateLabel(doc.date)}`);

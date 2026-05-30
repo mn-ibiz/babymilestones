@@ -39,3 +39,4 @@ export * from "./backup-runs.js";
 export * from "./loyalty.js";
 export * from "./loyalty-rates.js";
 export * from "./job-runs.js";
+export * from "./kra-etims-queue.js";
