@@ -97,8 +97,42 @@ export function formatReceiptNumber(series: string, sequenceNumber: number): str
   return `${series}-${String(sequenceNumber).padStart(6, "0")}`;
 }
 
-export { LocalReceiptWriter } from "./local-receipt-writer.js";
-export { EtimsReceiptWriter, EtimsNotImplementedError } from "./etims-receipt-writer.js";
+export { LocalReceiptWriter, ReceiptValidationError } from "./local-receipt-writer.js";
+export {
+  EtimsReceiptWriter,
+  EtimsNotImplementedError,
+  createEtimsReceiptWriter,
+  defaultFetchTransport,
+  EtimsConfigError,
+  EtimsTransportError,
+} from "./etims-receipt-writer.js";
+export type {
+  EtimsConfig,
+  EtimsTransport,
+  EtimsTransportRequestOptions,
+  EtimsTransportResponse,
+  CreateEtimsWriterOptions,
+} from "./etims-receipt-writer.js";
+export {
+  STANDARD_VAT_RATE_BP,
+  computeLineVat,
+  buildEtimsInvoice,
+} from "./etims-payload.js";
+export type {
+  EtimsInvoice,
+  EtimsInvoiceItem,
+  EtimsInvoiceSeller,
+  BuildEtimsInvoiceOptions,
+} from "./etims-payload.js";
+export {
+  resolveReceiptWriter,
+  isEtimsEnabled,
+  ETIMS_SETTING_KEY,
+} from "./writer-selector.js";
+export type {
+  ResolveReceiptWriterOptions,
+  EtimsWiring,
+} from "./writer-selector.js";
 export {
   voidReceipt,
   AlreadyVoidedError,
