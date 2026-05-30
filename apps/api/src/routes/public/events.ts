@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { and, asc, eq, gte, isNull, inArray } from "drizzle-orm";
-import { events, eventTicketTiers, type Database } from "@bm/db";
+import { and, asc, eq, gte, isNull, inArray, sql } from "drizzle-orm";
+import { events, eventTicketTiers, tickets, type Database } from "@bm/db";
 import type { PublicEventDto, PublicEventTierDto, EventUnit } from "@bm/contracts";
 
 export interface PublicEventsDeps {
@@ -12,9 +12,9 @@ type EventRow = typeof events.$inferSelect;
 type TierRow = typeof eventTicketTiers.$inferSelect;
 
 /**
- * Map a tier row to its public view. `sold` is the number of seats already
- * taken; until the ticketing tables land (30-3) this is 0, so `remaining`
- * equals the allotment. Sold-out tiers are flagged, not hidden (30-2 AC2).
+ * Map a tier row to its public view. `sold` is the number of issued seats (paid
+ * tickets + free RSVPs, story 30-3/30-4); `remaining` is the allotment minus
+ * that. Sold-out tiers are flagged, not hidden (30-2 AC2).
  */
 function toPublicTierDto(tier: TierRow, sold: number): PublicEventTierDto {
   const remaining = Math.max(0, tier.allotment - sold);
@@ -30,7 +30,11 @@ function toPublicTierDto(tier: TierRow, sold: number): PublicEventTierDto {
   };
 }
 
-function toPublicEventDto(event: EventRow, tiers: TierRow[]): PublicEventDto {
+function toPublicEventDto(
+  event: EventRow,
+  tiers: TierRow[],
+  soldByTier: Map<string, number>,
+): PublicEventDto {
   return {
     id: event.id,
     name: event.name,
@@ -41,7 +45,7 @@ function toPublicEventDto(event: EventRow, tiers: TierRow[]): PublicEventDto {
     endsAt: event.endsAt.toISOString(),
     venue: event.venue,
     capacity: event.capacity,
-    tiers: tiers.map((t) => toPublicTierDto(t, 0)),
+    tiers: tiers.map((t) => toPublicTierDto(t, soldByTier.get(t.id) ?? 0)),
   };
 }
 
@@ -70,6 +74,19 @@ export function registerPublicEvents(app: FastifyInstance, deps: PublicEventsDep
     return byEvent;
   }
 
+  /** Issued (non-cancelled) seat count per tier, keyed by tier id. */
+  async function loadSoldByTier(tierIds: string[]): Promise<Map<string, number>> {
+    const sold = new Map<string, number>();
+    if (tierIds.length === 0) return sold;
+    const rows = await db
+      .select({ tierId: tickets.tierId, n: sql<number>`count(*)` })
+      .from(tickets)
+      .where(and(inArray(tickets.tierId, tierIds), inArray(tickets.status, ["issued", "checked_in"])))
+      .groupBy(tickets.tierId);
+    for (const r of rows) sold.set(r.tierId, Number(r.n));
+    return sold;
+  }
+
   // List published, non-deleted, upcoming events (AC1), ordered by start.
   app.get("/public/events", async (req: FastifyRequest, reply) => {
     const includePast = (req.query as { include_past?: string }).include_past;
@@ -83,8 +100,10 @@ export function registerPublicEvents(app: FastifyInstance, deps: PublicEventsDep
         );
     const rows = await db.select().from(events).where(where).orderBy(asc(events.startsAt));
     const byEvent = await loadTiers(rows.map((e) => e.id));
+    const allTierIds = [...byEvent.values()].flat().map((t) => t.id);
+    const soldByTier = await loadSoldByTier(allTierIds);
     return reply.code(200).send({
-      events: rows.map((e) => toPublicEventDto(e, byEvent.get(e.id) ?? [])),
+      events: rows.map((e) => toPublicEventDto(e, byEvent.get(e.id) ?? [], soldByTier)),
     });
   });
 
@@ -115,6 +134,7 @@ export function registerPublicEvents(app: FastifyInstance, deps: PublicEventsDep
       .select()
       .from(eventTicketTiers)
       .where(eq(eventTicketTiers.eventId, event.id));
-    return reply.code(200).send({ event: toPublicEventDto(event, tiers) });
+    const soldByTier = await loadSoldByTier(tiers.map((t) => t.id));
+    return reply.code(200).send({ event: toPublicEventDto(event, tiers, soldByTier) });
   });
 }

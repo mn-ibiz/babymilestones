@@ -155,6 +155,10 @@ export const AUDIT_ACTION_CATALOGUE = {
     "event.published",
     "event.unpublished",
     "event.deleted",
+    "ticket.order.created",
+    "ticket.order.paid",
+    "ticket.rsvp.created",
+    "ticket.checked_in",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

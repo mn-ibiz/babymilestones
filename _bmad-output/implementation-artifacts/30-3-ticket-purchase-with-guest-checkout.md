@@ -1,6 +1,6 @@
 # Story 30.3: Ticket purchase with guest checkout
 
-Status: backlog
+Status: in-progress
 
 > Canonical ID: P4-E05-S03 · Phase: P4 · Source: _bmad-output/planning-artifacts/stories/p4/P4-E05-S03.md
 

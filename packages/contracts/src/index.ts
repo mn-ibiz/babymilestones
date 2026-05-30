@@ -1815,6 +1815,113 @@ export interface PublicEventDto {
   tiers: PublicEventTierDto[];
 }
 
+/** Max tickets a single guest order/RSVP may request (sane bound on a free flow). */
+export const TICKET_ORDER_MAX_QUANTITY = 20;
+
+/** Permissive email regex reused for the optional e-ticket email on a guest order. */
+const ticketEmailRegex = emailLightRegex;
+
+/**
+ * Guest ticket checkout (P4-E05-S03). No account: the buyer supplies a name and
+ * phone (+ optional email for the e-ticket). `tierId` selects a paid tier on the
+ * event; `quantity` is the seat count. Payment provider is chosen here; a free
+ * (price 0) tier is handled by the RSVP flow (30-4), not this schema.
+ */
+export const ticketCheckoutSchema = z.object({
+  tierId: z.string().uuid("tierId must be a valid id"),
+  quantity: z
+    .number({ message: "quantity is required" })
+    .int("quantity must be a whole number")
+    .min(1, "At least one ticket is required")
+    .max(TICKET_ORDER_MAX_QUANTITY, `At most ${TICKET_ORDER_MAX_QUANTITY} tickets per order`),
+  buyerName: z.string().trim().min(1, "Your name is required").max(120),
+  buyerPhone: z.string().trim().min(1, "A phone number is required").max(32),
+  buyerEmail: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v === "" || ticketEmailRegex.test(v), { message: "Enter a valid email address" })
+    .transform((v) => (v === "" ? null : v)),
+  provider: z.enum(["mpesa", "paystack"], { message: "Choose M-Pesa or card" }),
+});
+export type TicketCheckoutInput = z.infer<typeof ticketCheckoutSchema>;
+
+/**
+ * Free-event RSVP (P4-E05-S04). Same buyer fields as a paid checkout minus the
+ * payment provider — the selected tier must be free (price 0). Tickets are
+ * issued immediately.
+ */
+export const ticketRsvpSchema = z.object({
+  tierId: z.string().uuid("tierId must be a valid id"),
+  quantity: z
+    .number({ message: "quantity is required" })
+    .int("quantity must be a whole number")
+    .min(1, "At least one spot is required")
+    .max(TICKET_ORDER_MAX_QUANTITY, `At most ${TICKET_ORDER_MAX_QUANTITY} spots per RSVP`),
+  buyerName: z.string().trim().min(1, "Your name is required").max(120),
+  buyerPhone: z.string().trim().min(1, "A phone number is required").max(32),
+  buyerEmail: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v === "" || ticketEmailRegex.test(v), { message: "Enter a valid email address" })
+    .transform((v) => (v === "" ? null : v)),
+});
+export type TicketRsvpInput = z.infer<typeof ticketRsvpSchema>;
+
+/** One issued ticket as returned to the buyer / door list (P4-E05-S03/S05). */
+export interface TicketDto {
+  id: string;
+  code: string;
+  eventId: string;
+  tierId: string;
+  buyerName: string;
+  buyerPhone: string;
+  status: string;
+  checkedInAt: string | null;
+}
+
+/** A guest ticket order as returned by the checkout/RSVP API. */
+export interface TicketOrderDto {
+  id: string;
+  eventId: string;
+  tierId: string;
+  buyerName: string;
+  buyerPhone: string;
+  buyerEmail: string | null;
+  quantity: number;
+  amountCents: number;
+  status: string;
+  provider: string | null;
+  paymentReference: string | null;
+}
+
+/** Door check-in: mark one ticket admitted by its code (P4-E05-S05). */
+export const ticketCheckInSchema = z.object({
+  code: z.string().trim().min(1, "A ticket code is required").max(64),
+});
+export type TicketCheckInInput = z.infer<typeof ticketCheckInSchema>;
+
+/** One row on the staff door list (P4-E05-S05). */
+export interface DoorListTicket {
+  id: string;
+  code: string;
+  buyerName: string;
+  buyerPhone: string;
+  tierName: string;
+  status: string;
+  checkedInAt: string | null;
+}
+
+/** Door list response: the tickets plus the capacity-vs-checked-in counter (AC3). */
+export interface DoorListResponse {
+  eventId: string;
+  eventName: string;
+  total: number;
+  checkedIn: number;
+  tickets: DoorListTicket[];
+}
+
 /* --- Service schedules / time-slots (P2-E01-S01) ------------------------- */
 
 /** HH:MM 24h wall-clock time (mirrors the `service_schedules` migration CHECK). */
