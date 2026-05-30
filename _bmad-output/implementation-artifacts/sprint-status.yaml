@@ -294,7 +294,7 @@ development_status:
   epic-31-retrospective: optional
 
   # Epic 32 — eTIMS Writer Swap  (P5-E02)
-  epic-32: ready-for-dev
+  epic-32: done
   32-1-etims-adapter-implementation: done  # P5-E02-S01
   32-2-etims-retry-dead-letter: done  # P5-E02-S02
   32-3-switch-flag-with-rollback: done  # P5-E02-S03

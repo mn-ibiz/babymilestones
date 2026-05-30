@@ -1,6 +1,6 @@
 # Story 32.3: Switch flag with rollback
 
-Status: backlog
+Status: done
 
 > Canonical ID: P5-E02-S03 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E02-S03.md
 

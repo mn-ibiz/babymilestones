@@ -82,7 +82,7 @@ describe("Admin eTIMS dead-letters (P5-E02-S02)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as { deadLetters: { idempotencyKey: string; lastError: string }[] };
     expect(body.deadLetters).toHaveLength(1);
-    expect(body.deadLetters[0]!.idempotencyKey).toBe("BM-2026:1");
+    expect(body.deadLetters[0]!.idempotencyKey).toBe("BM-2026-000001");
     expect(body.deadLetters[0]!.lastError).toBe("terminal");
   });
 

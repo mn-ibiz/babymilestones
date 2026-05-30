@@ -209,6 +209,18 @@ export function renderReceiptA4(doc: ReceiptDocument): string {
     ? `<div class="kra">KRA PIN: ${escapeHtml(doc.business.kraPin)}</div>`
     : "";
 
+  // P5-E02-S04: VAT-registration footer block — each line emitted only when the
+  // metadata is present (so a bare receipt omits the block cleanly).
+  const vatFooterA4 = [
+    doc.business.vatRegistrationNumber
+      ? `VAT Reg No: ${escapeHtml(doc.business.vatRegistrationNumber)}`
+      : "",
+    doc.business.registeredAddress ? escapeHtml(doc.business.registeredAddress) : "",
+  ]
+    .filter(Boolean)
+    .map((line) => `  <div class="footer">${line}</div>`)
+    .join("\n");
+
   // Inline brand logo mark — a simple branded SVG badge, no external asset.
   const logo =
     `<svg class="logo" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">` +
@@ -277,7 +289,7 @@ export function renderReceiptA4(doc: ReceiptDocument): string {
       )}</td></tr>
     </tfoot>
   </table>
-  <div class="footer">Thank you for choosing ${escapeHtml(doc.business.name)}.</div>
+  <div class="footer">Thank you for choosing ${escapeHtml(doc.business.name)}.</div>${vatFooterA4 ? `\n${vatFooterA4}` : ""}
 </body>
 </html>`;
 }
@@ -317,6 +329,10 @@ export function renderReceiptThermal(doc: ReceiptDocument): string {
   for (const line of doc.business.addressLines) out.push(center(line));
   out.push(center(doc.business.phone));
   if (doc.business.kraPin) out.push(center(`KRA PIN: ${doc.business.kraPin}`));
+  // P5-E02-S04: VAT-registration footer lines (emitted only when present).
+  if (doc.business.vatRegistrationNumber)
+    out.push(center(`VAT Reg No: ${doc.business.vatRegistrationNumber}`));
+  if (doc.business.registeredAddress) out.push(center(doc.business.registeredAddress));
   out.push(rule);
   out.push(`Receipt: ${doc.displayNumber}`);
   out.push(`Date:    ${dateLabel(doc.date)}`);

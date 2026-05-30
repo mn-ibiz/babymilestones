@@ -33,9 +33,8 @@ export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations
 export { createEtimsRetryJob } from "./jobs/etims-retry.js";
 export type {
   EtimsRetryJobDeps,
-  ResubmitEtims,
-  ResubmitResult,
-  EtimsKraFields,
+  EtimsResubmit,
+  EtimsRetryLogger,
 } from "./jobs/etims-retry.js";
 
 /**

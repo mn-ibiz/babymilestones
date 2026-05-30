@@ -50,7 +50,7 @@ describe("eTIMS retry worker (P5-E02-S02)", () => {
     });
     await job.run();
 
-    expect(submitted).toEqual(["BM-2026:1"]);
+    expect(submitted).toEqual(["BM-2026-000001"]);
     const [after] = await dbh.db.select().from(kraEtimsQueue).where(eq(kraEtimsQueue.id, row.id));
     expect(after!.status).toBe("sent");
     expect(after!.sentAt).not.toBeNull();
@@ -112,7 +112,7 @@ describe("eTIMS retry worker (P5-E02-S02)", () => {
       .from(auditOutbox)
       .where(eq(auditOutbox.action, "etims.submission.dead_lettered"));
     expect(alert).toHaveLength(1);
-    expect((alert[0]!.payload as Record<string, unknown>).idempotency_key).toBe("BM-2026:1");
+    expect((alert[0]!.payload as Record<string, unknown>).idempotency_key).toBe("BM-2026-000001");
   });
 
   it("isolates a failing row so the rest of the batch still processes", async () => {
@@ -130,8 +130,8 @@ describe("eTIMS retry worker (P5-E02-S02)", () => {
 
     const rows = await dbh.db.select().from(kraEtimsQueue);
     const byKey = new Map(rows.map((r) => [r.idempotencyKey, r.status]));
-    expect(byKey.get("BM-2026:1")).toBe("pending"); // failed, backed off
-    expect(byKey.get("BM-2026:2")).toBe("sent"); // succeeded
+    expect(byKey.get("BM-2026-000001")).toBe("pending"); // failed, backed off
+    expect(byKey.get("BM-2026-000002")).toBe("sent"); // succeeded
   });
 
   it("never double-registers: a retry reuses the row's stable idempotency key", async () => {
@@ -145,7 +145,7 @@ describe("eTIMS retry worker (P5-E02-S02)", () => {
     await job.run();
     // Re-running after a (simulated) sent does nothing — the row is no longer due.
     await job.run();
-    expect(keys).toEqual(["BM-2026:7"]);
+    expect(keys).toEqual(["BM-2026-000007"]);
     void row;
   });
 });
