@@ -14,6 +14,7 @@ import { registerAdminSmsTemplates } from "./sms-templates.js";
 import { registerAdminAudit } from "./audit.js";
 import { registerAdminSettings } from "./settings.js";
 import { registerAdminEvents } from "./events.js";
+import { registerDoorCheckIn } from "./door.js";
 
 export interface AdminDeps {
   db: Database;
@@ -36,4 +37,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminAudit(app, deps);
   registerAdminSettings(app, deps);
   registerAdminEvents(app, deps);
+  registerDoorCheckIn(app, deps);
 }
