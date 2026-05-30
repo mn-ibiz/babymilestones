@@ -1,6 +1,6 @@
 # Story 28.5: M-Pesa STK reconciliation cron now under framework
 
-Status: backlog
+Status: done
 
 > Canonical ID: P3-E06-S05 · Phase: P3 · Source: _bmad-output/planning-artifacts/stories/p3/P3-E06-S05.md
 
@@ -71,3 +71,4 @@ claude-opus-4-8 (1M context)
 |------|---------|-------------|--------|
 | 2026-05-25 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
 | 2026-05-30 | 1.0 | M-Pesa STK reconciliation moved under the framework (60s cron, recovered count logged) | claude-opus-4-8 |
+| 2026-05-30 | 1.1 | Story marked done; sprint status updated | claude-opus-4-8 |

@@ -261,7 +261,7 @@ development_status:
   28-2-anonymisation-worker-registered: done  # P3-E06-S02
   28-3-commission-run-registered: ready-for-dev  # P3-E06-S03
   28-4-sms-retry-worker-registered: done  # P3-E06-S04
-  28-5-m-pesa-stk-reconciliation-cron-now-under-framework: ready-for-dev  # P3-E06-S05
+  28-5-m-pesa-stk-reconciliation-cron-now-under-framework: done  # P3-E06-S05
   epic-28-retrospective: optional
 
   # Epic 29 — POS ↔ WooCommerce Sync  (P4-E04)
