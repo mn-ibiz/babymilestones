@@ -71,9 +71,17 @@ export async function clawbackForRefund(
 
   const balance = await loyaltyBalance(db, parentId);
 
-  // Idempotency: a clawback already tied to this refund must not repeat.
-  const existing = await db
-    .select({ id: loyaltyLedger.id })
+  // Idempotency: a *finalised* clawback (non-zero points_delta) tied to this
+  // refund must not repeat. A zero-delta row tied to this refund is a pending
+  // marker (S04, markPendingClawback) — finalisation is allowed to proceed and
+  // will clear that pending. We therefore look only for an already-finalised
+  // clawback here, and separately note any pending we must offset on finalise.
+  const tied = await db
+    .select({
+      id: loyaltyLedger.id,
+      pointsDelta: loyaltyLedger.pointsDelta,
+      pendingClawback: loyaltyLedger.pendingClawback,
+    })
     .from(loyaltyLedger)
     .where(
       and(
@@ -81,11 +89,12 @@ export async function clawbackForRefund(
         eq(loyaltyLedger.kind, "clawback"),
         eq(loyaltyLedger.sourceWalletLedgerId, refundWalletLedgerId),
       ),
-    )
-    .limit(1);
-  if (existing.length > 0) {
+    );
+
+  const finalised = tied.find((r) => r.pointsDelta !== 0);
+  if (finalised) {
     return {
-      ledgerId: existing[0]!.id,
+      ledgerId: finalised.id,
       clawedBack: 0,
       alreadyClawedBack: true,
       negativeCarry: false,
@@ -93,8 +102,35 @@ export async function clawbackForRefund(
     };
   }
 
+  // Sum any pending this refund provisioned (S04) so the finalised row offsets
+  // it — once finalised the balance itself drops, so the pending must net to 0.
+  const pendingToClear = tied.reduce((sum, r) => sum + (r.pendingClawback ?? 0), 0);
+
   const points = loyaltyClawbackPoints(earnedPoints, refundedMinor, originalMinor);
   if (points <= 0) {
+    // Nothing to claw back. If we held a pending for this refund, release it so
+    // a refund that nets to zero points does not strand the parent's balance.
+    if (pendingToClear > 0) {
+      const [release] = await db
+        .insert(loyaltyLedger)
+        .values({
+          parentId,
+          pointsDelta: 0,
+          kind: "clawback",
+          postedBy,
+          reversesLoyaltyLedgerId: earnLedgerId,
+          sourceWalletLedgerId: refundWalletLedgerId,
+          pendingClawback: -pendingToClear,
+        })
+        .returning();
+      return {
+        ledgerId: release!.id,
+        clawedBack: 0,
+        alreadyClawedBack: false,
+        negativeCarry: false,
+        balanceAfter: balance,
+      };
+    }
     return {
       ledgerId: null,
       clawedBack: 0,
@@ -117,6 +153,9 @@ export async function clawbackForRefund(
       reversesLoyaltyLedgerId: earnLedgerId,
       sourceWalletLedgerId: refundWalletLedgerId,
       negativeCarry,
+      // Offset any pending provisioned for this refund (S04) so available-to-
+      // redeem re-aligns with the reduced balance and is never double-counted.
+      pendingClawback: -pendingToClear,
     })
     .returning();
 
