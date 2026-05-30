@@ -276,8 +276,8 @@ development_status:
   epic-29-retrospective: optional
 
   # Epic 30 — Events & Recital Ticketing  (P4-E05)
-  epic-30: ready-for-dev
-  30-1-event-creation: ready-for-dev  # P4-E05-S01
+  epic-30: in-progress
+  30-1-event-creation: in-progress  # P4-E05-S01
   30-2-public-event-listing-detail-page: ready-for-dev  # P4-E05-S02
   30-3-ticket-purchase-with-guest-checkout: ready-for-dev  # P4-E05-S03
   30-4-free-events-rsvp-only: ready-for-dev  # P4-E05-S04
