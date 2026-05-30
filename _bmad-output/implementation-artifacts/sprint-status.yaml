@@ -202,9 +202,9 @@ development_status:
   epic-20-retrospective: optional
 
   # Epic 21 — Backup Retention Configurability  (P2-E06)
-  epic-21: ready-for-dev
-  21-1-settings-for-backup-retention-policy: ready-for-dev  # P2-E06-S01
-  21-2-backup-pruner-respects-policy: ready-for-dev  # P2-E06-S02
+  epic-21: done
+  21-1-settings-for-backup-retention-policy: done  # P2-E06-S01
+  21-2-backup-pruner-respects-policy: done  # P2-E06-S02
   epic-21-retrospective: optional
 
   # Epic 22 — Auto-credit & Outstanding Surface (parent app)  (P2-E07)

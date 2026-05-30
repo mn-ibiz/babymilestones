@@ -8,6 +8,7 @@ import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
+import { createBackupPruneJob } from "./jobs/backup-prune.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -29,6 +30,12 @@ export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
+export { createBackupPruneJob } from "./jobs/backup-prune.js";
+export type { BackupPruneJobDeps, BackupStore } from "./jobs/backup-prune.js";
+export {
+  selectBackupsToPrune,
+  type PrunableBackup,
+} from "./jobs/backup-retention.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -86,6 +93,13 @@ export function registerAnonymiseObservationsJob(
   deps: Parameters<typeof createAnonymiseObservationsJob>[0],
 ): void {
   register(createAnonymiseObservationsJob(deps));
+}
+
+/** Wire the daily policy-driven backup pruner cron (P2-E06-S02). */
+export function registerBackupPruneJob(
+  deps: Parameters<typeof createBackupPruneJob>[0],
+): void {
+  register(createBackupPruneJob(deps));
 }
 
 export { logger } from "./logger.js";
