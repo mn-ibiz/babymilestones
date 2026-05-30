@@ -51,7 +51,7 @@ claude-opus-4-8 (1M context)
 - AC1 — `apps/jobs/src/jobs/sms-retry.ts` `createSmsRetryJob` selects `sms_outbox`
   rows with status=`failed`, `attempt_count < 5`, not dead-lettered, past the
   `next_attempt_at` backoff gate (oldest-first, bounded batch). Migration
-  `0058b_sms_outbox_retry.sql` adds `attempt_count`, `next_attempt_at`,
+  `0077_sms_outbox_retry.sql` adds `attempt_count`, `next_attempt_at`,
   `dead_lettered_at`, `last_error`, `sent_at` (+ a scan index); the drizzle
   `sms.ts` schema mirrors them.
 - AC2 — a failed (re)send bumps `attempt_count` and sets `next_attempt_at` via the
@@ -69,7 +69,7 @@ claude-opus-4-8 (1M context)
 
 ### File List
 
-- packages/db/migrations/0058b_sms_outbox_retry.sql (new)
+- packages/db/migrations/0077_sms_outbox_retry.sql (new)
 - packages/db/src/schema/sms.ts (retry columns)
 - apps/jobs/src/jobs/sms-retry.ts (new) + sms-retry.test.ts (new)
 - apps/jobs/src/index.ts (export + registerSmsRetryJob)
@@ -80,3 +80,4 @@ claude-opus-4-8 (1M context)
 |------|---------|-------------|--------|
 | 2026-05-25 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
 | 2026-05-30 | 1.0 | SMS retry worker: backoff retry of failed sms_outbox rows + dead-letter/alert at 5 attempts | claude-opus-4-8 |
+| 2026-05-30 | 1.1 | Renumbered migration 0058b→0077 (POS 0058 collision); sprint status marked done | claude-opus-4-8 |
