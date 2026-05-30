@@ -50,6 +50,28 @@ export {
   type CreateProductInput,
 } from "./products.js";
 
+// Commission rates + runs (P3-E01).
+export {
+  setCommissionRate,
+  resolveRateAt,
+  getOpenCommissionRate,
+  listCommissionRates,
+  commissionCents,
+  type SetCommissionRateInput,
+} from "./commission-rates.js";
+
+export {
+  createCommissionRun,
+  previewCommissionRun,
+  priorMonthPeriod,
+  buildPayoutCsv,
+  PAYOUT_CSV_COLUMNS,
+  type CreateCommissionRunInput,
+  type CommissionRunResult,
+  type CommissionRunPreview,
+  type PayoutRow,
+} from "./commission-run.js";
+
 export {
   SUBSCRIPTION_PERIODS,
   isSubscriptionPeriod,

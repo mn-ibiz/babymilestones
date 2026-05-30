@@ -17,7 +17,7 @@ import {
   type RecordVisitResponse,
   type VisitDebitOutcome,
 } from "@bm/contracts";
-import { debit } from "@bm/wallet";
+import { debit, recordBookingCommission } from "@bm/wallet";
 import type { ReceptionDeps } from "./index.js";
 
 /** Resolve a session userId to its live id+role (for the permission guard). */
@@ -144,6 +144,11 @@ export function registerRecordVisit(app: FastifyInstance, deps: ReceptionDeps): 
 
     const outcome = result.outcome as VisitDebitOutcome;
     const warning = isVisitOutstanding(outcome);
+
+    // Commission accrual (P3-E01-S02): the attributed staff member's commission
+    // line for this settled visit. Idempotent + self-skipping (unattributed /
+    // no-rate), so it is a no-op when no staff is attributed or none has a rate.
+    await recordBookingCommission(db, { bookingId, postedBy: staffActor });
 
     await audit(db, {
       actor: staffActor,

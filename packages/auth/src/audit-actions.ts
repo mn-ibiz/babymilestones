@@ -162,6 +162,16 @@ export const AUDIT_ACTION_CATALOGUE = {
    * audit log. The SMS-retry worker dead-lettering a message (P3-E06-S04 AC3) is
    * a state change worth a forensic trail. */
   jobs: ["job.run_now", "sms.retry.dead_lettered"],
+  /** Attribution & commission ledger (P3-E01) — rate changes, ledger postings
+   * (incl. refund reversals), monthly/ad-hoc runs and the payout export/mark-paid. */
+  commission: [
+    "commission.rate.set",
+    "commission.ledger.posted",
+    "commission.ledger.reversed",
+    "commission.run.created",
+    "commission.run.export",
+    "commission.run.paid_out",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */
