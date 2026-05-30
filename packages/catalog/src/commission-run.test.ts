@@ -10,6 +10,10 @@ import { createCommissionRun, priorMonthPeriod } from "./commission-run.js";
  * claiming that a later monthly run then excludes (S04 AC3).
  */
 
+/** Unique E.164 phone per insert so the users.phone unique constraint never collides. */
+let phoneSeq = 0;
+const nextPhone = () => `+2547${String(++phoneSeq).padStart(8, "0")}`;
+
 async function seedStaff(dbh: TestDb, name: string) {
   const [s] = await dbh.db.insert(staff).values({ displayName: name, role: "stylist" }).returning();
   return s!.id;
