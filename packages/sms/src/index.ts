@@ -41,6 +41,26 @@ export type {
   UpdateSmsConfigInput,
   ConfigExecutor,
 } from "./config.js";
+export {
+  CappedSmsSender,
+  getSmsCaps,
+  usageForDay,
+  dayWindow,
+  SMS_CAP_PER_DAY_KEY,
+  SMS_CAP_PER_RECIPIENT_DAY_KEY,
+  SMS_CAP_MAX_COST_CENTS_KEY,
+  SMS_CAP_EST_COST_CENTS_KEY,
+  SMS_DEFAULT_CAP_PER_DAY,
+  SMS_DEFAULT_CAP_PER_RECIPIENT_DAY,
+} from "./limiter.js";
+export type {
+  SmsCaps,
+  DayWindow,
+  DayUsage,
+  CapReason,
+  CappedSmsResult,
+  CappedSmsSenderOptions,
+} from "./limiter.js";
 
 /** @bm/sms — provider-agnostic SMS sender. Launch ships a DB-backed stub. */
 export const PACKAGE = "@bm/sms" as const;

@@ -305,7 +305,7 @@ development_status:
   epic-33: in-progress
   33-1-live-sms-adapter-provider-agnostic: done  # P5-E03-S01
   33-2-live-stub-switch-flag: done  # P5-E03-S02
-  33-3-rate-limit-cost-control: ready-for-dev  # P5-E03-S03
+  33-3-rate-limit-cost-control: done  # P5-E03-S03
   33-4-template-editor-admin: ready-for-dev  # P5-E03-S04
   epic-33-retrospective: optional
 
