@@ -21,7 +21,7 @@ export type SmsTemplateKey =
   | "subscription.confirmed"
   | "subscription.dunning"
   | "pickup.handoff"
-  | "event.ticket"
+  | "event.eticket"
   | "event.rsvp"
   | "raw";
 
@@ -68,7 +68,7 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
   "pickup.handoff": (d) => `${str(d, "childName")}'s day at ${BRAND.name}: ${str(d, "summary")}`,
   // Guest e-ticket after a paid purchase (30-3): quantity, event, and the link
   // that opens the ticket(s) / door codes. No account — the link is the proof.
-  "event.ticket": (d) =>
+  "event.eticket": (d) =>
     `Your ${str(d, "quantity")} ticket(s) for ${str(d, "eventName")} are confirmed. View your e-ticket(s): ${str(d, "link")} — ${BRAND.name}`,
   // Free-event RSVP confirmation (30-4): same shape minus the payment.
   "event.rsvp": (d) =>
