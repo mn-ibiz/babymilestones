@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@bm/catalog": "workspace:*",
+    "@bm/contracts": "workspace:*",
     "@bm/db": "workspace:*",
     "@bm/export": "workspace:*",
     "@bm/observability": "workspace:*",

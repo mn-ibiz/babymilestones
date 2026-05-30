@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestDb, type TestDb } from "@bm/db/testing";
-import { settings } from "@bm/db";
+import { settings, users } from "@bm/db";
 import {
   BACKUP_RETENTION_SETTING_KEY,
   DEFAULT_BACKUP_RETENTION_POLICY,
@@ -72,6 +72,13 @@ describe("saveBackupRetentionPolicy", () => {
 
   it("upserts on the key so there is only ever one policy row, stamping updatedBy", async () => {
     const actor = "11111111-1111-1111-1111-111111111111";
+    // `settings.updated_by` is FK→users(id), so the actor must exist.
+    await dbh.db.insert(users).values({
+      id: actor,
+      phone: "+254712000099",
+      pinHash: "x",
+      role: "admin",
+    });
     await saveBackupRetentionPolicy(dbh.db, {
       dailyKeep: 10,
       monthlyKeep: 4,
