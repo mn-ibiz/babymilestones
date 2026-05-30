@@ -2458,6 +2458,46 @@ export function availableToRedeem(balance: number, pendingClawback: number): num
 }
 
 /**
+ * Total points still provisionally pending clawback for a parent (P3-E04-S04):
+ * the sum of `pending_clawback` over the parent's earn rows. Negative entries
+ * are ignored (a settled/never-pending row carries 0). Pure integer reducer —
+ * the redemption surface subtracts this from the balance (see
+ * {@link availableToRedeem}).
+ */
+export function sumPendingClawback(
+  rows: ReadonlyArray<{ pendingClawback: number }>,
+): number {
+  let total = 0;
+  for (const r of rows) {
+    if (r.pendingClawback > 0) total += r.pendingClawback;
+  }
+  return total;
+}
+
+/** Direction of an admin manual loyalty adjustment (P3-E04-S03). */
+export type LoyaltyAdjustmentDirection = "credit" | "debit";
+
+/** Input to {@link loyaltyAdjustmentDelta}. */
+export interface LoyaltyAdjustmentDeltaInput {
+  amount: number;
+  direction: LoyaltyAdjustmentDirection;
+}
+
+/**
+ * Signed points delta for an admin manual loyalty adjustment (P3-E04-S03): a
+ * positive `amount` credited or debited per `direction`. `amount` must be a
+ * positive integer (no fractional points); a credit yields `+amount`, a debit
+ * `-amount`. Throws on a non-positive or fractional amount.
+ */
+export function loyaltyAdjustmentDelta(input: LoyaltyAdjustmentDeltaInput): number {
+  const { amount, direction } = input;
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error("loyaltyAdjustmentDelta: amount must be a positive integer");
+  }
+  return direction === "debit" ? -amount : amount;
+}
+
+/**
  * Admin manual loyalty adjustment (P3-E04-S03 AC1/AC2). A signed integer points
  * delta (+ credit / − debit) plus a required free-text reason. `parentId` comes
  * from the route, never the body. The acting admin is the session user.

@@ -56,6 +56,21 @@ export type {
   ClawbackForRefundResult,
 } from "./loyalty-clawback.js";
 
+// Admin manual adjustment (P3-E04-S03).
+export { adjustLoyaltyPoints, LoyaltyAdjustmentError } from "./loyalty-adjust.js";
+export type {
+  AdjustLoyaltyPointsInput,
+  AdjustLoyaltyPointsResult,
+} from "./loyalty-adjust.js";
+
+// Redemption respects pending settlement (P3-E04-S04).
+export { availableLoyaltyToRedeem, markPendingClawback } from "./loyalty-redeem.js";
+export type {
+  AvailableLoyaltyToRedeem,
+  MarkPendingClawbackInput,
+  MarkPendingClawbackResult,
+} from "./loyalty-redeem.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
