@@ -155,6 +155,8 @@ export const AUDIT_ACTION_CATALOGUE = {
     "pos.sale.failed",
     "pos.cashup.closed",
   ],
+  /** Loyalty (P2-E05) — points earned, points redeemed, earn/redeem rate change. */
+  loyalty: ["loyalty.earn", "loyalty.redeem", "loyalty.rate_change"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

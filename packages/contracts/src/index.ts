@@ -2503,3 +2503,66 @@ export interface PosCashupResponse extends PosCashupExpected {
   /** The reconciliation adjustment posted for a non-zero variance (P1-E06). */
   reconciliationAdjustmentId: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Loyalty Redemption UI + Engine (P2-E05)
+// ---------------------------------------------------------------------------
+export type LoyaltyLedgerDirection = "earn" | "redeem";
+
+/** A single loyalty ledger movement, as surfaced to the parent app (P2-E05-S04). */
+export interface LoyaltyHistoryItem {
+  id: string;
+  direction: LoyaltyLedgerDirection;
+  points: number;
+  sourceType: string;
+  sourceId: string | null;
+  date: string; // ISO 8601
+}
+
+/** Parent loyalty summary: balance + lifetime totals (P2-E05-S04 AC1). */
+export interface LoyaltyBalanceResponse {
+  balance: number;
+  lifetimeEarned: number;
+  lifetimeRedeemed: number;
+  history: LoyaltyHistoryItem[];
+}
+
+/**
+ * Full parent loyalty account payload from `GET /parents/me/loyalty`: the S04
+ * balance/totals/history plus the S03 redemption `quote` for the checkout toggle.
+ */
+export interface LoyaltyAccountResponse extends LoyaltyBalanceResponse {
+  quote: LoyaltyRedemptionQuote;
+}
+
+/**
+ * Effective loyalty rates (P2-E05-S02).
+ *  earnRate   — KES of qualifying spend per 1 point (default 100)
+ *  redeemRate — KES value of 1 point at redemption (default 1)
+ */
+export interface LoyaltyRates {
+  earnRate: number;
+  redeemRate: number;
+}
+
+/** Redemption quote shown at checkout: "Use X points (save KES Y)" (P2-E05-S03 AC1). */
+export interface LoyaltyRedemptionQuote {
+  /** Points currently available to redeem (the balance). */
+  availablePoints: number;
+  /** Cash value (cents) of redeeming `availablePoints` at the current rate. */
+  maxDiscountCents: number;
+  redeemRate: number;
+}
+
+/** Request to redeem points at parent checkout (P2-E05-S03). */
+export interface RedeemPointsRequest {
+  points: number;
+  idempotencyKey: string;
+}
+
+/** Result of a redemption (P2-E05-S03). */
+export interface RedeemPointsResponse {
+  redeemedPoints: number;
+  discountCents: number;
+  balance: number;
+}

@@ -14,6 +14,7 @@ import { registerParentWallet } from "./wallet.js";
 import { registerParentAvailability } from "./availability.js";
 import { registerParentBooking } from "./booking.js";
 import { registerParentSubscriptions } from "./subscriptions.js";
+import { registerParentLoyalty } from "./loyalty.js";
 
 export interface ParentsDeps {
   db: Database;
@@ -70,4 +71,5 @@ export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDep
     sessions: deps.sessions,
     now: deps.now ? () => new Date(deps.now!()) : undefined,
   });
+  registerParentLoyalty(app, { db: deps.db, sessions: deps.sessions });
 }

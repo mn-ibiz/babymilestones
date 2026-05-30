@@ -33,3 +33,5 @@ export * from "./staff.js";
 export * from "./receipts.js";
 export * from "./settings.js";
 export * from "./backup-runs.js";
+export * from "./loyalty.js";
+export * from "./loyalty-rates.js";

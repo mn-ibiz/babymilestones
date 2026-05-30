@@ -43,6 +43,44 @@ export type { RecentTransaction, RecentTransactionsOptions } from "./recent.js";
 // Per-day-per-account reconciliation export read model (P1-E06-S04).
 export { reconciliationExportRows } from "./reconciliation-export.js";
 
+// Loyalty points engine — earn ledger + balance/history (P2-E05-S01).
+export {
+  earnPoints,
+  getLoyaltyBalance,
+  getLoyaltyTotals,
+  getLoyaltyHistory,
+  assertPositivePoints,
+} from "./loyalty.js";
+export type {
+  LoyaltyDirection,
+  LoyaltyEntry,
+  EarnPointsInput,
+  LoyaltyTotals,
+  LoyaltyHistoryOptions,
+} from "./loyalty.js";
+
+// Configurable, effective-dated earn/redeem rates + conversions (P2-E05-S02).
+export {
+  getEffectiveRates,
+  setRate,
+  pointsForSpend,
+  kesForPoints,
+  DEFAULT_EARN_RATE,
+  DEFAULT_REDEEM_RATE,
+} from "./loyalty-rates.js";
+export type {
+  LoyaltyRateType,
+  EffectiveRates,
+  SetRateInput,
+} from "./loyalty-rates.js";
+
+// Loyalty redemption — points -> wallet credit, atomic + idempotent (P2-E05-S03).
+export { redeemPoints, InsufficientPointsError } from "./loyalty-redeem.js";
+export type {
+  RedeemPointsInput,
+  RedeemPointsResult,
+} from "./loyalty-redeem.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
