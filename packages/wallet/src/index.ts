@@ -43,6 +43,19 @@ export type { RecentTransaction, RecentTransactionsOptions } from "./recent.js";
 // Per-day-per-account reconciliation export read model (P1-E06-S04).
 export { reconciliationExportRows } from "./reconciliation-export.js";
 
+// Loyalty engine — earn/balance foundation + clawback (P3-E04).
+export { earnPoints, loyaltyBalance } from "./loyalty.js";
+export type {
+  Points,
+  EarnPointsInput,
+  EarnPointsResult,
+} from "./loyalty.js";
+export { clawbackForRefund } from "./loyalty-clawback.js";
+export type {
+  ClawbackForRefundInput,
+  ClawbackForRefundResult,
+} from "./loyalty-clawback.js";
+
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
