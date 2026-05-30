@@ -31,7 +31,10 @@ export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
 export { createBackupPruneJob } from "./jobs/backup-prune.js";
-export type { BackupPruneJobDeps, BackupStore } from "./jobs/backup-prune.js";
+// `BackupStore` is already re-exported from db-backup.js above (identical
+// shape: `remove(location)`); the pruner reuses that contract, so we export
+// only the pruner-specific deps here to avoid a duplicate-identifier clash.
+export type { BackupPruneJobDeps } from "./jobs/backup-prune.js";
 export {
   selectBackupsToPrune,
   type PrunableBackup,

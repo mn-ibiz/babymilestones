@@ -154,7 +154,13 @@ describe("Backup retention admin API (P2-E06-S01)", () => {
       expect(res.statusCode).toBe(400);
       expect(res.json()).toHaveProperty("error");
       expect(await dbh.db.select().from(settings)).toHaveLength(0);
-      expect(await dbh.db.select().from(auditOutbox)).toHaveLength(0);
+      // No backup-retention audit row is written (staff-login audit rows from
+      // beforeEach are unrelated, so filter to this action).
+      const auditRows = await dbh.db
+        .select()
+        .from(auditOutbox)
+        .where(eq(auditOutbox.action, "backup.retention.updated"));
+      expect(auditRows).toHaveLength(0);
     });
   });
 });
