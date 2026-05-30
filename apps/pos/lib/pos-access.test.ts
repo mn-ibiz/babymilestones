@@ -3,6 +3,7 @@ import {
   FORBIDDEN_PATH,
   POS_ROLES,
   SALE_SCREEN_PATH,
+  canTakePayment,
   guardPosAccess,
   isPosRole,
   posLanding,
@@ -59,6 +60,16 @@ describe("POS access control (P2-E04-S01)", () => {
 
     it("forbids an absent role (defensive)", () => {
       expect(guardPosAccess("").ok).toBe(false);
+    });
+  });
+
+  describe("canTakePayment (mirrors the API create-payment gate)", () => {
+    it("lets reception + cashier transact", () => {
+      expect(canTakePayment("reception")).toBe(true);
+      expect(canTakePayment("cashier")).toBe(true);
+    });
+    it("makes packer read-only (no payment)", () => {
+      expect(canTakePayment("packer")).toBe(false);
     });
   });
 

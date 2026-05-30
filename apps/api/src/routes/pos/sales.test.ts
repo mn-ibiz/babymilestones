@@ -240,6 +240,23 @@ describe("POS sales — payment at POS (P2-E04-S04)", () => {
       expect(res.json().failureReason).toMatch(/insufficient/iu);
     });
 
+    it("lets a wallet sale be retried under the same key after a top-up (failed sale must not burn the key)", async () => {
+      const p = await seedProduct({ sku: "W4", name: "Retry", priceCents: 3000, stockQty: 4 });
+      const { walletId } = await seedParentWallet("+254733111444", 1000); // short
+      const creds = await login("+254712000002", "7422");
+      const key = "22222222-2222-4222-8222-222222222222";
+      const body = { method: "wallet", lines: [{ productId: p.id, qty: 1 }], customerPhone: "0733111444", idempotencyKey: key };
+
+      const failed = await sale(creds, body);
+      expect(failed.json().status).toBe("failed");
+
+      // Top the wallet up, then retry with the SAME idempotency key.
+      await post(dbh.db, { walletId, amount: 5000, kind: "topup", idempotencyKey: "topup-retry", source: "seed", postedBy: walletId });
+      const retried = await sale(creds, body);
+      expect(retried.statusCode).toBe(200);
+      expect(retried.json().status).toBe("paid");
+    });
+
     it("404s when no parent wallet matches the phone", async () => {
       const p = await seedProduct({ sku: "W3", name: "Thing", priceCents: 1000, stockQty: 4 });
       const creds = await login("+254712000002", "7422");

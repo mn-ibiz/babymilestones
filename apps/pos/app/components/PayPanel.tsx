@@ -49,6 +49,9 @@ export function PayPanel({ cart, totalCents, onPaid, onCancel }: PayPanelProps) 
     setError(null);
     setPhone("");
     setTender("");
+    // A different method is a different logical attempt — issue a fresh
+    // idempotency key so the server doesn't replay the prior method's sale.
+    if (typeof crypto !== "undefined") idemRef.current = crypto.randomUUID();
   }
 
   async function start() {

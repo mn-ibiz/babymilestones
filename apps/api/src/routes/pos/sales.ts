@@ -182,10 +182,13 @@ export function registerPosSales(app: FastifyInstance, deps: PosDeps): void {
     }
     const body = parsed.data;
 
-    // Idempotent replay: a repeated create with the same key returns the prior sale.
+    // Idempotent replay: a repeated create with the same key returns the prior
+    // sale — but ONLY a live one (paid/pending). A failed sale clears its key
+    // (see failSale + the wallet path), so a recoverable failure (top-up,
+    // re-scan) can be retried rather than permanently shadowed by the dead row.
     if (body.idempotencyKey) {
       const [existing] = await db.select().from(posSales).where(eq(posSales.idempotencyKey, body.idempotencyKey));
-      if (existing) return reply.code(200).send(toResponse(existing));
+      if (existing && existing.status !== "failed") return reply.code(200).send(toResponse(existing));
     }
 
     const ids = body.lines.map((l) => l.productId);
@@ -304,7 +307,9 @@ export function registerPosSales(app: FastifyInstance, deps: PosDeps): void {
         if (e instanceof InsufficientFundsError) {
           const [s] = await db
             .insert(posSales)
-            .values({ ...baseInsert, parentId: parent.parentId, status: "failed", failureReason: "Insufficient wallet balance" })
+            // idempotencyKey null: a transient decline must not burn the key —
+            // the cashier can retry once the wallet is topped up.
+            .values({ ...baseInsert, idempotencyKey: null, parentId: parent.parentId, status: "failed", failureReason: "Insufficient wallet balance" })
             .returning();
           await audit(db, {
             actor: cashierId,
@@ -451,7 +456,8 @@ async function failSale(
 ): Promise<PosSaleResponse> {
   await db
     .update(posSales)
-    .set({ status: "failed", failureReason: reason, updatedAt: new Date() })
+    // Clear the idempotency key so a failed sale never shadows a legitimate retry.
+    .set({ status: "failed", failureReason: reason, idempotencyKey: null, updatedAt: new Date() })
     .where(eq(posSales.id, sale.id));
   await audit(db, {
     actor: cashierId,

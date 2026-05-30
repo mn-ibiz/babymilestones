@@ -61,6 +61,17 @@ export function guardPosAccess(role: string): PosAccessOutcome {
   return { ok: false, status: 403, redirectTo: FORBIDDEN_PATH };
 }
 
+/**
+ * Whether a role may actually take payment / close the till. Mirrors the API's
+ * `create payment` guard: reception + cashier hold it, packer does NOT (packer
+ * is read-only on the POS — it can browse the catalogue but not transact). The
+ * UI uses this to render the sale screen read-only for packer rather than
+ * letting them build a cart that the API would 403 at Pay.
+ */
+export function canTakePayment(role: string): boolean {
+  return role === "reception" || role === "cashier";
+}
+
 /** Human label for the till-facing surface a POS role works on. */
 export function surfaceLabel(role: string): string {
   switch (role) {

@@ -22,7 +22,7 @@ interface PrintableReceipt {
  * paid sale the cart clears, a confirmation shows, and the receipt can be sent
  * to the default printer (AC6).
  */
-export function SaleScreen() {
+export function SaleScreen({ canTakePayment = true }: { canTakePayment?: boolean }) {
   const [cart, setCart] = useState<CartModel>(emptyCart);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<PrintableReceipt | null>(null);
@@ -78,7 +78,12 @@ export function SaleScreen() {
             onCancel={() => setPaying(false)}
           />
         ) : (
-          <Cart cart={cart} onChange={setCart} onProceed={() => setPaying(true)} />
+          <Cart
+            cart={cart}
+            onChange={setCart}
+            onProceed={() => setPaying(true)}
+            canPay={canTakePayment}
+          />
         )}
       </aside>
 

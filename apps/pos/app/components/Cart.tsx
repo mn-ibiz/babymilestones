@@ -19,6 +19,8 @@ export interface CartProps {
   onChange: (cart: CartModel) => void;
   /** Called only when the Pay-step stock check passes (AC4). Payment is S04. */
   onProceed?: () => void;
+  /** Whether this operator's role may take payment (false → read-only till). */
+  canPay?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ export interface CartProps {
  * with a clear error when any line exceeds available stock (AC4); the payment
  * flow itself lands in S04.
  */
-export function Cart({ cart, onChange, onProceed }: CartProps) {
+export function Cart({ cart, onChange, onProceed, canPay = true }: CartProps) {
   const [stockError, setStockError] = useState<string | null>(null);
   const totals = computeTotals(cart);
 
@@ -179,10 +181,16 @@ export function Cart({ cart, onChange, onProceed }: CartProps) {
         </p>
       )}
 
+      {!canPay && (
+        <p className="mt-2 text-sm text-ink/60">
+          Your role can browse the catalogue but not take payment.
+        </p>
+      )}
+
       <button
         type="button"
         onClick={pay}
-        disabled={cart.lines.length === 0}
+        disabled={cart.lines.length === 0 || !canPay}
         className="touch-target mt-4 w-full rounded-lg bg-brand px-4 font-medium text-surface disabled:opacity-50"
       >
         Pay {formatKes(totals.grandTotalCents)}
