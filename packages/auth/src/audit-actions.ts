@@ -148,6 +148,18 @@ export const AUDIT_ACTION_CATALOGUE = {
     "attendance.checked_out",
     "observation.anonymised",
   ],
+  /**
+   * eTIMS (KRA) receipt integration (P5-E02). Submission lifecycle on the
+   * retry/dead-letter queue (S02), the enable-flag rollback (S03), and the
+   * VAT-registration metadata change (S04).
+   */
+  etims: [
+    "etims.submission.sent",
+    "etims.submission.dead_lettered",
+    "etims.submission.requeued",
+    "etims.flag.changed",
+    "etims.vat_metadata.updated",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

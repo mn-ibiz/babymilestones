@@ -77,6 +77,17 @@ export {
   STANDARD_VAT_RATE_BP,
   computeLineVat,
   buildEtimsInvoice,
+  // eTIMS retry / dead-letter queue (P5-E02-S02).
+  etimsBackoffMs,
+  ETIMS_BACKOFF_CAP_MS,
+  ETIMS_BACKOFF_BASE_MS,
+  ETIMS_DEFAULT_MAX_ATTEMPTS,
+  enqueueEtimsSubmission,
+  claimDueEtimsSubmissions,
+  markEtimsSubmissionSent,
+  recordEtimsSubmissionFailure,
+  listDeadLetters,
+  requeueDeadLetter,
   // Receipt void as a reversing entry (P1-E08-S05).
   voidReceipt,
   AlreadyVoidedError,
@@ -101,6 +112,10 @@ export type {
   EtimsInvoiceItem,
   EtimsInvoiceSeller,
   BuildEtimsInvoiceOptions,
+  EtimsQueueRow,
+  EnqueueEtimsInput,
+  ClaimDueInput,
+  RecordFailureResult,
   VoidReceiptInput,
   VoidReceiptResult,
 } from "./receipts/index.js";

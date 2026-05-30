@@ -8,6 +8,7 @@ import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
+import { createEtimsRetryJob } from "./jobs/etims-retry.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -29,6 +30,13 @@ export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
+export { createEtimsRetryJob } from "./jobs/etims-retry.js";
+export type {
+  EtimsRetryJobDeps,
+  ResubmitEtims,
+  ResubmitResult,
+  EtimsKraFields,
+} from "./jobs/etims-retry.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -86,6 +94,13 @@ export function registerAnonymiseObservationsJob(
   deps: Parameters<typeof createAnonymiseObservationsJob>[0],
 ): void {
   register(createAnonymiseObservationsJob(deps));
+}
+
+/** Wire the eTIMS retry / dead-letter worker (P5-E02-S02; 60s cadence). */
+export function registerEtimsRetryJob(
+  deps: Parameters<typeof createEtimsRetryJob>[0],
+): void {
+  register(createEtimsRetryJob(deps));
 }
 
 export { logger } from "./logger.js";

@@ -134,6 +134,24 @@ export type {
   EtimsWiring,
 } from "./writer-selector.js";
 export {
+  etimsBackoffMs,
+  ETIMS_BACKOFF_CAP_MS,
+  ETIMS_BACKOFF_BASE_MS,
+  ETIMS_DEFAULT_MAX_ATTEMPTS,
+  enqueueEtimsSubmission,
+  claimDueEtimsSubmissions,
+  markEtimsSubmissionSent,
+  recordEtimsSubmissionFailure,
+  listDeadLetters,
+  requeueDeadLetter,
+} from "./etims-queue.js";
+export type {
+  EtimsQueueRow,
+  EnqueueEtimsInput,
+  ClaimDueInput,
+  RecordFailureResult,
+} from "./etims-queue.js";
+export {
   voidReceipt,
   AlreadyVoidedError,
   VoidReceiptNotFoundError,
