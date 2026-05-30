@@ -1,6 +1,6 @@
 # Story 23.1: Per-staff commission rate with effective dating
 
-Status: backlog
+Status: done
 
 > Canonical ID: P3-E01-S01 · Phase: P3 · Source: _bmad-output/planning-artifacts/stories/p3/P3-E01-S01.md
 

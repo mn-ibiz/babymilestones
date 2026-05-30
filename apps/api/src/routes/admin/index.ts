@@ -13,7 +13,7 @@ import { registerAdminSmsConfig } from "./sms-config.js";
 import { registerAdminSmsTemplates } from "./sms-templates.js";
 import { registerAdminAudit } from "./audit.js";
 import { registerAdminSettings } from "./settings.js";
-import { registerCommissionRates } from "./commission-rates.js";
+import { registerCommissionRateRoutes } from "./commission-rates.js";
 import { registerCommissionRuns } from "./commission-runs.js";
 
 export interface AdminDeps {
@@ -36,6 +36,6 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminSmsTemplates(app, deps);
   registerAdminAudit(app, deps);
   registerAdminSettings(app, deps);
-  registerCommissionRates(app, deps); // P3-E01-S01
+  registerCommissionRateRoutes(app, deps); // P3-E01-S01
   registerCommissionRuns(app, deps); // P3-E01-S04/S05
 }

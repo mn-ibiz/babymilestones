@@ -215,12 +215,12 @@ development_status:
   epic-22-retrospective: optional
 
   # Epic 23 — Attribution & Commission Ledger  (P3-E01)
-  epic-23: ready-for-dev
-  23-1-per-staff-commission-rate-with-effective-dating: ready-for-dev  # P3-E01-S01
+  epic-23: done
+  23-1-per-staff-commission-rate-with-effective-dating: done  # P3-E01-S01
   23-2-commission-line-recorded-on-every-attributed-booking: done  # P3-E01-S02
   23-3-monthly-commission-run-scheduled-job: done  # P3-E01-S03
   23-4-ad-hoc-commission-calculation-e-g-on-the-15th: done  # P3-E01-S04
-  23-5-commission-payout-export-csv: in-progress  # P3-E01-S05
+  23-5-commission-payout-export-csv: done  # P3-E01-S05
   epic-23-retrospective: optional
 
   # Epic 24 — Stylist Commission Viewer (named, not auth)  (P3-E02)
