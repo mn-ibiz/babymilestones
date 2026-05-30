@@ -302,11 +302,11 @@ development_status:
   epic-32-retrospective: optional
 
   # Epic 33 — SMS Go-Live  (P5-E03)
-  epic-33: ready-for-dev
-  33-1-live-sms-adapter-provider-agnostic: ready-for-dev  # P5-E03-S01
-  33-2-live-stub-switch-flag: ready-for-dev  # P5-E03-S02
-  33-3-rate-limit-cost-control: ready-for-dev  # P5-E03-S03
-  33-4-template-editor-admin: ready-for-dev  # P5-E03-S04
+  epic-33: done
+  33-1-live-sms-adapter-provider-agnostic: done  # P5-E03-S01
+  33-2-live-stub-switch-flag: done  # P5-E03-S02
+  33-3-rate-limit-cost-control: done  # P5-E03-S03
+  33-4-template-editor-admin: done  # P5-E03-S04
   epic-33-retrospective: optional
 
   # Epic 34 — Feedback Engine  (P5-E04)

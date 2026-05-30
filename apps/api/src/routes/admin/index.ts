@@ -10,6 +10,7 @@ import { registerAdminPlans } from "./plans.js";
 import { registerAdminStaff } from "./staff.js";
 import { registerAdminUsers } from "./users.js";
 import { registerAdminSmsConfig } from "./sms-config.js";
+import { registerAdminSmsLive } from "./sms-live.js";
 import { registerAdminSmsTemplates } from "./sms-templates.js";
 import { registerAdminAudit } from "./audit.js";
 import { registerAdminSettings } from "./settings.js";
@@ -42,6 +43,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminStaff(app, deps);
   registerAdminUsers(app, deps);
   registerAdminSmsConfig(app, deps);
+  registerAdminSmsLive(app, deps);
   registerAdminSmsTemplates(app, deps);
   registerAdminAudit(app, deps);
   registerAdminSettings(app, deps);

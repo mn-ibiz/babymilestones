@@ -1,8 +1,21 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
-import { users, type Database, type SmsTemplateRow } from "@bm/db";
-import { validateSession, can, CSRF_HEADER_NAME, type PermissionPrincipal } from "@bm/auth";
-import { listActiveTemplates, listTemplateVersions, toPublicSmsTemplate } from "@bm/sms";
+import { audit, users, type Database, type SmsTemplateRow } from "@bm/db";
+import {
+  validateSession,
+  can,
+  auditAction,
+  CSRF_HEADER_NAME,
+  type PermissionPrincipal,
+} from "@bm/auth";
+import {
+  listActiveTemplates,
+  listTemplateVersions,
+  toPublicSmsTemplate,
+  validateTemplateBody,
+  saveTemplateVersion,
+  extractPlaceholders,
+} from "@bm/sms";
 import type { SessionStore } from "@bm/auth";
 
 export interface AdminSmsTemplatesDeps {
@@ -39,13 +52,19 @@ function serialize(row: SmsTemplateRow) {
 }
 
 /**
- * Registered SMS templates — read-only admin surface (P1-E09-S03, AC3). Editing
- * is deferred to P2; P1 only lists the registered, versioned copy so an operator
- * can see exactly what `send(...)` will render. Gated on `manage config`
- * (admin / super_admin), matching the SMS-config surface.
+ * SMS templates admin API.
  *
- *   GET /admin/sms-templates            — active template per key (the view)
- *   GET /admin/sms-templates/:key/versions — version history for one key
+ * Read (P1-E09-S03, AC3): list the active template per key and version history.
+ * Write (P5-E03-S04 / Epic 33-4): edit a body and save a NEW VERSION. The save
+ * validates placeholders against the body the editor previously rendered from
+ * (the current active body's placeholders are the required set — AC2: a missing
+ * `{name}` etc. is flagged), inserts a new active row at `version + 1`, and
+ * retains all prior versions (AC3). All routes are gated on `manage config`
+ * (admin / super_admin); the save is audited.
+ *
+ *   GET /admin/sms-templates                — active template per key (the view)
+ *   GET /admin/sms-templates/:key/versions  — version history for one key
+ *   PUT /admin/sms-templates/:key           — save a new version of the body
  */
 export function registerAdminSmsTemplates(app: FastifyInstance, deps: AdminSmsTemplatesDeps): void {
   const { db, sessions } = deps;
@@ -74,7 +93,7 @@ export function registerAdminSmsTemplates(app: FastifyInstance, deps: AdminSmsTe
     return auth.user;
   }
 
-  // List the active template per key (the read-only admin view, AC3).
+  // List the active template per key (the admin view, AC3).
   app.get("/admin/sms-templates", async (req: FastifyRequest, reply: FastifyReply) => {
     const actor = await authorize(req, reply);
     if (!actor) return reply;
@@ -93,4 +112,44 @@ export function registerAdminSmsTemplates(app: FastifyInstance, deps: AdminSmsTe
       return reply.code(200).send({ key, versions: rows.map(serialize) });
     },
   );
+
+  // Save a new version of a template body (Epic 33-4, AC2/AC3).
+  app.put("/admin/sms-templates/:key", async (req: FastifyRequest, reply: FastifyReply) => {
+    const actor = await authorize(req, reply);
+    if (!actor) return reply;
+    const { key } = req.params as { key: string };
+    const body = req.body as { body?: unknown; language?: unknown } | null;
+    if (!body || typeof body.body !== "string") {
+      return reply.code(400).send({ error: "body must be a string", field: "body" });
+    }
+    const language = typeof body.language === "string" ? body.language : undefined;
+
+    // The required placeholder set is whatever the current active body uses, so
+    // an edit that DROPS a placeholder the template depends on is flagged (AC2).
+    const versions = await listTemplateVersions(db, key, language);
+    if (versions.length === 0) {
+      return reply.code(404).send({ error: "Unknown template key", field: "key" });
+    }
+    const currentActive = versions.find((v) => v.isActive) ?? versions[0]!;
+    const required = extractPlaceholders(currentActive.body);
+
+    const validation = validateTemplateBody(body.body, required);
+    if (!validation.valid) {
+      return reply.code(400).send({ error: validation.issues[0], field: "body", issues: validation.issues });
+    }
+
+    const saved = await saveTemplateVersion(db, {
+      key,
+      body: body.body,
+      language,
+      updatedBy: actor.id,
+    });
+    await audit(db, {
+      actor: actor.id,
+      action: auditAction("sms.template.saved"),
+      target: { table: "sms_templates", id: saved.id },
+      payload: { key, language: saved.language, version: saved.version },
+    });
+    return reply.code(200).send(serialize(saved));
+  });
 }
