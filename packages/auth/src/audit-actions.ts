@@ -182,6 +182,18 @@ export const AUDIT_ACTION_CATALOGUE = {
     "etims.flag.changed",
     "etims.vat_metadata.updated",
   ],
+  /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
+  event: [
+    "event.created",
+    "event.updated",
+    "event.published",
+    "event.unpublished",
+    "event.deleted",
+    "ticket.order.created",
+    "ticket.order.paid",
+    "ticket.rsvp.created",
+    "ticket.checked_in",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */

@@ -1,6 +1,6 @@
 # Story 30.5: Door check-in via ticket code or manual list
 
-Status: backlog
+Status: done
 
 > Canonical ID: P4-E05-S05 · Phase: P4 · Source: _bmad-output/planning-artifacts/stories/p4/P4-E05-S05.md
 

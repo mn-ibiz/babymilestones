@@ -21,6 +21,8 @@ export type SmsTemplateKey =
   | "subscription.confirmed"
   | "subscription.dunning"
   | "pickup.handoff"
+  | "event.eticket"
+  | "event.rsvp"
   | "raw";
 
 /** Data bag passed to a template; renderers read the fields they need. */
@@ -64,6 +66,13 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
   "subscription.dunning": (d) =>
     `We couldn't renew your ${str(d, "planName")} subscription — please top up your ${BRAND.name} wallet to keep it active.`,
   "pickup.handoff": (d) => `${str(d, "childName")}'s day at ${BRAND.name}: ${str(d, "summary")}`,
+  // Guest e-ticket after a paid purchase (30-3): quantity, event, and the link
+  // that opens the ticket(s) / door codes. No account — the link is the proof.
+  "event.eticket": (d) =>
+    `Your ${str(d, "quantity")} ticket(s) for ${str(d, "eventName")} are confirmed. View your e-ticket(s): ${str(d, "link")} — ${BRAND.name}`,
+  // Free-event RSVP confirmation (30-4): same shape minus the payment.
+  "event.rsvp": (d) =>
+    `You're confirmed for ${str(d, "eventName")} (${str(d, "quantity")} place(s)). View your pass(es): ${str(d, "link")} — ${BRAND.name}`,
   raw: (d) => str(d, "body"),
 };
 

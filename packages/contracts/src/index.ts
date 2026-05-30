@@ -1778,6 +1778,193 @@ export const subscriptionCreateSchema = z.object({
 });
 export type SubscriptionCreateInput = z.infer<typeof subscriptionCreateSchema>;
 
+// ---------------------------------------------------------------------------
+// Events & recital ticketing (Epic 30)
+// ---------------------------------------------------------------------------
+
+/**
+ * The kind of happening an event represents (Epic 30). Mirrors the
+ * `events.unit` CHECK in migration 0067 and the admin/public route enums.
+ */
+export const EVENT_UNITS = ["reading_corner", "talent_recital", "general"] as const;
+export type EventUnit = (typeof EVENT_UNITS)[number];
+
+/**
+ * One ticket tier on an admin-facing event (P4-E05-S01). A named price band:
+ * `priceCents` 0 denotes a free RSVP tier (story 30-4). `allotment` is the seat
+ * cap for the tier; the optional sale window bounds when it may be sold.
+ */
+export interface EventTierDto {
+  id: string;
+  eventId: string;
+  name: string;
+  priceCents: number;
+  allotment: number;
+  saleStartsAt: string | null;
+  saleEndsAt: string | null;
+}
+
+/**
+ * An event as returned by the admin API (P4-E05-S01) — the full record with its
+ * ticket tiers. Timestamps are ISO strings; `unit` is one of {@link EVENT_UNITS}.
+ */
+export interface EventDto {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  unit: EventUnit;
+  startsAt: string;
+  endsAt: string;
+  venue: string | null;
+  capacity: number;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tiers: EventTierDto[];
+}
+
+/**
+ * Public (unauthenticated) view of a ticket tier (P4-E05-S02). Exposes the
+ * remaining capacity and sold-out / free flags the storefront renders; `sold`
+ * is 0 until ticketing lands (story 30-3).
+ */
+export interface PublicEventTierDto {
+  id: string;
+  name: string;
+  priceCents: number;
+  allotment: number;
+  sold: number;
+  remaining: number;
+  soldOut: boolean;
+  isFree: boolean;
+}
+
+/**
+ * Public (unauthenticated) view of a published event (P4-E05-S02). Drops the
+ * admin-only lifecycle fields (`published`, audit timestamps) and carries the
+ * public tier projection.
+ */
+export interface PublicEventDto {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  unit: EventUnit;
+  startsAt: string;
+  endsAt: string;
+  venue: string | null;
+  capacity: number;
+  tiers: PublicEventTierDto[];
+}
+
+/** Max tickets a single guest order/RSVP may request (sane bound on a free flow). */
+export const TICKET_ORDER_MAX_QUANTITY = 20;
+
+/** Permissive email regex reused for the optional e-ticket email on a guest order. */
+const ticketEmailRegex = emailLightRegex;
+
+/**
+ * Guest ticket checkout (P4-E05-S03). No account: the buyer supplies a name and
+ * phone (+ optional email for the e-ticket). `tierId` selects a paid tier on the
+ * event; `quantity` is the seat count. Payment provider is chosen here; a free
+ * (price 0) tier is handled by the RSVP flow (30-4), not this schema.
+ */
+export const ticketCheckoutSchema = z.object({
+  tierId: z.string().uuid("tierId must be a valid id"),
+  quantity: z
+    .number({ message: "quantity is required" })
+    .int("quantity must be a whole number")
+    .min(1, "At least one ticket is required")
+    .max(TICKET_ORDER_MAX_QUANTITY, `At most ${TICKET_ORDER_MAX_QUANTITY} tickets per order`),
+  buyerName: z.string().trim().min(1, "Your name is required").max(120),
+  buyerPhone: z.string().trim().min(1, "A phone number is required").max(32),
+  buyerEmail: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v === "" || ticketEmailRegex.test(v), { message: "Enter a valid email address" })
+    .transform((v) => (v === "" ? null : v)),
+  provider: z.enum(["mpesa", "paystack"], { message: "Choose M-Pesa or card" }),
+});
+export type TicketCheckoutInput = z.infer<typeof ticketCheckoutSchema>;
+
+/**
+ * Free-event RSVP (P4-E05-S04). Same buyer fields as a paid checkout minus the
+ * payment provider — the selected tier must be free (price 0). Tickets are
+ * issued immediately.
+ */
+export const ticketRsvpSchema = z.object({
+  tierId: z.string().uuid("tierId must be a valid id"),
+  quantity: z
+    .number({ message: "quantity is required" })
+    .int("quantity must be a whole number")
+    .min(1, "At least one spot is required")
+    .max(TICKET_ORDER_MAX_QUANTITY, `At most ${TICKET_ORDER_MAX_QUANTITY} spots per RSVP`),
+  buyerName: z.string().trim().min(1, "Your name is required").max(120),
+  buyerPhone: z.string().trim().min(1, "A phone number is required").max(32),
+  buyerEmail: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v === "" || ticketEmailRegex.test(v), { message: "Enter a valid email address" })
+    .transform((v) => (v === "" ? null : v)),
+});
+export type TicketRsvpInput = z.infer<typeof ticketRsvpSchema>;
+
+/** One issued ticket as returned to the buyer / door list (P4-E05-S03/S05). */
+export interface TicketDto {
+  id: string;
+  code: string;
+  eventId: string;
+  tierId: string;
+  buyerName: string;
+  buyerPhone: string;
+  status: string;
+  checkedInAt: string | null;
+}
+
+/** A guest ticket order as returned by the checkout/RSVP API. */
+export interface TicketOrderDto {
+  id: string;
+  eventId: string;
+  tierId: string;
+  buyerName: string;
+  buyerPhone: string;
+  buyerEmail: string | null;
+  quantity: number;
+  amountCents: number;
+  status: string;
+  provider: string | null;
+  paymentReference: string | null;
+}
+
+/** Door check-in: mark one ticket admitted by its code (P4-E05-S05). */
+export const ticketCheckInSchema = z.object({
+  code: z.string().trim().min(1, "A ticket code is required").max(64),
+});
+export type TicketCheckInInput = z.infer<typeof ticketCheckInSchema>;
+
+/** One row on the staff door list (P4-E05-S05). */
+export interface DoorListTicket {
+  id: string;
+  code: string;
+  buyerName: string;
+  buyerPhone: string;
+  tierName: string;
+  status: string;
+  checkedInAt: string | null;
+}
+
+/** Door list response: the tickets plus the capacity-vs-checked-in counter (AC3). */
+export interface DoorListResponse {
+  eventId: string;
+  eventName: string;
+  total: number;
+  checkedIn: number;
+  tickets: DoorListTicket[];
+}
+
 /* --- Service schedules / time-slots (P2-E01-S01) ------------------------- */
 
 /** HH:MM 24h wall-clock time (mirrors the `service_schedules` migration CHECK). */

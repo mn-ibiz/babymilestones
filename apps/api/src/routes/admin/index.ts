@@ -19,6 +19,8 @@ import { registerAdminJobs, type RunnableJob } from "./jobs.js";
 import { registerCommissionRateRoutes } from "./commission-rates.js";
 import { registerCommissionRuns } from "./commission-runs.js";
 import { registerAdminEtims } from "./etims.js";
+import { registerAdminEvents } from "./events.js";
+import { registerDoorCheckIn } from "./door.js";
 
 export interface AdminDeps {
   db: Database;
@@ -52,4 +54,6 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerCommissionRateRoutes(app, deps); // P3-E01-S01
   registerCommissionRuns(app, deps); // P3-E01-S04/S05
   registerAdminEtims(app, deps);
+  registerAdminEvents(app, deps);
+  registerDoorCheckIn(app, deps);
 }

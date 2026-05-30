@@ -33,6 +33,7 @@ import { registerCashRoutes } from "./routes/payments/cash/index.js";
 import { registerBankRoutes } from "./routes/payments/bank/index.js";
 import { registerReceptionRoutes } from "./routes/reception/index.js";
 import { registerPosRoutes } from "./routes/pos/index.js";
+import { registerPublicRoutes } from "./routes/public/index.js";
 import { registerTreasuryRoutes } from "./routes/treasury/index.js";
 import { registerReceiptRoutes } from "./routes/receipts/index.js";
 import { registerHealthRoutes, type ReadinessCheck } from "./routes/health.js";
@@ -265,6 +266,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       now,
     });
     registerAdminRoutes(app, { db, sessions: deps.sessions, jobs: deps.jobs });
+
+    // P4-E05-S02: public, unauthenticated event listing + detail (no account
+    // required). Read-only over the events catalogue.
+    registerPublicRoutes(app, {
+      db,
+      now: deps.now ? () => new Date(deps.now!()) : undefined,
+    });
 
     // Resolve provider wiring once (explicit deps in tests, env in production) so
     // both the parent-facing payment routes and the reception top-up rails (S03)
