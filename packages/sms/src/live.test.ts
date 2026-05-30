@@ -83,11 +83,13 @@ describe("LiveSmsAdapter", () => {
 
   it("renders a registered DB template body before sending (reuses the resolver)", async () => {
     await seedActiveConfig();
-    await db.insert(smsTemplates).values({ key: "topup.success", body: "Hi {name}", version: 1, isActive: true });
+    // Use a key the launch seed (migration 0036) does NOT already activate, so
+    // this row is the sole active template for its (key, language).
+    await db.insert(smsTemplates).values({ key: "test.custom", body: "Hi {name}", version: 1, isActive: true });
     const { transport, calls } = okTransport();
     const adapter = new LiveSmsAdapter(db, { transport, apiKey: "k" });
 
-    await adapter.send({ to: "+254711111111", template: "topup.success", data: { name: "Asha" } });
+    await adapter.send({ to: "+254711111111", template: "test.custom", data: { name: "Asha" } });
 
     const init = calls[0]!.init as { body?: string };
     expect(JSON.parse(init.body ?? "{}").message).toBe("Hi Asha");

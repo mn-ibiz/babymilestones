@@ -17,6 +17,12 @@ export {
   DEFAULT_TEMPLATE_LANGUAGE,
 } from "./template-store.js";
 export type { PublicSmsTemplate, TemplateExecutor } from "./template-store.js";
+export {
+  extractPlaceholders,
+  validateTemplateBody,
+  saveTemplateVersion,
+} from "./template-editor.js";
+export type { TemplateValidation, SaveTemplateVersionInput } from "./template-editor.js";
 export { checkProviderUrlSafety, isSafeProviderUrl } from "./url-safety.js";
 export type { UrlSafetyResult, UrlSafetyReason } from "./url-safety.js";
 export { LiveSmsAdapter } from "./live.js";

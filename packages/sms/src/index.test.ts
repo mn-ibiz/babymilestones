@@ -111,8 +111,9 @@ it("createSmsSender selects the stub by default and on provider=stub (AC3)", asy
   try {
     expect(createSmsSender(db)).toBeInstanceOf(StubSmsSender);
     expect(createSmsSender(db, { provider: "stub" })).toBeInstanceOf(StubSmsSender);
-    // The live provider is the one-line swap reserved for P5-E03.
-    expect(() => createSmsSender(db, { provider: "live" })).toThrow(/P5-E03/);
+    // The live provider is the one-line swap reserved for P5-E03; selecting it
+    // without a wired transport + key is a programming error and throws.
+    expect(() => createSmsSender(db, { provider: "live" })).toThrow(/live provider selected without/);
   } finally {
     await close();
   }
