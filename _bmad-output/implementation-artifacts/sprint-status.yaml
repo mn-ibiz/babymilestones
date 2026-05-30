@@ -279,7 +279,7 @@ development_status:
   epic-30: in-progress
   30-1-event-creation: done  # P4-E05-S01
   30-2-public-event-listing-detail-page: done  # P4-E05-S02
-  30-3-ticket-purchase-with-guest-checkout: in-progress  # P4-E05-S03
+  30-3-ticket-purchase-with-guest-checkout: done  # P4-E05-S03
   30-4-free-events-rsvp-only: ready-for-dev  # P4-E05-S04
   30-5-door-check-in-via-ticket-code-or-manual-list: ready-for-dev  # P4-E05-S05
   epic-30-retrospective: optional
