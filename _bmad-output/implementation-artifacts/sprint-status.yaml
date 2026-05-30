@@ -257,7 +257,7 @@ development_status:
 
   # Epic 28 — Jobs Runner  (P3-E06)
   epic-28: in-progress
-  28-1-job-framework-scheduling-observability: in-progress  # P3-E06-S01
+  28-1-job-framework-scheduling-observability: done  # P3-E06-S01
   28-2-anonymisation-worker-registered: done  # P3-E06-S02
   28-3-commission-run-registered: ready-for-dev  # P3-E06-S03
   28-4-sms-retry-worker-registered: ready-for-dev  # P3-E06-S04

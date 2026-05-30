@@ -1,6 +1,6 @@
 # Story 28.1: Job framework: scheduling + observability
 
-Status: in-progress
+Status: done
 
 > Canonical ID: P3-E06-S01 · Phase: P3 · Source: _bmad-output/planning-artifacts/stories/p3/P3-E06-S01.md
 
@@ -57,7 +57,7 @@ claude-opus-4-8 (1M context)
 - AC1 — `apps/jobs/src/registry.ts` `Job` now carries name, `cron` expression,
   `intervalMs`, `onFailure` policy, and the handler; `schedule()` returns public
   descriptors and `allJobs()` the live jobs. Existing crons declare cron + policy.
-- AC2 — new `job_runs` table (migration `0058_job_runs.sql` + drizzle schema
+- AC2 — new `job_runs` table (migration `0076_job_runs.sql` + drizzle schema
   `job-runs.ts`). `runJob()` (apps/jobs/src/runner.ts) opens a `running` row
   (started_at), then stamps ended_at + status (`success`|`failed`) + error.
 - AC3 — `runJob` forwards a thrown handler to an injected `JobTracker`
@@ -71,14 +71,15 @@ claude-opus-4-8 (1M context)
   `app/(console)/jobs/page.tsx` lists jobs + a Run-now button; nav link added.
 - New audit action `job.run_now` (and `sms.retry.dead_lettered` for 28-4)
   registered in the `@bm/auth` catalogue.
-- Migration note: HEAD of this worktree predates the POS session's 0055–0058
-  (those are not in this branch), but the reserved number 0058 is honoured here;
-  on merge there will be parallel 0058_* files (pos_cashups vs job_runs) — both
-  additive, neither colliding on table/object names.
+- Migration note: `main` now ships `0058_pos_cashups.sql` from the POS session,
+  so this branch's job migrations were renumbered into Epic 28's reserved range —
+  `0076_job_runs.sql` (this story) and `0077_sms_outbox_retry.sql` (28-4). All
+  additive; the drizzle schema references table names, not filenames.
+- Fixed a duplicate `export * from "./job-runs.js"` in `packages/db/src/schema/index.ts`.
 
 ### File List
 
-- packages/db/migrations/0058_job_runs.sql (new)
+- packages/db/migrations/0076_job_runs.sql (new)
 - packages/db/src/schema/job-runs.ts (new) + schema/index.ts (re-export)
 - apps/jobs/src/runner.ts + runner.test.ts (new)
 - apps/jobs/src/registry.ts (cron/onFailure/schedule/allJobs) + index.ts (exports)
@@ -92,3 +93,4 @@ claude-opus-4-8 (1M context)
 |------|---------|-------------|--------|
 | 2026-05-25 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
 | 2026-05-30 | 1.0 | Job framework: registry + job_runs + runner/scheduler + Sentry alert + super-admin run-now (API + console) | claude-opus-4-8 |
+| 2026-05-30 | 1.1 | Renumbered migration 0058→0076 (POS 0058 collision); removed duplicate schema barrel export; story marked done | claude-opus-4-8 |
