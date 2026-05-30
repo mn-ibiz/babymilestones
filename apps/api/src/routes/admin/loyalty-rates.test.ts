@@ -20,14 +20,21 @@ describe("admin loyalty rates API (P2-E05-S02)", () => {
   let adminCookie: string;
   let csrfToken: string;
 
+  // Admin/reception are staff roles, so they authenticate via the staff login
+  // flow (the parent `/auth/login` rejects staff roles with a 403 and no
+  // session cookie). The route guards mutating requests with the CSRF
+  // double-submit pattern, so callers must send the `bm_csrf` cookie alongside
+  // the `x-csrf-token` header.
   async function login(phone: string, pin: string) {
     const res = await app.inject({
       method: "POST",
-      url: "/auth/login",
+      url: "/auth/staff/login",
       payload: { phone, pin },
     });
     const cookies = res.headers["set-cookie"] as string[];
-    const cookie = cookies.find((c) => c.startsWith("bm_session="))!.split(";")[0]!;
+    const session = cookies.find((c) => c.startsWith("bm_session="))!.split(";")[0]!;
+    const csrfCookie = cookies.find((c) => c.startsWith("bm_csrf="))!.split(";")[0]!;
+    const cookie = `${session}; ${csrfCookie}`;
     return { cookie, csrfToken: res.json().csrfToken as string };
   }
 
