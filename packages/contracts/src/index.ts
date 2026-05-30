@@ -1735,6 +1735,86 @@ export const subscriptionCreateSchema = z.object({
 });
 export type SubscriptionCreateInput = z.infer<typeof subscriptionCreateSchema>;
 
+// ---------------------------------------------------------------------------
+// Events & recital ticketing (Epic 30)
+// ---------------------------------------------------------------------------
+
+/**
+ * The kind of happening an event represents (Epic 30). Mirrors the
+ * `events.unit` CHECK in migration 0067 and the admin/public route enums.
+ */
+export const EVENT_UNITS = ["reading_corner", "talent_recital", "general"] as const;
+export type EventUnit = (typeof EVENT_UNITS)[number];
+
+/**
+ * One ticket tier on an admin-facing event (P4-E05-S01). A named price band:
+ * `priceCents` 0 denotes a free RSVP tier (story 30-4). `allotment` is the seat
+ * cap for the tier; the optional sale window bounds when it may be sold.
+ */
+export interface EventTierDto {
+  id: string;
+  eventId: string;
+  name: string;
+  priceCents: number;
+  allotment: number;
+  saleStartsAt: string | null;
+  saleEndsAt: string | null;
+}
+
+/**
+ * An event as returned by the admin API (P4-E05-S01) — the full record with its
+ * ticket tiers. Timestamps are ISO strings; `unit` is one of {@link EVENT_UNITS}.
+ */
+export interface EventDto {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  unit: EventUnit;
+  startsAt: string;
+  endsAt: string;
+  venue: string | null;
+  capacity: number;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tiers: EventTierDto[];
+}
+
+/**
+ * Public (unauthenticated) view of a ticket tier (P4-E05-S02). Exposes the
+ * remaining capacity and sold-out / free flags the storefront renders; `sold`
+ * is 0 until ticketing lands (story 30-3).
+ */
+export interface PublicEventTierDto {
+  id: string;
+  name: string;
+  priceCents: number;
+  allotment: number;
+  sold: number;
+  remaining: number;
+  soldOut: boolean;
+  isFree: boolean;
+}
+
+/**
+ * Public (unauthenticated) view of a published event (P4-E05-S02). Drops the
+ * admin-only lifecycle fields (`published`, audit timestamps) and carries the
+ * public tier projection.
+ */
+export interface PublicEventDto {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  unit: EventUnit;
+  startsAt: string;
+  endsAt: string;
+  venue: string | null;
+  capacity: number;
+  tiers: PublicEventTierDto[];
+}
+
 /* --- Service schedules / time-slots (P2-E01-S01) ------------------------- */
 
 /** HH:MM 24h wall-clock time (mirrors the `service_schedules` migration CHECK). */

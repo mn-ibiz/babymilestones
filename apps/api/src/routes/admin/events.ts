@@ -180,6 +180,7 @@ export function registerAdminEvents(app: FastifyInstance, deps: AdminEventsDeps)
           createdBy: actor.id,
         })
         .returning();
+      if (!row) throw new Error("event insert returned no row");
 
       const tierRows = await tx
         .insert(eventTicketTiers)
@@ -280,6 +281,7 @@ export function registerAdminEvents(app: FastifyInstance, deps: AdminEventsDeps)
       .set(updates)
       .where(and(eq(events.id, id), isNull(events.deletedAt)))
       .returning();
+    if (!row) return reply.code(404).send({ error: "Event not found" });
 
     const tiers = await db
       .select()

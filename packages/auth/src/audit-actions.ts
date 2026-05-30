@@ -148,6 +148,14 @@ export const AUDIT_ACTION_CATALOGUE = {
     "attendance.checked_out",
     "observation.anonymised",
   ],
+  /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
+  event: [
+    "event.created",
+    "event.updated",
+    "event.published",
+    "event.unpublished",
+    "event.deleted",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 /** The catalogue category keys (for completeness assertions / docs). */
