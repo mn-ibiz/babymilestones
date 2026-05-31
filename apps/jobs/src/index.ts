@@ -11,6 +11,7 @@ import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js
 import { createSmsRetryJob } from "./jobs/sms-retry.js";
 import { createCommissionRunJob } from "./jobs/commission-run.js";
 import { createEtimsRetryJob } from "./jobs/etims-retry.js";
+import { createBackupPruneJob } from "./jobs/backup-prune.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -57,6 +58,15 @@ export type {
   EtimsResubmit,
   EtimsRetryLogger,
 } from "./jobs/etims-retry.js";
+export { createBackupPruneJob } from "./jobs/backup-prune.js";
+// `BackupStore` is already re-exported from db-backup.js above (identical
+// shape: `remove(location)`); the pruner reuses that contract, so we export
+// only the pruner-specific deps here to avoid a duplicate-identifier clash.
+export type { BackupPruneJobDeps } from "./jobs/backup-prune.js";
+export {
+  selectBackupsToPrune,
+  type PrunableBackup,
+} from "./jobs/backup-retention.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -133,6 +143,12 @@ export function registerEtimsRetryJob(
   deps: Parameters<typeof createEtimsRetryJob>[0],
 ): void {
   register(createEtimsRetryJob(deps));
+}
+/** Wire the daily policy-driven backup pruner cron (P2-E06-S02). */
+export function registerBackupPruneJob(
+  deps: Parameters<typeof createBackupPruneJob>[0],
+): void {
+  register(createBackupPruneJob(deps));
 }
 
 export { logger } from "./logger.js";

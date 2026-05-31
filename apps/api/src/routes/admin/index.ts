@@ -22,6 +22,7 @@ import { registerAdminEtims } from "./etims.js";
 import { registerAdminEvents } from "./events.js";
 import { registerDoorCheckIn } from "./door.js";
 import { registerAdminLoyalty } from "./loyalty.js";
+import { registerAdminBackupRetention } from "./backup-retention.js";
 
 export interface AdminDeps {
   db: Database;
@@ -58,4 +59,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminEvents(app, deps);
   registerDoorCheckIn(app, deps);
   registerAdminLoyalty(app, deps);
+  registerAdminBackupRetention(app, deps);
 }
