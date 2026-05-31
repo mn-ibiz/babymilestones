@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { parents, users, wallets, loyaltyLedger } from "@bm/db";
 import { createTestDb } from "@bm/db/testing";
 import { InMemorySessionStore, hashPin } from "@bm/auth";
-import { earnPoints, getLoyaltyBalance, balance as walletBalance } from "@bm/wallet";
+import { earnPointsV2 as earnPoints, getLoyaltyBalance, balance as walletBalance } from "@bm/wallet";
 import { buildApp } from "../../app.js";
 import type { FastifyInstance } from "fastify";
 

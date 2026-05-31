@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb, type TestDb } from "@bm/db/testing";
 import { users, wallets, walletLedger, loyaltyLedger, auditOutbox } from "@bm/db";
 import {
-  earnPoints,
+  earnPointsV2 as earnPoints,
   getLoyaltyBalance,
   getLoyaltyTotals,
   getLoyaltyHistory,

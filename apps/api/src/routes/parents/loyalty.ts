@@ -85,10 +85,10 @@ export function registerParentLoyalty(app: FastifyInstance, deps: ParentsDeps): 
 
     const history: LoyaltyHistoryItem[] = rows.map((r) => ({
       id: r.id,
-      direction: r.direction as "earn" | "redeem",
-      points: r.points,
-      sourceType: r.sourceType,
-      sourceId: r.sourceId,
+      direction: (r.direction ?? "earn") as "earn" | "redeem",
+      points: r.points ?? 0,
+      sourceType: r.sourceType ?? "",
+      sourceId: r.sourceId ?? null,
       date: r.createdAt.toISOString(),
     }));
 

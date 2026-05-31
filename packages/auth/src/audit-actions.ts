@@ -157,8 +157,16 @@ export const AUDIT_ACTION_CATALOGUE = {
     "pos.sale.failed",
     "pos.cashup.closed",
   ],
-  /** Loyalty (P2-E05) — points earned, points redeemed, earn/redeem rate change. */
-  loyalty: ["loyalty.earn", "loyalty.redeem", "loyalty.rate_change"],
+  /** Loyalty (P2-E05 + P3-E04) — points earned, redeemed, earn/redeem rate
+   * change, proportional clawback on refund (P3-E04-S01) and the admin manual
+   * adjustment (P3-E04-S03). */
+  loyalty: [
+    "loyalty.earn",
+    "loyalty.redeem",
+    "loyalty.rate_change",
+    "loyalty.clawback",
+    "loyalty.adjust",
+  ],
   /** Background-jobs runner (P3-E06). A super-admin "run now" is an audited
    * mutation (AC4); a cron tick's lifecycle is recorded in `job_runs`, not the
    * audit log. The SMS-retry worker dead-lettering a message (P3-E06-S04 AC3) is

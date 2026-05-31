@@ -40,6 +40,10 @@ export const RESOURCES = [
   "audit",
   "report",
   "config",
+  // P3-E04 (Epic 26): the loyalty-points engine. `manage loyalty` gates the
+  // admin manual adjustment surface (S03); read access is implicit for the
+  // parent's own balance view (handled at the route, not the matrix).
+  "loyalty",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -125,6 +129,8 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "read", resource: "report" },
     // P1-E09-S02: managing `config` gates the SMS provider config CRUD surface.
     { action: "manage", resource: "config" },
+    // P3-E04-S03: managing `loyalty` gates the admin manual points-adjustment.
+    { action: "manage", resource: "loyalty" },
   ],
   // Super admin: everything, including role mutation + impersonation.
   super_admin: [everything],

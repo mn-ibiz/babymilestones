@@ -48,6 +48,8 @@ const EXPECTED: ReadonlyArray<{ role: string; action: string; resource: string }
   { role: "admin", action: "read", resource: "audit" },
   { role: "admin", action: "read", resource: "report" },
   { role: "admin", action: "manage", resource: "config" },
+  // P3-E04-S03: admin manual loyalty adjustment (migration 0086).
+  { role: "admin", action: "manage", resource: "loyalty" },
   { role: "super_admin", action: "*", resource: "*" },
 ];
 

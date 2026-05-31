@@ -1,22 +1,25 @@
-/** @bm/wallet — loyalty redemption engine (P2-E05-S03). Redeeming points credits
- *  the wallet (KES = points × redeem_rate) and writes a loyalty_ledger debit, in
- *  ONE transaction, idempotently. Cannot redeem more than the current balance
- *  (no negative loyalty balance) and cannot double-spend (idempotency key +
- *  in-transaction balance recheck). Integer-cents only — no float drift. */
-import type { Database } from "@bm/db";
+/** @bm/wallet — loyalty redemption.
+ *
+ * P2-E05-S03: redeemPoints — points → wallet credit, atomic + idempotent.
+ * P3-E04-S04: availableLoyaltyToRedeem + markPendingClawback — redemption
+ *             respects pending settlement (un-finalised refund hold).
+ */
+import type { Database, Transaction } from "@bm/db";
 import { audit, loyaltyLedger, walletLedger } from "@bm/db";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { assertPositivePoints, getLoyaltyBalance } from "./loyalty.js";
 import { getEffectiveRates, kesForPoints } from "./loyalty-rates.js";
+import { availableToRedeem } from "@bm/contracts";
 
-/** Thrown when a redemption would exceed the available points balance (AC3). */
+type LedgerReader = Database | Transaction;
+
+// ── P2-E05 — redeemPoints ─────────────────────────────────────────────────────
+
 export class InsufficientPointsError extends Error {
   readonly available: number;
   readonly requested: number;
   constructor(available: number, requested: number) {
-    super(
-      `cannot redeem ${requested} points: only ${available} available`,
-    );
+    super(`cannot redeem ${requested} points: only ${available} available`);
     this.name = "InsufficientPointsError";
     this.available = available;
     this.requested = requested;
@@ -25,16 +28,9 @@ export class InsufficientPointsError extends Error {
 
 export interface RedeemPointsInput {
   walletId: string;
-  /** Strictly-positive integer points to redeem. */
   points: number;
-  /** Dedup key; a retried redeem with this key is a no-op (no double-spend). */
   idempotencyKey: string;
-  /** Acting parent/user id (UUID) for the audit row + wallet posting. */
   actor: string;
-  /**
-   * Redeem rate (KES per point) to use. Defaults to the effective rate now. The
-   * rate used is snapshotted onto the loyalty_ledger row (AC: survives changes).
-   */
   redeemRate?: number;
   sourceType?: string;
   sourceId?: string | null;
@@ -43,40 +39,18 @@ export interface RedeemPointsInput {
 
 export interface RedeemPointsResult {
   redeemedPoints: number;
-  /** Cash value credited to the wallet (integer cents). */
   discountCents: number;
-  /** New loyalty points balance after the redemption. */
   balance: number;
-  /** The loyalty_ledger debit row id. */
   loyaltyEntryId: string;
-  /** The wallet_ledger credit row id. */
   walletEntryId: string;
 }
 
-/**
- * Redeem loyalty points for wallet credit (P2-E05-S03). Atomic + idempotent:
- *
- * 1. If a loyalty_ledger row already exists for `idempotencyKey`, returns it
- *    (no double-spend, no second wallet credit).
- * 2. Re-reads the balance INSIDE the transaction; throws
- *    {@link InsufficientPointsError} if `points` exceeds it (AC3 — cannot redeem
- *    more than the balance; a concurrent racing redeem either fails this check
- *    or loses the unique-key race below).
- * 3. Credits the wallet by `points × redeemRate` (AC2/AC4 — wallet_ledger
- *    credit) and writes the loyalty_ledger debit referencing that entry.
- * 4. Audits `loyalty.redeem`.
- *
- * The booking debit is unaffected — it still debits the wallet normally (AC4);
- * redemption only tops the wallet up first.
- */
 export async function redeemPoints(
   db: Database,
   input: RedeemPointsInput,
 ): Promise<RedeemPointsResult> {
   assertPositivePoints(input.points);
-
   return db.transaction(async (tx) => {
-    // (1) Idempotency: a prior redeem with this key short-circuits.
     const [existing] = await tx
       .select()
       .from(loyaltyLedger)
@@ -84,35 +58,27 @@ export async function redeemPoints(
       .limit(1);
     if (existing) {
       const balance = await getLoyaltyBalance(tx, input.walletId);
-      const rate = existing.rateSnapshot;
+      const rate = existing.rateSnapshot!;
       return {
-        redeemedPoints: existing.points,
-        discountCents: kesForPoints(existing.points, rate),
+        redeemedPoints: existing.points!,
+        discountCents: kesForPoints(existing.points!, rate),
         balance,
         loyaltyEntryId: existing.id,
         walletEntryId: existing.walletLedgerEntryId ?? "",
       };
     }
-
-    // (2) Double-spend guard: re-check the balance inside the transaction.
     const balanceBefore = await getLoyaltyBalance(tx, input.walletId);
     if (input.points > balanceBefore) {
       throw new InsufficientPointsError(balanceBefore, input.points);
     }
-
-    // (3) Resolve the redeem rate (snapshot) + compute the cash credit.
-    const redeemRate =
-      input.redeemRate ?? (await getEffectiveRates(tx)).redeemRate;
+    const redeemRate = input.redeemRate ?? (await getEffectiveRates(tx)).redeemRate;
     const discountCents = kesForPoints(input.points, redeemRate);
-
-    // Credit the wallet (mirrors @bm/wallet `post` so it stays in our tx). The
-    // unique idempotency_key keeps the wallet layer safe under concurrent retry.
     const walletKey = `loyalty-redeem:${input.idempotencyKey}`;
     const [walletRow] = await tx
       .insert(walletLedger)
       .values({
         walletId: input.walletId,
-        amount: discountCents, // positive = credit
+        amount: discountCents,
         direction: "credit",
         kind: "adjustment",
         idempotencyKey: walletKey,
@@ -120,8 +86,6 @@ export async function redeemPoints(
         source: "loyalty",
       })
       .returning();
-
-    // Write the loyalty_ledger debit referencing the wallet credit entry.
     const [loyaltyRow] = await tx
       .insert(loyaltyLedger)
       .values({
@@ -136,8 +100,6 @@ export async function redeemPoints(
         metadata: input.metadata ?? {},
       })
       .returning();
-
-    // (4) Audit the redemption.
     await audit(tx, {
       actor: input.actor,
       action: "loyalty.redeem",
@@ -150,7 +112,6 @@ export async function redeemPoints(
         wallet_ledger_entry_id: walletRow!.id,
       },
     });
-
     return {
       redeemedPoints: input.points,
       discountCents,
@@ -159,4 +120,79 @@ export async function redeemPoints(
       walletEntryId: walletRow!.id,
     };
   });
+}
+
+// ── P3-E04 — availableLoyaltyToRedeem + markPendingClawback ──────────────────
+
+export interface AvailableLoyaltyToRedeem {
+  balance: number;
+  pendingClawback: number;
+  availableToRedeem: number;
+}
+
+export async function availableLoyaltyToRedeem(
+  db: LedgerReader,
+  parentId: string,
+): Promise<AvailableLoyaltyToRedeem> {
+  const [row] = await db
+    .select({
+      balance: sql<string>`COALESCE(SUM(${loyaltyLedger.pointsDelta}), 0)`,
+      pending: sql<string>`COALESCE(SUM(${loyaltyLedger.pendingClawback}), 0)`,
+    })
+    .from(loyaltyLedger)
+    .where(eq(loyaltyLedger.parentId, parentId));
+  const balance = Number(row?.balance ?? 0);
+  const pendingClawback = Number(row?.pending ?? 0);
+  return { balance, pendingClawback, availableToRedeem: availableToRedeem(balance, pendingClawback) };
+}
+
+export interface MarkPendingClawbackInput {
+  db: LedgerReader;
+  parentId: string;
+  earnLedgerId: string;
+  points: number;
+  refundWalletLedgerId: string;
+  postedBy?: string;
+}
+
+export interface MarkPendingClawbackResult {
+  ledgerId: string;
+  pending: number;
+  alreadyPending: boolean;
+}
+
+export async function markPendingClawback(
+  input: MarkPendingClawbackInput,
+): Promise<MarkPendingClawbackResult> {
+  const { db, parentId, earnLedgerId, points, refundWalletLedgerId, postedBy = "system" } = input;
+  if (!Number.isInteger(points) || points <= 0) {
+    throw new Error("markPendingClawback: points must be a positive integer");
+  }
+  const existing = await db
+    .select({ id: loyaltyLedger.id })
+    .from(loyaltyLedger)
+    .where(
+      and(
+        eq(loyaltyLedger.parentId, parentId),
+        eq(loyaltyLedger.kind, "clawback"),
+        eq(loyaltyLedger.sourceWalletLedgerId, refundWalletLedgerId),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) {
+    return { ledgerId: existing[0]!.id, pending: 0, alreadyPending: true };
+  }
+  const [row] = await db
+    .insert(loyaltyLedger)
+    .values({
+      parentId,
+      pointsDelta: 0,
+      kind: "clawback",
+      postedBy,
+      reversesLoyaltyLedgerId: earnLedgerId,
+      sourceWalletLedgerId: refundWalletLedgerId,
+      pendingClawback: points,
+    })
+    .returning();
+  return { ledgerId: row!.id, pending: points, alreadyPending: false };
 }

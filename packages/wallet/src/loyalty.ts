@@ -1,46 +1,75 @@
-/** @bm/wallet — loyalty points engine (P2-E05). Rides on the append-only
- *  `loyalty_ledger` table (schema in @bm/db). Earn rows are written for settled
- *  payments and reference the wallet_ledger entry that triggered them; the
- *  earn/redeem rate is snapshotted so historical points survive rate changes.
- *  Balance is derived from the ledger (never a stored column). */
+/** @bm/wallet — loyalty points engine (P2-E05 + P3-E04).
+ *
+ * P2-E05 functions use walletId + direction/points schema.
+ * P3-E04 functions use parentId + pointsDelta/kind schema.
+ * Both coexist on the merged loyalty_ledger table (see migration 0087).
+ */
 import type { Database, Transaction } from "@bm/db";
 import { audit, loyaltyLedger } from "@bm/db";
 import { desc, eq, sql } from "drizzle-orm";
+import { splitEarnAgainstCarry } from "@bm/contracts";
 
-/** A drizzle handle that can read the ledger (the pooled db or a transaction). */
 type LedgerReader = Database | Transaction;
 
-export type LoyaltyDirection = "earn" | "redeem";
+// ── P2-E05 types ─────────────────────────────────────────────────────────────
 
-/** Re-export of the persisted row shape for convenience. */
+export type LoyaltyDirection = "earn" | "redeem";
 export type LoyaltyEntry = typeof loyaltyLedger.$inferSelect;
 
-/**
- * Guard: loyalty points are always a strictly-positive integer. Throws BEFORE
- * any write so a bad amount can never reach the ledger.
- */
+export interface EarnPointsInputV2 {
+  walletId: string;
+  points: number;
+  rateSnapshot: number;
+  walletLedgerEntryId?: string | null;
+  sourceType: string;
+  sourceId?: string | null;
+  idempotencyKey: string;
+  actor?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LoyaltyTotals {
+  balance: number;
+  lifetimeEarned: number;
+  lifetimeRedeemed: number;
+}
+
+export interface LoyaltyHistoryOptions {
+  limit?: number;
+  offset?: number;
+}
+
+// ── P3-E04 types ─────────────────────────────────────────────────────────────
+
+export type Points = number;
+
+export interface EarnPointsInput {
+  db: LedgerReader;
+  parentId: string;
+  points: Points;
+  postedBy?: string;
+  earnRate?: number | null;
+  earnedAmountMinor?: number | null;
+  sourceWalletLedgerId?: string | null;
+}
+
+export interface EarnPointsResult {
+  id: string;
+  points: Points;
+  appliedToNegativeCarry: Points;
+  spendable: Points;
+  balanceAfter: Points;
+}
+
+// ── Shared guard ──────────────────────────────────────────────────────────────
+
 export function assertPositivePoints(points: number): void {
   if (!Number.isInteger(points) || points <= 0) {
     throw new Error("loyalty points must be a positive integer");
   }
 }
 
-export interface EarnPointsInput {
-  walletId: string;
-  /** Strictly-positive integer points to credit. */
-  points: number;
-  /** Earn rate (KES per point) in force now — snapshotted onto the row (AC3). */
-  rateSnapshot: number;
-  /** The wallet_ledger entry that triggered this earn (AC2). */
-  walletLedgerEntryId?: string | null;
-  sourceType: string;
-  sourceId?: string | null;
-  /** Dedup key; a retried earn with this key is a no-op (no double-credit). */
-  idempotencyKey: string;
-  /** Acting user id (UUID) for the audit row, or null for system. */
-  actor?: string | null;
-  metadata?: Record<string, unknown>;
-}
+// ── P2-E05 functions ──────────────────────────────────────────────────────────
 
 async function findByIdempotencyKey(
   tx: LedgerReader,
@@ -54,25 +83,18 @@ async function findByIdempotencyKey(
   return row;
 }
 
-/**
- * Insert an append-only `earn` row idempotently (P2-E05-S01). Re-invoking with
- * the same `idempotencyKey` returns the existing row and does NOT double-credit.
- * Audits `loyalty.earn`. Runs inside one transaction; the UNIQUE constraint on
- * `idempotency_key` is the durable backstop against concurrent double-earn.
- */
-export async function earnPoints(
+/** Idempotent earn (P2-E05-S01). Uses walletId + direction/points schema. */
+export async function earnPointsV2(
   db: Database,
-  input: EarnPointsInput,
+  input: EarnPointsInputV2,
 ): Promise<LoyaltyEntry> {
   assertPositivePoints(input.points);
   if (!Number.isInteger(input.rateSnapshot) || input.rateSnapshot <= 0) {
     throw new Error("rateSnapshot must be a positive integer");
   }
-
   return db.transaction(async (tx) => {
     const existing = await findByIdempotencyKey(tx, input.idempotencyKey);
     if (existing) return existing;
-
     const [row] = await tx
       .insert(loyaltyLedger)
       .values({
@@ -87,7 +109,6 @@ export async function earnPoints(
         metadata: input.metadata ?? {},
       })
       .returning();
-
     await audit(tx, {
       actor: input.actor ?? null,
       action: "loyalty.earn",
@@ -100,20 +121,12 @@ export async function earnPoints(
         source_id: input.sourceId ?? null,
       },
     });
-
     return row!;
   });
 }
 
-/**
- * Net loyalty balance = SUM(earn.points) - SUM(redeem.points), derived from the
- * append-only ledger. Never read from a mutable cached column. Returns 0 for an
- * empty wallet. Accepts a tx so a redemption can re-check balance atomically.
- */
-export async function getLoyaltyBalance(
-  db: LedgerReader,
-  walletId: string,
-): Promise<number> {
+/** Net loyalty balance for a wallet (P2-E05). Uses direction/points columns. */
+export async function getLoyaltyBalance(db: LedgerReader, walletId: string): Promise<number> {
   const [row] = await db
     .select({
       balance: sql<string>`COALESCE(SUM(CASE WHEN ${loyaltyLedger.direction} = 'earn' THEN ${loyaltyLedger.points} ELSE -${loyaltyLedger.points} END), 0)`,
@@ -123,17 +136,7 @@ export async function getLoyaltyBalance(
   return Number(row?.balance ?? 0);
 }
 
-/** Lifetime totals for the parent dashboard (P2-E05-S04 AC1). */
-export interface LoyaltyTotals {
-  balance: number;
-  lifetimeEarned: number;
-  lifetimeRedeemed: number;
-}
-
-export async function getLoyaltyTotals(
-  db: LedgerReader,
-  walletId: string,
-): Promise<LoyaltyTotals> {
+export async function getLoyaltyTotals(db: LedgerReader, walletId: string): Promise<LoyaltyTotals> {
   const [row] = await db
     .select({
       earned: sql<string>`COALESCE(SUM(CASE WHEN ${loyaltyLedger.direction} = 'earn' THEN ${loyaltyLedger.points} ELSE 0 END), 0)`,
@@ -143,21 +146,9 @@ export async function getLoyaltyTotals(
     .where(eq(loyaltyLedger.walletId, walletId));
   const lifetimeEarned = Number(row?.earned ?? 0);
   const lifetimeRedeemed = Number(row?.redeemed ?? 0);
-  return {
-    balance: lifetimeEarned - lifetimeRedeemed,
-    lifetimeEarned,
-    lifetimeRedeemed,
-  };
+  return { balance: lifetimeEarned - lifetimeRedeemed, lifetimeEarned, lifetimeRedeemed };
 }
 
-export interface LoyaltyHistoryOptions {
-  limit?: number;
-  offset?: number;
-}
-
-/**
- * Ledger rows for a wallet, newest-first (by `seq`), paginated. Read-only.
- */
 export async function getLoyaltyHistory(
   db: LedgerReader,
   walletId: string,
@@ -172,4 +163,53 @@ export async function getLoyaltyHistory(
     .orderBy(desc(loyaltyLedger.seq))
     .limit(limit)
     .offset(offset);
+}
+
+// ── P3-E04 functions ──────────────────────────────────────────────────────────
+
+/** Net loyalty balance for a parent (P3-E04). Uses pointsDelta column. */
+export async function loyaltyBalance(db: LedgerReader, parentId: string): Promise<Points> {
+  const [row] = await db
+    .select({ total: sql<string>`COALESCE(SUM(${loyaltyLedger.pointsDelta}), 0)` })
+    .from(loyaltyLedger)
+    .where(eq(loyaltyLedger.parentId, parentId));
+  return Number(row?.total ?? 0);
+}
+
+/** Credit loyalty points to a parent (P3-E04-S02). Repays negative carry first. */
+export async function earnPoints(input: EarnPointsInput): Promise<EarnPointsResult> {
+  const {
+    db,
+    parentId,
+    points,
+    postedBy = "system",
+    earnRate = null,
+    earnedAmountMinor = null,
+    sourceWalletLedgerId = null,
+  } = input;
+  if (!Number.isInteger(points) || points <= 0) {
+    throw new Error("loyalty.earn: points must be a positive integer");
+  }
+  const balance = await loyaltyBalance(db, parentId);
+  const { appliedToCarry, spendable } = splitEarnAgainstCarry(balance, points);
+  const [row] = await db
+    .insert(loyaltyLedger)
+    .values({
+      parentId,
+      pointsDelta: points,
+      kind: "earn",
+      postedBy,
+      earnRate: earnRate === null ? null : String(earnRate),
+      earnedAmountMinor,
+      sourceWalletLedgerId,
+      appliedToNegativeCarry: appliedToCarry,
+    })
+    .returning();
+  return {
+    id: row!.id,
+    points,
+    appliedToNegativeCarry: appliedToCarry,
+    spendable,
+    balanceAfter: balance + points,
+  };
 }

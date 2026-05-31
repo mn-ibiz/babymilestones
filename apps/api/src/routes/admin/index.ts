@@ -21,6 +21,7 @@ import { registerCommissionRuns } from "./commission-runs.js";
 import { registerAdminEtims } from "./etims.js";
 import { registerAdminEvents } from "./events.js";
 import { registerDoorCheckIn } from "./door.js";
+import { registerAdminLoyalty } from "./loyalty.js";
 
 export interface AdminDeps {
   db: Database;
@@ -56,4 +57,5 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminEtims(app, deps);
   registerAdminEvents(app, deps);
   registerDoorCheckIn(app, deps);
+  registerAdminLoyalty(app, deps);
 }

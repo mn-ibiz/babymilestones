@@ -239,11 +239,11 @@ development_status:
   epic-25-retrospective: optional
 
   # Epic 26 — Loyalty Engine: Clawback + Negative Carry  (P3-E04)
-  epic-26: ready-for-dev
-  26-1-proportional-loyalty-clawback-on-refund: ready-for-dev  # P3-E04-S01
-  26-2-negative-loyalty-carry-repaid-by-future-earnings: ready-for-dev  # P3-E04-S02
-  26-3-admin-manual-loyalty-adjustment: ready-for-dev  # P3-E04-S03
-  26-4-loyalty-redemption-respects-pending-settlement: ready-for-dev  # P3-E04-S04
+  epic-26: done
+  26-1-proportional-loyalty-clawback-on-refund: done  # P3-E04-S01
+  26-2-negative-loyalty-carry-repaid-by-future-earnings: done  # P3-E04-S02
+  26-3-admin-manual-loyalty-adjustment: done  # P3-E04-S03
+  26-4-loyalty-redemption-respects-pending-settlement: done  # P3-E04-S04
   epic-26-retrospective: optional
 
   # Epic 27 — Operational Reporting  (P3-E05)

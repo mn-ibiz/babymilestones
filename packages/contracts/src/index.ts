@@ -2595,6 +2595,134 @@ export function parseSettingValue(
 }
 
 // ---------------------------------------------------------------------------
+// Loyalty Engine: clawback + negative carry (P3-E04)
+// ---------------------------------------------------------------------------
+
+/** Loyalty ledger entry kinds (mirrors the DB CHECK on loyalty_ledger.kind). */
+export const LOYALTY_KINDS = ["earn", "redeem", "clawback", "adjustment"] as const;
+export type LoyaltyKind = (typeof LOYALTY_KINDS)[number];
+
+/** Bounds for a single manual loyalty adjustment (integer points, ± goodwill). */
+export const LOYALTY_ADJUST_MIN_POINTS = -1_000_000;
+export const LOYALTY_ADJUST_MAX_POINTS = 1_000_000;
+export const LOYALTY_ADJUST_REASON_MAX = 280;
+
+/**
+ * Proportional loyalty clawback on refund (P3-E04-S01 AC1). Of the points
+ * originally earned on a transaction, claw back the fraction that was refunded:
+ * `round(earnedPoints × refundedMinor / originalMinor)`, clamped to
+ * `[0, earnedPoints]`.
+ *
+ * Pure integer arithmetic — no floating point, so no drift at any scale. The
+ * round-half-up is computed from the integer quotient + remainder rather than
+ * `Math.round(a/b)`, which would re-introduce float error for large operands.
+ */
+export function loyaltyClawbackPoints(
+  earnedPoints: number,
+  refundedMinor: number,
+  originalMinor: number,
+): number {
+  if (earnedPoints <= 0 || refundedMinor <= 0 || originalMinor <= 0) return 0;
+  const numerator = earnedPoints * refundedMinor;
+  const quotient = Math.floor(numerator / originalMinor);
+  const remainder = numerator - quotient * originalMinor;
+  const rounded = 2 * remainder >= originalMinor ? quotient + 1 : quotient;
+  if (rounded <= 0) return 0;
+  if (rounded >= earnedPoints) return earnedPoints;
+  return rounded;
+}
+
+/**
+ * Split a fresh earn against a (possibly negative) running balance (P3-E04-S02
+ * AC1/AC2). Future earnings repay any negative carry FIRST; only the remainder
+ * is spendable. Returns the portion applied to the carry and the spendable
+ * remainder. All integer points.
+ *
+ * Example: balance −80, earn 100 → { appliedToCarry: 80, spendable: 20 }.
+ *          balance  10, earn 100 → { appliedToCarry: 0,  spendable: 100 }.
+ */
+export function splitEarnAgainstCarry(
+  balance: number,
+  earnedPoints: number,
+): { appliedToCarry: number; spendable: number } {
+  if (earnedPoints <= 0) return { appliedToCarry: 0, spendable: 0 };
+  if (balance >= 0) return { appliedToCarry: 0, spendable: earnedPoints };
+  const deficit = -balance;
+  const appliedToCarry = Math.min(deficit, earnedPoints);
+  return { appliedToCarry, spendable: earnedPoints - appliedToCarry };
+}
+
+/**
+ * Points a parent may actually redeem (P3-E04-S04 AC1): the raw balance minus
+ * any points pending clawback (a refund initiated but not yet finalised).
+ * Never negative — a fully-eroded balance redeems 0.
+ */
+export function availableToRedeem(balance: number, pendingClawback: number): number {
+  const available = balance - Math.max(0, pendingClawback);
+  return available > 0 ? available : 0;
+}
+
+/**
+ * Total points still provisionally pending clawback for a parent (P3-E04-S04):
+ * the sum of `pending_clawback` over the parent's earn rows. Negative entries
+ * are ignored (a settled/never-pending row carries 0). Pure integer reducer —
+ * the redemption surface subtracts this from the balance (see
+ * {@link availableToRedeem}).
+ */
+export function sumPendingClawback(
+  rows: ReadonlyArray<{ pendingClawback: number }>,
+): number {
+  let total = 0;
+  for (const r of rows) {
+    if (r.pendingClawback > 0) total += r.pendingClawback;
+  }
+  return total;
+}
+
+/** Direction of an admin manual loyalty adjustment (P3-E04-S03). */
+export type LoyaltyAdjustmentDirection = "credit" | "debit";
+
+/** Input to {@link loyaltyAdjustmentDelta}. */
+export interface LoyaltyAdjustmentDeltaInput {
+  amount: number;
+  direction: LoyaltyAdjustmentDirection;
+}
+
+/**
+ * Signed points delta for an admin manual loyalty adjustment (P3-E04-S03): a
+ * positive `amount` credited or debited per `direction`. `amount` must be a
+ * positive integer (no fractional points); a credit yields `+amount`, a debit
+ * `-amount`. Throws on a non-positive or fractional amount.
+ */
+export function loyaltyAdjustmentDelta(input: LoyaltyAdjustmentDeltaInput): number {
+  const { amount, direction } = input;
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error("loyaltyAdjustmentDelta: amount must be a positive integer");
+  }
+  return direction === "debit" ? -amount : amount;
+}
+
+/**
+ * Admin manual loyalty adjustment (P3-E04-S03 AC1/AC2). A signed integer points
+ * delta (+ credit / − debit) plus a required free-text reason. `parentId` comes
+ * from the route, never the body. The acting admin is the session user.
+ */
+export const loyaltyAdjustSchema = z.object({
+  points: z
+    .number({ message: "Points is required" })
+    .int("points must be an integer")
+    .min(LOYALTY_ADJUST_MIN_POINTS, "points adjustment is too large")
+    .max(LOYALTY_ADJUST_MAX_POINTS, "points adjustment is too large")
+    .refine((v) => v !== 0, "points adjustment cannot be zero"),
+  reason: z
+    .string()
+    .trim()
+    .min(1, "A reason is required")
+    .max(LOYALTY_ADJUST_REASON_MAX, `Reason must be ${LOYALTY_ADJUST_REASON_MAX} characters or fewer`),
+});
+export type LoyaltyAdjustInput = z.infer<typeof loyaltyAdjustSchema>;
+
+// ---------------------------------------------------------------------------
 // WhatsApp deep-link + UTM acquisition attribution (P1-E12-S03)
 // ---------------------------------------------------------------------------
 export * from "./utm.js";

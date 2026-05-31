@@ -7,7 +7,7 @@ import {
   setRate,
   pointsForSpend,
   kesForPoints,
-  earnPoints,
+  earnPointsV2 as earnPoints,
 } from "./index.js";
 
 // ── pure conversion helpers (no DB) ────────────────────────────────────────

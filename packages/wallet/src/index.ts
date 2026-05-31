@@ -43,20 +43,25 @@ export type { RecentTransaction, RecentTransactionsOptions } from "./recent.js";
 // Per-day-per-account reconciliation export read model (P1-E06-S04).
 export { reconciliationExportRows } from "./reconciliation-export.js";
 
-// Loyalty points engine — earn ledger + balance/history (P2-E05-S01).
+// Loyalty points engine — P2-E05 earn/balance/history + P3-E04 clawback/carry.
 export {
   earnPoints,
+  earnPointsV2,
   getLoyaltyBalance,
   getLoyaltyTotals,
   getLoyaltyHistory,
   assertPositivePoints,
+  loyaltyBalance,
 } from "./loyalty.js";
 export type {
   LoyaltyDirection,
   LoyaltyEntry,
   EarnPointsInput,
+  EarnPointsInputV2,
   LoyaltyTotals,
   LoyaltyHistoryOptions,
+  Points,
+  EarnPointsResult,
 } from "./loyalty.js";
 
 // Configurable, effective-dated earn/redeem rates + conversions (P2-E05-S02).
@@ -74,12 +79,29 @@ export type {
   SetRateInput,
 } from "./loyalty-rates.js";
 
-// Loyalty redemption — points -> wallet credit, atomic + idempotent (P2-E05-S03).
-export { redeemPoints, InsufficientPointsError } from "./loyalty-redeem.js";
+// Loyalty redemption — points -> wallet credit (P2-E05-S03) + pending-settlement guard (P3-E04-S04).
+export {
+  redeemPoints,
+  InsufficientPointsError,
+  availableLoyaltyToRedeem,
+  markPendingClawback,
+} from "./loyalty-redeem.js";
 export type {
   RedeemPointsInput,
   RedeemPointsResult,
+  AvailableLoyaltyToRedeem,
+  MarkPendingClawbackInput,
+  MarkPendingClawbackResult,
 } from "./loyalty-redeem.js";
+
+// Proportional clawback on refund (P3-E04-S01).
+export { clawbackForRefund } from "./loyalty-clawback.js";
+export type { ClawbackForRefundInput, ClawbackForRefundResult } from "./loyalty-clawback.js";
+
+// Admin manual loyalty adjustment (P3-E04-S03).
+export { adjustLoyaltyPoints, LoyaltyAdjustmentError } from "./loyalty-adjust.js";
+export type { AdjustLoyaltyPointsInput, AdjustLoyaltyPointsResult } from "./loyalty-adjust.js";
+
 // Commission accrual + refund reversal hook (P3-E01-S02).
 export {
   recordBookingCommission,
