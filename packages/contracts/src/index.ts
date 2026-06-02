@@ -6208,6 +6208,11 @@ export const articleSaveSchema = z.object({
   coverImageUrl: z
     .string()
     .max(ARTICLE_URL_MAX, `Cover image URL must be ${ARTICLE_URL_MAX} characters or fewer`)
+    // Stored-XSS / scheme-safety guard (security review of Story 36.4). The cover is
+    // rendered on the public pages as a next/image src + OG/Twitter image + JSON-LD
+    // image, so reuse the same predicate that hardens the parallel CMS heroImageUrl —
+    // empty stays allowed (the cover is optional and `isSafeCmsUrl("")` is true).
+    .refine(isSafeCmsUrl, CMS_URL_SAFE_MESSAGE)
     .nullish()
     .transform((v) => (v && v.trim() !== "" ? v.trim() : null)),
   tags: z

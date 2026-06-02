@@ -40,6 +40,22 @@ export class ArticleSlugTakenError extends Error {
 /** A well-formed slug: lowercase kebab-case, single hyphens, no edges (AC1). */
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
+/**
+ * Scheme-safety guard for the cover image URL (security review of Story 36.4),
+ * mirroring the contracts `isSafeCmsUrl` refine + the parallel CMS hardening so the
+ * catalog layer rejects a `javascript:`/`data:`/`vbscript:`/`//evil` value too
+ * (defence in depth — it never reaches the DB even if a caller skips the schema).
+ * A URL is SAFE iff it is empty, a same-origin root-relative path (`/x` but NOT
+ * protocol-relative `//x`), or an explicit http(s) URL.
+ */
+function isSafeCoverImageUrl(value: string): boolean {
+  const v = value.trim();
+  if (v === "") return true;
+  if (v.startsWith("//")) return false;
+  if (v.startsWith("/")) return true;
+  return /^https?:\/\//iu.test(v);
+}
+
 /** Validate + normalise the editable content of an article (AC1). */
 function assertContent(input: {
   slug: string;
@@ -74,6 +90,12 @@ function assertContent(input: {
     input.coverImageUrl != null && String(input.coverImageUrl).trim() !== ""
       ? String(input.coverImageUrl).trim()
       : null;
+  if (cover != null && !isSafeCoverImageUrl(cover)) {
+    throw new ArticleValidationError(
+      "coverImageUrl",
+      "Cover image URL must be empty, a relative path (e.g. /img/x.jpg), or an http(s):// URL",
+    );
+  }
 
   return { slug, title, bodyMd, author, tags, coverImageUrl: cover };
 }

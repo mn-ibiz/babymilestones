@@ -88,6 +88,23 @@ describe("articles module (P6-E06-S04 / Story 36.4)", () => {
       ).rejects.toBeInstanceOf(ArticleSlugTakenError);
     });
 
+    // Defence-in-depth scheme-safety guard for the cover image URL (security review
+    // of Story 36.4) — mirrors the contracts refine + the parallel CMS hardening so
+    // an unsafe scheme is rejected at the catalog layer too, never reaching the DB.
+    it("rejects an unsafe coverImageUrl scheme", async () => {
+      const actor = await seedActor();
+      for (const bad of ["javascript:alert(1)", "data:text/html,x", "vbscript:x", "//evil.com"]) {
+        await expect(
+          createArticle(dbh.db, {
+            ...base,
+            slug: `bad-${Math.random().toString(36).slice(2, 8)}`,
+            coverImageUrl: bad,
+            createdBy: actor,
+          }),
+        ).rejects.toBeInstanceOf(ArticleValidationError);
+      }
+    });
+
     it("normalises tags (trims, drops blanks)", async () => {
       const actor = await seedActor();
       const a = await createArticle(dbh.db, {
@@ -131,6 +148,14 @@ describe("articles module (P6-E06-S04 / Story 36.4)", () => {
       await expect(
         updateArticle(dbh.db, b.id, { ...base, slug: "first", coverImageUrl: null }),
       ).rejects.toBeInstanceOf(ArticleSlugTakenError);
+    });
+
+    it("rejects an update with an unsafe coverImageUrl scheme", async () => {
+      const actor = await seedActor();
+      const a = await createArticle(dbh.db, { ...base, createdBy: actor });
+      await expect(
+        updateArticle(dbh.db, a.id, { ...base, coverImageUrl: "javascript:alert(1)" }),
+      ).rejects.toBeInstanceOf(ArticleValidationError);
     });
 
     it("allows an update that keeps the same slug", async () => {

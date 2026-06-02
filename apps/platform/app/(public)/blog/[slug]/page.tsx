@@ -7,6 +7,7 @@ import {
   renderArticleMarkdown,
   shareLinks,
 } from "../../../../lib/blog";
+import { safeImageSrc } from "../../../../lib/cms-page";
 import { articleJsonLd, buildMetadata } from "../../../../lib/seo";
 import { JsonLd } from "../../../components/JsonLd";
 
@@ -34,13 +35,16 @@ export async function generateMetadata(props: {
   // A short, plain-text description from the start of the body (markup stripped).
   const description = article.bodyMd.replace(/[#*_>\-`[\]()]/gu, "").trim().slice(0, 160);
   // Story 36.2 AC2: full canonical + OG (type=article) + Twitter, using the
-  // article cover as the share image when present.
+  // article cover as the share image when present. Defence-in-depth (security review
+  // of 36.4): only a scheme-safe cover becomes the OG/Twitter image, so a pre-refine
+  // `javascript:`/`data:`/`//evil` value can't leak into a share meta tag.
+  const cover = safeImageSrc(article.coverImageUrl ?? "");
   return buildMetadata({
     title: `${article.title} — Baby Milestones`,
     description,
     path: `/blog/${slug}`,
     type: "article",
-    ...(article.coverImageUrl ? { image: article.coverImageUrl } : {}),
+    ...(cover ? { image: cover } : {}),
   });
 }
 
@@ -53,11 +57,15 @@ export default async function ArticleDetailPage(props: {
 
   const bodyHtml = renderArticleMarkdown(article.bodyMd);
   const shares = shareLinks(article);
+  // Defence-in-depth (security review of 36.4): a scheme-safe cover only, reused for
+  // the next/image render and the Article JSON-LD image. An unsafe (pre-refine) value
+  // collapses to undefined, so the <Image> is dropped and the JSON-LD omits `image`.
+  const coverSrc = safeImageSrc(article.coverImageUrl ?? "");
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 md:py-16">
       {/* Story 36.2 AC2: per-article Article structured data (LocalBusiness is in the layout). */}
-      <JsonLd data={articleJsonLd(article)} />
+      <JsonLd data={articleJsonLd({ ...article, coverImageUrl: coverSrc ?? null })} />
       <p className="text-sm text-ink/60">
         <Link href="/blog" className="text-brand hover:underline">
           ← All stories
@@ -83,9 +91,9 @@ export default async function ArticleDetailPage(props: {
           </ul>
         )}
 
-        {article.coverImageUrl && (
+        {coverSrc && (
           <Image
-            src={article.coverImageUrl}
+            src={coverSrc}
             alt={article.title}
             width={1024}
             height={576}

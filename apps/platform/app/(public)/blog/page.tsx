@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchPublishedArticles } from "../../../lib/blog";
+import { safeImageSrc } from "../../../lib/cms-page";
 import { buildMetadata } from "../../../lib/seo";
 
 /**
@@ -54,15 +55,19 @@ export default async function BlogIndexPage({ searchParams }: BlogParams) {
         <p className="mt-10 text-base text-ink/60">No articles yet — check back soon.</p>
       ) : (
         <ul className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((a) => (
+          {articles.map((a) => {
+            // Defence-in-depth (security review of 36.4): only a scheme-safe cover is
+            // passed to next/image; an unsafe (pre-refine) value drops the image.
+            const coverSrc = safeImageSrc(a.coverImageUrl ?? "");
+            return (
             <li
               key={a.slug}
               className="flex h-full flex-col overflow-hidden rounded-xl border border-ink/10 bg-surface"
             >
               <Link href={`/blog/${a.slug}`} className="flex h-full flex-col hover:bg-ink/5">
-                {a.coverImageUrl && (
+                {coverSrc && (
                   <Image
-                    src={a.coverImageUrl}
+                    src={coverSrc}
                     alt={a.title}
                     width={640}
                     height={360}
@@ -88,7 +93,8 @@ export default async function BlogIndexPage({ searchParams }: BlogParams) {
                 </div>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </main>

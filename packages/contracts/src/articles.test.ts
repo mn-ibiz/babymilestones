@@ -87,5 +87,27 @@ describe("articles contracts (P6-E06-S04 / Story 36.4)", () => {
       const r = articleSaveSchema.parse({ ...valid, tags: [" nutrition ", "", "  ", "sleep"] });
       expect(r.tags).toEqual(["nutrition", "sleep"]);
     });
+
+    // Stored-XSS / scheme-safety guard for the cover image URL (security review of
+    // Story 36.4). The cover is rendered on the public /blog + /blog/[slug] pages as
+    // a next/image src, an OG/Twitter share image, and in the Article JSON-LD image —
+    // so an unsafe scheme persisted by an admin must be rejected at write time, exactly
+    // like the parallel CMS heroImageUrl/ctaHref fields.
+    it("rejects an unsafe coverImageUrl scheme", () => {
+      for (const bad of [
+        "javascript:alert(1)",
+        "data:text/html,x",
+        "vbscript:x",
+        "//evil.com",
+      ]) {
+        expect(articleSaveSchema.safeParse({ ...valid, coverImageUrl: bad }).success).toBe(false);
+      }
+    });
+
+    it("accepts a safe (empty / relative / http(s)) coverImageUrl", () => {
+      for (const ok of ["", "/img/x.jpg", "https://cdn.example.com/x.jpg"]) {
+        expect(articleSaveSchema.safeParse({ ...valid, coverImageUrl: ok }).success).toBe(true);
+      }
+    });
   });
 });
