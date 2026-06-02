@@ -21,11 +21,27 @@ const SESSION_COOKIE_NAME = "bm_session";
 /** Roles allowed on the admin surface (for the API role guard, AC4). */
 export const ADMIN_ALLOWED_ROLES = ["admin", "super_admin", "treasury", "accountant"] as const;
 
-const PUBLIC_PATHS = ["/login", "/_next", "/favicon.ico"];
+/**
+ * Paths served WITHOUT a session. `/staff-earnings` (P3-E02-S01) is a deliberately
+ * PUBLIC route: a stylist checks earnings from the reception PC with no login
+ * (AC1). It reads only the public, rate-limited `/public/staff-earnings` API, which
+ * exposes a display name + three numbers and no PII (AC4) — so it is safe outside
+ * the SSO/role gate.
+ */
+export const PUBLIC_PATHS = ["/login", "/staff-earnings", "/_next", "/favicon.ico"] as const;
+
+/**
+ * Whether `pathname` is served without a session — the negative of the SSO gate.
+ * Exported + pure so the public-route guarantee (AC1) is unit-tested without the
+ * Next edge runtime.
+ */
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+}
 
 export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
