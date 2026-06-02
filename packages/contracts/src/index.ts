@@ -2353,6 +2353,72 @@ export interface SalonBookingConfirmation {
   amountCents: number;
 }
 
+/* --- 1:1 Coaching booking (P5-E01-S02 / Story 31.2) ---------------------- */
+
+/** How many days ahead the parent coaching-slot browse window spans. */
+export const COACHING_AVAILABILITY_WINDOW_DAYS = 60;
+
+/** A coach a parent can pick for a 1:1 coaching offering (P5-E01-S02 AC2). */
+export interface CoachOption {
+  id: string;
+  displayName: string;
+}
+
+/** A bookable 1:1 coaching slot in the parent browse (P5-E01-S02 AC2). */
+export interface CoachingSlotOption {
+  id: string;
+  staffId: string;
+  staffName: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+}
+
+/**
+ * Parent coaching-availability response for an offering (P5-E01-S02 AC2). A 1:1
+ * session is privately held, so the parent picks the coach EXPLICITLY: every coach
+ * with an open slot is listed, and a `staffId` filter narrows the slots to just
+ * that coach's open slots.
+ */
+export interface CoachingAvailability {
+  serviceId: string;
+  /** First day of the browse window (`YYYY-MM-DD`, server clock). */
+  windowStart: string;
+  /** The coaches with at least one open slot in the window — the coach picker. */
+  coaches: CoachOption[];
+  /** The active coach filter, or null when none is picked yet. */
+  staffId: string | null;
+  slots: CoachingSlotOption[];
+}
+
+/**
+ * Confirm a 1:1 coaching booking (P5-E01-S02 AC3/AC4). `coachingSlotId` + `childId`
+ * are the chosen slot + child. `staffId` is the picked coach; when supplied it must
+ * match the slot's coach (AC2).
+ */
+export const coachingBookingCreateSchema = z.object({
+  coachingSlotId: z.string().uuid("coachingSlotId must be a valid id"),
+  childId: z.string().uuid("childId must be a valid id"),
+  staffId: z.string().uuid("staffId must be a valid id").optional(),
+});
+export type CoachingBookingCreateInput = z.infer<typeof coachingBookingCreateSchema>;
+
+/** Successful 1:1 coaching-booking confirmation returned to the parent (P5-E01-S02 AC3/AC4). */
+export interface CoachingBookingConfirmation {
+  bookingId: string;
+  invoiceId: string;
+  coachingSlotId: string;
+  serviceId: string;
+  /** The coach the booking was attributed to (AC2/AC4). */
+  staffId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  /** Offering price snapshotted onto the pending invoice (AC4), integer KES cents. */
+  amountCents: number;
+}
+
 /* --- Salon counter check-in & service completion (P3-E03-S03 / Story 25.3) - */
 
 /** One salon booking on the reception counter board (AC1). */

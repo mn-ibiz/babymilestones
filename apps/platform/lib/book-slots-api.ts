@@ -2,6 +2,8 @@ import type {
   BookablePlan,
   BookableService,
   BookingConfirmation,
+  CoachingAvailability,
+  CoachingBookingConfirmation,
   ParentBooking,
   SalonAvailability,
   SalonBookingConfirmation,
@@ -176,4 +178,47 @@ export async function bookSalonSlotRequest(
     throw new BookingError(res.status, err.error ?? `Salon booking failed (${res.status})`);
   }
   return (await res.json()) as SalonBookingConfirmation;
+}
+
+/* --- 1:1 Coaching booking (P5-E01-S02 / Story 31.2) ---------------------- */
+
+/**
+ * GET the coaching availability for an offering over the browse window (AC2). When
+ * `staffId` is supplied only that coach's open slots are returned; otherwise every
+ * coach's open slots are listed so the parent can pick a coach (required for a 1:1
+ * session — there is no "Any available" fallback).
+ */
+export async function fetchCoachingAvailability(
+  serviceId: string,
+  staffId?: string,
+): Promise<CoachingAvailability> {
+  const qs = staffId ? `?staffId=${encodeURIComponent(staffId)}` : "";
+  const res = await fetch(
+    `/parents/me/coaching/services/${encodeURIComponent(serviceId)}/availability${qs}`,
+    { credentials: "include" },
+  );
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `Failed to load coaching availability (${res.status})`);
+  }
+  return (await res.json()) as CoachingAvailability;
+}
+
+/** POST a 1:1 coaching booking for a slot + child + coach (AC3/AC4). Throws {@link BookingError} on a non-2xx. */
+export async function bookCoachingSlotRequest(
+  coachingSlotId: string,
+  childId: string,
+  staffId: string,
+): Promise<CoachingBookingConfirmation> {
+  const res = await fetch("/parents/me/coaching/bookings", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
+    body: JSON.stringify({ coachingSlotId, childId, staffId }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new BookingError(res.status, err.error ?? `Coaching booking failed (${res.status})`);
+  }
+  return (await res.json()) as CoachingBookingConfirmation;
 }
