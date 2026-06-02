@@ -314,7 +314,7 @@ development_status:
   34-1-0-5-rating-after-every-paid-touchpoint: review  # P5-E04-S01
   34-2-feedback-dashboard-by-unit-and-by-staff: review  # P5-E04-S02
   34-3-negative-feedback-alert: review  # P5-E04-S03
-  34-4-public-review-snippets-optional: ready-for-dev  # P5-E04-S04
+  34-4-public-review-snippets-optional: review  # P5-E04-S04
   epic-34-retrospective: optional
 
   # Epic 35 — Advanced Reporting / Cohort Analytics  (P5-E05)
