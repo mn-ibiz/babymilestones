@@ -1,6 +1,6 @@
 # Story 34.1: 0–5 rating after every paid touchpoint
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E04-S01 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E04-S01.md
 

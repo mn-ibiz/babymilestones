@@ -1,6 +1,6 @@
 # Story 34.2: Feedback dashboard by unit and by staff
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E04-S02 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E04-S02.md
 

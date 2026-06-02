@@ -1,6 +1,6 @@
 # Story 34.4: Public review snippets (optional)
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E04-S04 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E04-S04.md
 

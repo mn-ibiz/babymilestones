@@ -1,6 +1,6 @@
 # Story 35.5: Expenses module
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E05-S05 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E05-S05.md
 
