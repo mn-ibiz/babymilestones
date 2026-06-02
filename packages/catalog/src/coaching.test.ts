@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@bm/db/testing";
-import { auditOutbox, bookings, children, coachingSlots, invoices, parents, users } from "@bm/db";
+import { auditOutbox, bookings, children, invoices, parents, users } from "@bm/db";
 import { createService, setServicePrice } from "./services.js";
 import { createStaff, setStaffActive } from "./staff.js";
 import { createStaffAvailability } from "./salon.js";
@@ -29,10 +29,6 @@ import { addDaysIso, dayOfWeekIso, enumerateSlotDates } from "./schedules.js";
  */
 
 const FROM = "2026-06-15"; // a Monday — dayOfWeekIso === 1.
-
-async function seedCoachingOffering(name = "Sleep coaching", priceCents = 5000, durationMinutes = 45) {
-  return { name, priceCents, durationMinutes };
-}
 
 describe("coaching slot generation (AC1)", () => {
   let dbh: Awaited<ReturnType<typeof createTestDb>>;

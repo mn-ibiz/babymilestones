@@ -3,7 +3,6 @@ import { and, eq } from "drizzle-orm";
 import {
   attendances,
   auditOutbox,
-  bookings,
   children,
   feedback,
   parents,

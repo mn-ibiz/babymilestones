@@ -6,7 +6,6 @@ import {
   invoices,
   services,
   staff,
-  staffAvailability,
   type CoachingSlotRow,
   type Database,
   type StaffAvailabilityRow,

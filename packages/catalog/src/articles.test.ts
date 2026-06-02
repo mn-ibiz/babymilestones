@@ -256,7 +256,7 @@ describe("articles module (P6-E06-S04 / Story 36.4)", () => {
       const actor = await seedActor();
       const a = await createArticle(dbh.db, { ...base, slug: "one", createdBy: actor });
       await new Promise((r) => setTimeout(r, 5));
-      const b = await createArticle(dbh.db, { ...base, slug: "two", createdBy: actor });
+      await createArticle(dbh.db, { ...base, slug: "two", createdBy: actor });
       await publishArticle(dbh.db, a.id);
       const list = await listArticlesForAdmin(dbh.db);
       expect(list.map((x) => x.slug)).toEqual(["two", "one"]);

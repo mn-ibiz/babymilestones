@@ -34,7 +34,6 @@ export default function CohortRetentionPage() {
   useEffect(() => {
     load(range);
     // Load once on mount with the default range.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const vm = report ? cohortGrid(report) : null;
