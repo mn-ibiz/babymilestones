@@ -166,21 +166,21 @@ describe("Admin CMS pages API (P6-E06-S03 / Story 36.3)", () => {
 
       const events = await dbh.db.select().from(auditOutbox);
       const actions = events.map((e) => e.action);
-      expect(actions).toContain("cms.page.created");
-      expect(actions).toContain("cms.page.published");
+      expect(actions).toContain("cms.unit_page.created");
+      expect(actions).toContain("cms.unit_page.published");
       const [page] = await dbh.db.select().from(cmsPages).where(eq(cmsPages.slug, "play"));
       expect(page).toBeTruthy();
     });
 
-    it("logs cms.page.updated (not created) on a second save of the same slug", async () => {
+    it("logs cms.unit_page.updated (not created) on a second save of the same slug", async () => {
       const creds = await loginStaff("+254712000001", "7421");
       await req("POST", "/admin/cms-pages", creds, validPage);
       await req("POST", "/admin/cms-pages", creds, { ...validPage, heroCopy: "Again." });
 
       const events = await dbh.db.select().from(auditOutbox);
       const actions = events.map((e) => e.action);
-      expect(actions).toContain("cms.page.created");
-      expect(actions).toContain("cms.page.updated");
+      expect(actions).toContain("cms.unit_page.created");
+      expect(actions).toContain("cms.unit_page.updated");
     });
   });
 });

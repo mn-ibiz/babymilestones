@@ -189,7 +189,7 @@ export function registerAdminCmsPages(app: FastifyInstance, deps: AdminCmsPagesD
 
     await audit(db, {
       actor: actor.id,
-      action: existed ? "cms.page.updated" : "cms.page.created",
+      action: existed ? "cms.unit_page.updated" : "cms.unit_page.created",
       target: { table: "cms_pages", id: row.id },
       payload: { slug: row.slug, ip: req.ip },
     });
@@ -216,7 +216,7 @@ export function registerAdminCmsPages(app: FastifyInstance, deps: AdminCmsPagesD
 
     await audit(db, {
       actor: actor.id,
-      action: "cms.page.published",
+      action: "cms.unit_page.published",
       target: { table: "cms_pages", id: row.id },
       payload: { slug: row.slug, ip: req.ip },
     });

@@ -13,7 +13,6 @@ export function JsonLd({ data }: { data: object }) {
   return (
     <script
       type="application/ld+json"
-      // eslint-disable-next-line react/no-danger -- serialised from trusted, pure helpers only.
       dangerouslySetInnerHTML={{ __html: serializeJsonLd(data) }}
     />
   );

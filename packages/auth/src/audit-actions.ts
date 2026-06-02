@@ -296,6 +296,13 @@ export const AUDIT_ACTION_CATALOGUE = {
     "expense.recurring.updated",
     "expense.recurring.deleted",
   ],
+  /** CMS-driven unit pages (Epic 36 / P5-E06-S03 / Story 36.3) — admins edit the
+   * public marketing unit pages without a deploy. Creating / updating / publishing
+   * a page changes what the public sees, so each is a content mutation worth a trail. */
+  cmsPage: ["cms.unit_page.created", "cms.unit_page.updated", "cms.unit_page.published"],
+  /** Blog / parenting articles (Epic 36 / P5-E06-S04 / Story 36.4) — marketing content.
+   * Create / update / publish / unpublish change public visibility, worth a trail. */
+  article: ["article.created", "article.updated", "article.published", "article.unpublished"],
   /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
   event: [
     "event.created",
