@@ -312,4 +312,99 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     const empty = await req("PATCH", `/admin/services/${svc.id}`, creds, {});
     expect(empty.statusCode).toBe(400);
   });
+
+  /* --- Coaching catalogue (P5-E01-S01 / Story 31.1) ------------------------ */
+
+  it("creates a coaching offering with format, duration, age-stage tags + coach, audited (AC1-AC4)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Sleep coaching",
+      unit: "coaching",
+      format: "one_to_one",
+      coachingDurationMinutes: 45,
+      ageStageTags: ["expecting", "0-3mo"],
+      attributionRoleRequired: "coach",
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.unit).toBe("coaching");
+    expect(body.format).toBe("one_to_one");
+    expect(body.coachingDurationMinutes).toBe(45);
+    expect(body.ageStageTags).toEqual(["expecting", "0-3mo"]);
+    expect(body.attributionRoleRequired).toBe("coach");
+
+    // Round-trips on read.
+    const read = await req("GET", `/admin/services/${body.id}`, creds);
+    expect(read.json().format).toBe("one_to_one");
+    expect(read.json().ageStageTags).toEqual(["expecting", "0-3mo"]);
+
+    // Reuses the catalog.service.create audit action (AC4).
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "catalog.service.create"));
+    expect(audits.some((a) => a.targetId === body.id)).toBe(true);
+  });
+
+  it("creates a group coaching offering with empty age-stage tags (AC2)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "New-parent group",
+      unit: "coaching",
+      format: "group",
+      coachingDurationMinutes: 90,
+      ageStageTags: [],
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().format).toBe("group");
+    expect(res.json().ageStageTags).toEqual([]);
+  });
+
+  it("rejects a coaching format outside the enum (AC2)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Bad",
+      unit: "coaching",
+      format: "webinar",
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("format");
+  });
+
+  it("updates the format/duration/tags of a coaching offering via PATCH, audited (AC2/AC4)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (
+      await req("POST", "/admin/services", creds, {
+        name: "Coaching",
+        unit: "coaching",
+        format: "one_to_one",
+        coachingDurationMinutes: 30,
+      })
+    ).json();
+    const patched = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      format: "group",
+      coachingDurationMinutes: 60,
+      ageStageTags: ["3-6mo", "6-12mo"],
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().format).toBe("group");
+    expect(patched.json().coachingDurationMinutes).toBe(60);
+    expect(patched.json().ageStageTags).toEqual(["3-6mo", "6-12mo"]);
+
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "catalog.service.update"));
+    expect(audits.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("reception (no manage service) cannot create a coaching offering (AC4 RBAC)", async () => {
+    const creds = await loginStaff("+254712000003", "7423");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Coaching",
+      unit: "coaching",
+      format: "group",
+    });
+    expect(res.statusCode).toBe(403);
+  });
 });

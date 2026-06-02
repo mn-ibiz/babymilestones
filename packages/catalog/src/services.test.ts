@@ -5,6 +5,7 @@ import { servicePrices } from "@bm/db";
 import {
   ATTRIBUTION_ROLES,
   checkBookingAttribution,
+  COACHING_FORMATS,
   computeLineTax,
   createService,
   DEFAULT_TAX_TREATMENT,
@@ -12,7 +13,9 @@ import {
   getServiceAttributionRole,
   getServiceTaxTreatment,
   isAttributionRole,
+  isCoachingFormat,
   isTaxTreatment,
+  listServicesByUnit,
   serviceTaxTreatment,
   TAX_TREATMENTS,
   listServicePrices,
@@ -23,6 +26,7 @@ import {
   setServicePrice,
   updateService,
 } from "./services.js";
+import { createStaff } from "./staff.js";
 
 /**
  * P1-E07-S01 — service catalogue + effective-dated price history domain logic.
@@ -341,5 +345,152 @@ describe("attribution role per service (P1-E07-S02)", () => {
     it("computeLineTax: honours a custom rate", () => {
       expect(computeLineTax("vat_exclusive", 100_000, 800)).toMatchObject({ taxCents: 8_000 });
     });
+  });
+});
+
+/**
+ * P5-E01-S01 (Story 31.1) — Coaching catalogue (1:1 + group). A coaching offering
+ * is a `service` with `unit = 'coaching'` carrying a format (one_to_one | group),
+ * a duration, optional free-set age-stage tags, and a coach assigned via the
+ * existing attribution mechanism (`attributionRoleRequired = 'coach'`, no login).
+ */
+describe("coaching catalogue (P5-E01-S01)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  it("exposes the constrained coaching-format set + guard (AC2)", () => {
+    expect(COACHING_FORMATS).toEqual(["one_to_one", "group"]);
+    for (const f of COACHING_FORMATS) expect(isCoachingFormat(f)).toBe(true);
+    expect(isCoachingFormat("webinar")).toBe(false);
+    expect(isCoachingFormat(null)).toBe(false);
+    expect(isCoachingFormat("")).toBe(false);
+  });
+
+  it("creates a 1:1 coaching offering with format, duration, age-stage tags + a coach (AC1/AC2/AC3)", async () => {
+    const svc = await createService(dbh.db, {
+      name: "Sleep coaching",
+      description: "1:1 newborn sleep guidance",
+      unit: "coaching",
+      format: "one_to_one",
+      coachingDurationMinutes: 45,
+      ageStageTags: ["expecting", "0-3mo"],
+      attributionRoleRequired: "coach",
+    });
+    expect(svc.unit).toBe("coaching");
+    expect(svc.format).toBe("one_to_one");
+    expect(svc.coachingDurationMinutes).toBe(45);
+    expect(svc.ageStageTags).toEqual(["expecting", "0-3mo"]);
+    expect(svc.attributionRoleRequired).toBe("coach");
+    expect(svc.isActive).toBe(true);
+  });
+
+  it("creates a group coaching offering (AC2)", async () => {
+    const svc = await createService(dbh.db, {
+      name: "New-parent group",
+      unit: "coaching",
+      format: "group",
+      coachingDurationMinutes: 90,
+    });
+    expect(svc.format).toBe("group");
+    expect(svc.coachingDurationMinutes).toBe(90);
+    // Tags are optional — null when omitted (AC2).
+    expect(svc.ageStageTags).toBeNull();
+  });
+
+  it("round-trips age-stage tags incl. empty + clears them via update (AC2)", async () => {
+    const empty = await createService(dbh.db, {
+      name: "Empty tags",
+      unit: "coaching",
+      format: "group",
+      ageStageTags: [],
+    });
+    // An explicit empty set persists as an empty array (distinct from null).
+    expect(empty.ageStageTags).toEqual([]);
+
+    const withTags = await updateService(dbh.db, empty.id, {
+      ageStageTags: ["3-6mo", "6-12mo"],
+    });
+    expect(withTags?.ageStageTags).toEqual(["3-6mo", "6-12mo"]);
+
+    const cleared = await updateService(dbh.db, empty.id, { ageStageTags: null });
+    expect(cleared?.ageStageTags).toBeNull();
+  });
+
+  it("updates the format + duration of a coaching offering (AC2)", async () => {
+    const svc = await createService(dbh.db, {
+      name: "Coaching",
+      unit: "coaching",
+      format: "one_to_one",
+      coachingDurationMinutes: 30,
+    });
+    const updated = await updateService(dbh.db, svc.id, {
+      format: "group",
+      coachingDurationMinutes: 60,
+    });
+    expect(updated?.format).toBe("group");
+    expect(updated?.coachingDurationMinutes).toBe(60);
+  });
+
+  it("DB CHECK rejects a format outside the enum (AC2)", async () => {
+    await expect(
+      createService(dbh.db, {
+        name: "Bad format",
+        unit: "coaching",
+        // @ts-expect-error — intentionally invalid value to exercise the CHECK
+        format: "webinar",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("DB CHECK rejects a non-positive coaching duration (AC2)", async () => {
+    await expect(
+      createService(dbh.db, {
+        name: "Zero duration",
+        unit: "coaching",
+        format: "group",
+        coachingDurationMinutes: 0,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("a coach is a staff record (no login) reused via attribution role (AC3)", async () => {
+    // The coach exists only as a `staff` DATA record — no users/auth association.
+    const coach = await createStaff(dbh.db, { displayName: "Asha", role: "coach" });
+    expect(coach.role).toBe("coach");
+    expect("userId" in coach).toBe(false);
+
+    const svc = await createService(dbh.db, {
+      name: "Lactation coaching",
+      unit: "coaching",
+      format: "one_to_one",
+      attributionRoleRequired: "coach",
+    });
+    // The gate forces a matching active coach pick at booking time (P1-E07-S02).
+    expect(
+      checkBookingAttribution(svc.attributionRoleRequired, {
+        role: coach.role,
+        isActive: coach.active,
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("lists coaching offerings under the coaching unit (AC1/AC4)", async () => {
+    await createService(dbh.db, { name: "Soft Play", unit: "play" });
+    await createService(dbh.db, { name: "Sleep coaching", unit: "coaching", format: "one_to_one" });
+    await createService(dbh.db, { name: "Group coaching", unit: "coaching", format: "group" });
+
+    const coaching = await listServicesByUnit(dbh.db, "coaching");
+    expect(coaching.map((s) => s.name).sort()).toEqual(["Group coaching", "Sleep coaching"]);
+    for (const s of coaching) expect(s.unit).toBe("coaching");
+
+    const play = await listServicesByUnit(dbh.db, "play");
+    expect(play).toHaveLength(1);
+    expect(play[0]!.name).toBe("Soft Play");
   });
 });

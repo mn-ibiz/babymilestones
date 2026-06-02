@@ -41,6 +41,15 @@ export type AttributionRole = "stylist" | "instructor" | "attendant" | "coach" |
  * the runtime source of truth.
  */
 export type TaxTreatment = "vat_inclusive" | "vat_exclusive" | "vat_exempt" | "zero_rated";
+
+/**
+ * Coaching session format (P5-E01-S01 / Story 31.1 AC2). A nullable ENUM on
+ * `services`: only coaching offerings (`unit = 'coaching'`) carry one. Mirrors
+ * `COACHING_FORMATS` in `@bm/contracts`; CHECK-constrained in migration 0096. db
+ * has no dependency on contracts, so the literal union is duplicated here — the
+ * migration CHECK is the runtime source of truth.
+ */
+export type CoachingFormat = "one_to_one" | "group";
 export const services = pgTable("services", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -78,6 +87,34 @@ export const services = pgTable("services", {
   rescheduleCutoffHours: integer("reschedule_cutoff_hours").notNull().default(2),
   /** Cancellation fee in integer cents applied after the cut-off (P2-E01-S06). 0 = none. */
   cancellationFeeCents: bigint("cancellation_fee_cents", { mode: "number" }).notNull().default(0),
+  /**
+   * Salon appointment length in MINUTES (P3-E03-S01 / Story 25.1). Only
+   * `unit = 'salon'` services carry one; nullable + positive when set
+   * (CHECK-constrained in migration 0088). The nightly salon-slot generator chops
+   * a stylist's availability window into back-to-back slots of this length. Null =
+   * the service is not (yet) bookable as discrete salon slots.
+   */
+  salonDurationMinutes: integer("salon_duration_minutes"),
+  /**
+   * Coaching session format (P5-E01-S01 / Story 31.1 AC2). Only `unit =
+   * 'coaching'` offerings carry one; nullable + CHECK-constrained in migration
+   * 0096 to {`one_to_one` | `group`}. Null = not a coaching offering (or format
+   * unset). The coach is a `staff` record assigned via `attributionRoleRequired
+   * = 'coach'` (P1-E07-S02; no login — AC3).
+   */
+  format: text("format").$type<CoachingFormat>(),
+  /**
+   * Coaching session length in MINUTES (P5-E01-S01 / Story 31.1 AC2). Nullable +
+   * positive when set (CHECK-constrained in migration 0096). Kept separate from
+   * `salonDurationMinutes` so the two unit-specific durations never collide.
+   */
+  coachingDurationMinutes: integer("coaching_duration_minutes"),
+  /**
+   * Optional, FREE-SET age-stage tags for a coaching offering (P5-E01-S01 AC2):
+   * "expecting", "0-3mo", "3-6mo", ... A text[] (nullable); null = no tags. A free
+   * set rather than an enum so admin can coin new stages without a migration.
+   */
+  ageStageTags: text("age_stage_tags").array().$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

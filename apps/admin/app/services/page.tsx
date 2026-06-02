@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { ServiceUnit } from "@bm/contracts";
 import {
   attributionRoleLabel,
   attributionRoleOptions,
+  coachingFormatOptions,
   DEFAULT_TAX_TREATMENT,
   formatPriceKes,
+  parseAgeStageTags,
   priceHistoryRows,
   serviceUnitOptions,
   taxTreatmentLabel,
@@ -30,6 +32,9 @@ interface Service {
   isActive: boolean;
   attributionRoleRequired: string | null;
   taxTreatment: string;
+  format: string | null;
+  coachingDurationMinutes: number | null;
+  ageStageTags: string[] | null;
 }
 
 interface Price {
@@ -51,6 +56,9 @@ const EMPTY_SERVICE = {
   description: "",
   attributionRoleRequired: "",
   taxTreatment: DEFAULT_TAX_TREATMENT as string,
+  format: "",
+  coachingDurationMinutes: "",
+  ageStageTags: "",
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -64,9 +72,12 @@ export default function ServicesPage() {
         unit: form.unit,
         attributionRoleRequired: form.attributionRoleRequired,
         taxTreatment: form.taxTreatment,
+        format: form.format,
+        coachingDurationMinutes: form.coachingDurationMinutes === "" ? null : Number(form.coachingDurationMinutes),
       }),
     [form],
   );
+  const isCoaching = form.unit === "coaching";
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Price[]>([]);
@@ -94,6 +105,7 @@ export default function ServicesPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (Object.keys(serviceErrors).length > 0 || form.unit === "") return;
+      const isCoachingUnit = form.unit === "coaching";
       const res = await fetch("/admin/services", {
         method: "POST",
         credentials: "include",
@@ -104,6 +116,18 @@ export default function ServicesPage() {
           description: form.description.trim() || null,
           attributionRoleRequired: form.attributionRoleRequired || null,
           taxTreatment: form.taxTreatment || DEFAULT_TAX_TREATMENT,
+          // Coaching offering attributes (P5-E01-S01 / Story 31.1 AC2). Only sent
+          // for the coaching unit; empty/blank collapses to null server-side.
+          ...(isCoachingUnit
+            ? {
+                format: form.format || null,
+                coachingDurationMinutes:
+                  form.coachingDurationMinutes === ""
+                    ? null
+                    : Number(form.coachingDurationMinutes),
+                ageStageTags: parseAgeStageTags(form.ageStageTags),
+              }
+            : {}),
         }),
       });
       if (res.ok) {
@@ -253,6 +277,49 @@ export default function ServicesPage() {
             ))}
           </select>
         </label>
+        {isCoaching && (
+          <fieldset>
+            <legend>Coaching offering</legend>
+            <label>
+              Format
+              <select
+                name="format"
+                value={form.format}
+                onChange={(e) => setForm((f) => ({ ...f, format: e.target.value }))}
+                aria-invalid={Boolean(serviceErrors.format)}
+              >
+                <option value="">Choose…</option>
+                {coachingFormatOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Duration (minutes)
+              <input
+                name="coachingDurationMinutes"
+                type="number"
+                min={1}
+                value={form.coachingDurationMinutes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, coachingDurationMinutes: e.target.value }))
+                }
+                aria-invalid={Boolean(serviceErrors.coachingDurationMinutes)}
+              />
+            </label>
+            <label>
+              Age-stage tags
+              <input
+                name="ageStageTags"
+                placeholder="expecting, 0-3mo, 3-6mo"
+                value={form.ageStageTags}
+                onChange={(e) => setForm((f) => ({ ...f, ageStageTags: e.target.value }))}
+              />
+            </label>
+          </fieldset>
+        )}
         <label>
           Tax treatment
           <select

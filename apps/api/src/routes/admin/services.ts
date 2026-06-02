@@ -47,6 +47,10 @@ function serializeService(row: Awaited<ReturnType<typeof getService>>) {
     ageMaxMonths: row.ageMaxMonths,
     rescheduleCutoffHours: row.rescheduleCutoffHours,
     cancellationFeeCents: row.cancellationFeeCents,
+    // Coaching offering attributes (P5-E01-S01 / Story 31.1).
+    format: row.format,
+    coachingDurationMinutes: row.coachingDurationMinutes,
+    ageStageTags: row.ageStageTags,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -139,6 +143,8 @@ export function registerAdminServices(app: FastifyInstance, deps: AdminServicesD
         name: parsed.data.name,
         unit: parsed.data.unit,
         tax_treatment: parsed.data.taxTreatment,
+        // Coaching offering format, when set (P5-E01-S01).
+        ...(parsed.data.format != null ? { format: parsed.data.format } : {}),
         ip: req.ip,
       },
     });

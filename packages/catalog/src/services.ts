@@ -3,6 +3,7 @@ import {
   services,
   servicePrices,
   type AttributionRole,
+  type CoachingFormat,
   type Database,
   type ServiceRow,
   type TaxTreatment,
@@ -70,6 +71,18 @@ export function isTaxTreatment(value: unknown): value is TaxTreatment {
   return typeof value === "string" && (TAX_TREATMENTS as readonly string[]).includes(value);
 }
 
+/**
+ * Coaching session formats a coaching offering may declare (P5-E01-S01 / Story
+ * 31.1 AC2). A nullable ENUM on `services`; mirrors `COACHING_FORMATS` in
+ * `@bm/contracts` and is CHECK-constrained in migration 0096.
+ */
+export const COACHING_FORMATS = ["one_to_one", "group"] as const satisfies readonly CoachingFormat[];
+
+/** True when `value` is one of the allowed coaching formats (narrowing guard). */
+export function isCoachingFormat(value: unknown): value is CoachingFormat {
+  return typeof value === "string" && (COACHING_FORMATS as readonly string[]).includes(value);
+}
+
 export interface CreateServiceInput {
   name: string;
   description?: string | null;
@@ -84,6 +97,26 @@ export interface CreateServiceInput {
   rescheduleCutoffHours?: number;
   /** Cancellation fee in integer cents (P2-E01-S06). Defaults to 0. */
   cancellationFeeCents?: number;
+  /**
+   * Salon appointment length in MINUTES (P3-E03-S01 / Story 25.1). Only meaningful
+   * for `unit = 'salon'` services; null/omitted = not bookable as discrete salon
+   * slots yet. The nightly salon-slot generator chops a stylist's availability
+   * window into back-to-back slots of this length.
+   */
+  salonDurationMinutes?: number | null;
+  /**
+   * Coaching session format (P5-E01-S01 AC2). Only meaningful for `unit =
+   * 'coaching'`; null/omitted = unset. CHECK-constrained to {one_to_one | group}.
+   */
+  format?: CoachingFormat | null;
+  /** Coaching session length in minutes (P5-E01-S01 AC2). Positive when set; null = unset. */
+  coachingDurationMinutes?: number | null;
+  /**
+   * Optional free-set age-stage tags for a coaching offering (P5-E01-S01 AC2),
+   * e.g. ["expecting", "0-3mo"]. Null/omitted = no tags; an empty array persists
+   * as an empty set (distinct from null).
+   */
+  ageStageTags?: string[] | null;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -98,11 +131,18 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       taxTreatment: input.taxTreatment ?? DEFAULT_TAX_TREATMENT,
       ageMinMonths: input.ageMinMonths ?? null,
       ageMaxMonths: input.ageMaxMonths ?? null,
+      format: input.format ?? null,
+      coachingDurationMinutes: input.coachingDurationMinutes ?? null,
+      // An explicit (possibly empty) array is preserved; absent → null (no tags).
+      ageStageTags: input.ageStageTags ?? null,
       ...(input.rescheduleCutoffHours !== undefined
         ? { rescheduleCutoffHours: input.rescheduleCutoffHours }
         : {}),
       ...(input.cancellationFeeCents !== undefined
         ? { cancellationFeeCents: input.cancellationFeeCents }
+        : {}),
+      ...(input.salonDurationMinutes !== undefined
+        ? { salonDurationMinutes: input.salonDurationMinutes }
         : {}),
     })
     .returning();
@@ -124,6 +164,14 @@ export interface UpdateServiceInput {
   rescheduleCutoffHours?: number;
   /** Cancellation fee in integer cents (P2-E01-S06). */
   cancellationFeeCents?: number;
+  /** Salon appointment length in minutes (P3-E03-S01); null clears it. */
+  salonDurationMinutes?: number | null;
+  /** Coaching session format (P5-E01-S01 AC2); null clears it. */
+  format?: CoachingFormat | null;
+  /** Coaching session length in minutes (P5-E01-S01 AC2); null clears it. */
+  coachingDurationMinutes?: number | null;
+  /** Free-set age-stage tags (P5-E01-S01 AC2); null clears them, [] = empty set. */
+  ageStageTags?: string[] | null;
 }
 
 /**
@@ -144,6 +192,11 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
   if (patch.ageMaxMonths !== undefined) set.ageMaxMonths = patch.ageMaxMonths;
   if (patch.rescheduleCutoffHours !== undefined) set.rescheduleCutoffHours = patch.rescheduleCutoffHours;
   if (patch.cancellationFeeCents !== undefined) set.cancellationFeeCents = patch.cancellationFeeCents;
+  if (patch.salonDurationMinutes !== undefined) set.salonDurationMinutes = patch.salonDurationMinutes;
+  if (patch.format !== undefined) set.format = patch.format;
+  if (patch.coachingDurationMinutes !== undefined)
+    set.coachingDurationMinutes = patch.coachingDurationMinutes;
+  if (patch.ageStageTags !== undefined) set.ageStageTags = patch.ageStageTags;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;
 }
@@ -164,6 +217,22 @@ export async function listServices(db: Executor, opts: { activeOnly?: boolean } 
       .orderBy(desc(services.createdAt));
   }
   return db.select().from(services).orderBy(desc(services.createdAt));
+}
+
+/**
+ * List services of a single unit, newest first (P5-E01-S01 — the coaching
+ * catalogue reads its offerings via `unit = 'coaching'`). Pass `activeOnly` to
+ * exclude soft-deleted rows.
+ */
+export async function listServicesByUnit(
+  db: Executor,
+  unit: ServiceUnit,
+  opts: { activeOnly?: boolean } = {},
+) {
+  const where = opts.activeOnly
+    ? and(eq(services.unit, unit), eq(services.isActive, true))
+    : eq(services.unit, unit);
+  return db.select().from(services).where(where).orderBy(desc(services.createdAt));
 }
 
 /**

@@ -3,8 +3,11 @@ import {
   attributionRoleLabel,
   attributionRoleOptions,
   canManageServices,
+  coachingFormatLabel,
+  coachingFormatOptions,
   DEFAULT_TAX_TREATMENT,
   formatPriceKes,
+  parseAgeStageTags,
   priceHistoryRows,
   serviceUnitOptions,
   taxTreatmentLabel,
@@ -123,5 +126,36 @@ describe("tax treatment form logic (P1-E07-S04)", () => {
     expect(
       validateServiceForm({ name: "X", unit: "play", taxTreatment: "gst" }).taxTreatment,
     ).toBeDefined();
+  });
+});
+
+describe("coaching catalogue form logic (P5-E01-S01 / Story 31.1)", () => {
+  it("offers the two formats with labels (AC2)", () => {
+    expect(coachingFormatOptions.map((o) => o.value)).toEqual(["one_to_one", "group"]);
+    expect(coachingFormatLabel("one_to_one")).toBe("One to one");
+    expect(coachingFormatLabel("group")).toBe("Group");
+  });
+
+  it("accepts an empty/valid coaching format (AC2)", () => {
+    expect(validateServiceForm({ name: "C", unit: "coaching", format: "" })).toEqual({});
+    expect(validateServiceForm({ name: "C", unit: "coaching", format: "one_to_one" })).toEqual({});
+    expect(validateServiceForm({ name: "C", unit: "coaching", format: "group" })).toEqual({});
+  });
+
+  it("rejects a format outside the enum (AC2)", () => {
+    expect(validateServiceForm({ name: "C", unit: "coaching", format: "webinar" }).format).toBeDefined();
+  });
+
+  it("validates the coaching duration (positive integer minutes) (AC2)", () => {
+    expect(validateServiceForm({ name: "C", unit: "coaching", coachingDurationMinutes: 45 })).toEqual({});
+    expect(validateServiceForm({ name: "C", unit: "coaching", coachingDurationMinutes: 0 }).coachingDurationMinutes).toBeDefined();
+    expect(validateServiceForm({ name: "C", unit: "coaching", coachingDurationMinutes: 1.5 }).coachingDurationMinutes).toBeDefined();
+  });
+
+  it("parses a comma/newline age-stage tag input — trims, dedupes, drops blanks (AC2)", () => {
+    expect(parseAgeStageTags("expecting, 0-3mo, 3-6mo")).toEqual(["expecting", "0-3mo", "3-6mo"]);
+    expect(parseAgeStageTags(" 0-3mo ,, 0-3mo \n 3-6mo")).toEqual(["0-3mo", "3-6mo"]);
+    expect(parseAgeStageTags("")).toEqual([]);
+    expect(parseAgeStageTags("   ")).toEqual([]);
   });
 });

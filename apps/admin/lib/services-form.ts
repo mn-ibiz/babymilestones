@@ -13,13 +13,16 @@ import {
   SERVICE_UNITS,
   ATTRIBUTION_ROLES,
   TAX_TREATMENTS,
+  COACHING_FORMATS,
   SERVICE_PRICE_MIN_CENTS,
   SERVICE_PRICE_MAX_CENTS,
   isAttributionRole,
+  isCoachingFormat,
   isTaxTreatment,
   type ServiceUnit,
   type AttributionRole,
   type TaxTreatment,
+  type CoachingFormat,
 } from "@bm/contracts";
 
 /** Roles allowed to manage the service catalogue (mirrors `manage service`). */
@@ -111,11 +114,49 @@ export function taxTreatmentLabel(treatment: string): string {
 export const taxTreatmentOptions: readonly { value: TaxTreatment; label: string }[] =
   TAX_TREATMENTS.map((t) => ({ value: t, label: taxTreatmentLabel(t) }));
 
+/** Human label for a coaching session format (P5-E01-S01 / Story 31.1 AC2). */
+export function coachingFormatLabel(format: string): string {
+  switch (format) {
+    case "one_to_one":
+      return "One to one";
+    case "group":
+      return "Group";
+    default:
+      return format;
+  }
+}
+
+/**
+ * The selectable coaching formats for the create/edit form (P5-E01-S01 AC2). The
+ * empty option means "not a coaching offering / format unset".
+ */
+export const coachingFormatOptions: readonly { value: CoachingFormat; label: string }[] =
+  COACHING_FORMATS.map((f) => ({ value: f, label: coachingFormatLabel(f) }));
+
+/**
+ * Parse a free-text age-stage tag input (comma- or newline-separated) into a
+ * clean tag list (P5-E01-S01 AC2): trims each, drops blanks, removes duplicates
+ * (order-preserving). The server re-normalises + bounds; this only shapes input.
+ */
+export function parseAgeStageTags(input: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input.split(/[,\n]/u)) {
+    const tag = raw.trim();
+    if (tag === "" || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+  }
+  return out;
+}
+
 export interface ServiceFormErrors {
   name?: string;
   unit?: string;
   attributionRoleRequired?: string;
   taxTreatment?: string;
+  format?: string;
+  coachingDurationMinutes?: string;
 }
 
 /**
@@ -128,6 +169,8 @@ export function validateServiceForm(input: {
   unit: string;
   attributionRoleRequired?: string;
   taxTreatment?: string;
+  format?: string;
+  coachingDurationMinutes?: number | null;
 }): ServiceFormErrors {
   const errors: ServiceFormErrors = {};
   if (input.name.trim().length === 0) errors.name = "Name is required";
@@ -141,6 +184,18 @@ export function validateServiceForm(input: {
   const treatment = (input.taxTreatment ?? "").trim();
   if (treatment !== "" && !isTaxTreatment(treatment)) {
     errors.taxTreatment = "Choose a valid tax treatment";
+  }
+  // Coaching format is optional (empty = unset, P5-E01-S01 AC2); a present value
+  // must be one of the constrained formats.
+  const format = (input.format ?? "").trim();
+  if (format !== "" && !isCoachingFormat(format)) {
+    errors.format = "Choose a valid coaching format";
+  }
+  // Coaching duration is optional; when present it must be a positive whole
+  // number of minutes (P5-E01-S01 AC2).
+  const duration = input.coachingDurationMinutes;
+  if (duration != null && (!Number.isInteger(duration) || duration <= 0)) {
+    errors.coachingDurationMinutes = "Duration must be a positive whole number of minutes";
   }
   return errors;
 }
