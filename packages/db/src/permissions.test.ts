@@ -34,6 +34,8 @@ const EXPECTED: ReadonlyArray<{ role: string; action: string; resource: string }
   { role: "accountant", action: "read", resource: "reconciliation" },
   { role: "accountant", action: "read", resource: "report" },
   { role: "accountant", action: "create", resource: "report" },
+  // P6-E05-S05 (Story 35.5): accountant manages expenses + recurring templates.
+  { role: "accountant", action: "manage", resource: "expense" },
   { role: "treasury", action: "manage", resource: "float" },
   { role: "treasury", action: "manage", resource: "reconciliation" },
   { role: "treasury", action: "create", resource: "refund" },
@@ -50,6 +52,8 @@ const EXPECTED: ReadonlyArray<{ role: string; action: string; resource: string }
   { role: "admin", action: "manage", resource: "config" },
   // P3-E04-S03: admin manual loyalty adjustment (migration 0086).
   { role: "admin", action: "manage", resource: "loyalty" },
+  // P6-E05-S05 (Story 35.5): admin manages expenses + recurring templates.
+  { role: "admin", action: "manage", resource: "expense" },
   { role: "super_admin", action: "*", resource: "*" },
 ];
 

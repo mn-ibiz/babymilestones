@@ -436,3 +436,28 @@ export {
   wooTotalToCents,
   type LoadDailyDispatchOpts,
 } from "./daily-dispatch-db.js";
+
+// Expenses module — the FOUNDATION the consolidated P&L (Story 35.1) consumes
+// via expensesByUnitInPeriod (P6-E05-S05 / Story 35.5).
+export {
+  EXPENSE_BUSINESS_UNITS,
+  isExpenseBusinessUnit,
+  ExpenseValidationError,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  listExpenses,
+  createRecurringTemplate,
+  updateRecurringTemplate,
+  listRecurringTemplates,
+  materialiseDueRecurringExpenses,
+  expensesByUnitInPeriod,
+  type ExpenseBusinessUnit,
+  type CreateExpenseInput,
+  type UpdateExpenseInput,
+  type ListExpensesOpts,
+  type CreateRecurringTemplateInput,
+  type UpdateRecurringTemplateInput,
+  type MaterialiseResult,
+  type ExpensesByUnit,
+} from "./expenses.js";

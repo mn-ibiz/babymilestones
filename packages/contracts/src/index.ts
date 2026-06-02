@@ -5010,3 +5010,183 @@ export function reviewSnippetCards(
     .filter((s) => s.quote.trim().length > 0 && s.attributionLabel.trim().length > 0)
     .map((s) => ({ id: s.id, quote: s.quote.trim(), attribution: s.attributionLabel.trim() }));
 }
+
+// ---------------------------------------------------------------------------
+// Expenses module (P6-E05-S05 / Story 35.5) — the FOUNDATION the consolidated
+// P&L (Story 35.1) consumes. An expense is money the business SPENT, attributed
+// to a business unit OR left null for SHARED OVERHEAD.
+// ---------------------------------------------------------------------------
+
+/**
+ * Business-unit codes an expense may be attributed to (Story 35.5 AC1). A SUPERSET
+ * of {@link SERVICE_UNITS} plus `shop` (retail) — expenses accrue to the retail
+ * unit too. NULL (shared overhead) is a distinct, allowed state, NOT in this list.
+ * Mirrors `EXPENSE_BUSINESS_UNITS` in `@bm/catalog` + the DB CHECK in migration 0104.
+ */
+export const EXPENSE_BUSINESS_UNITS = [...SERVICE_UNITS, "shop"] as const;
+export type ExpenseBusinessUnit = (typeof EXPENSE_BUSINESS_UNITS)[number];
+
+/** Max lengths mirrored by the DB CHECKs (migration 0104). */
+export const EXPENSE_CATEGORY_MAX = 120;
+export const EXPENSE_PAYMENT_METHOD_MAX = 60;
+
+/** A YYYY-MM-DD calendar date. */
+const expenseDateField = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD");
+
+/**
+ * Business-unit field: a known code, or null for shared overhead. The empty
+ * string (a "— shared overhead —" select option) collapses to null so the admin
+ * form can submit it as such.
+ */
+const expenseUnitField = z
+  .union([z.enum(EXPENSE_BUSINESS_UNITS), z.literal(""), z.null()])
+  .transform((v) => (v === "" || v == null ? null : v));
+
+const expenseCategoryField = z
+  .string()
+  .trim()
+  .min(1, "Category is required")
+  .max(EXPENSE_CATEGORY_MAX, `Category must be ${EXPENSE_CATEGORY_MAX} characters or fewer`);
+
+const expensePaymentMethodField = z
+  .string()
+  .trim()
+  .min(1, "Payment method is required")
+  .max(EXPENSE_PAYMENT_METHOD_MAX, `Payment method must be ${EXPENSE_PAYMENT_METHOD_MAX} characters or fewer`);
+
+const expenseAmountField = z
+  .number()
+  .int("Amount must be a whole number of cents")
+  .positive("Amount must be greater than zero");
+
+/**
+ * Optional free text → trimmed, with empty/null collapsing to null. Uses
+ * `.optional()` LAST so an ABSENT key stays absent in the parsed output (the
+ * update schemas' "no fields to update" refine counts only the keys actually
+ * supplied); a PRESENT value is trimmed and empties collapse to null.
+ */
+const optionalExpenseText = z
+  .union([z.string().trim().max(500), z.null()])
+  .transform((v) => (v == null || v.length === 0 ? null : v))
+  .optional();
+
+/** Like {@link optionalExpenseText} but an ABSENT key defaults to null — used by
+ * the CREATE schema where every nullable column should be present in the output. */
+const optionalExpenseTextDefaultNull = z
+  .union([z.string().trim().max(500), z.null()])
+  .transform((v) => (v == null || v.length === 0 ? null : v))
+  .nullish()
+  .transform((v) => v ?? null);
+
+/** Create an expense (Story 35.5 AC1/AC2). */
+export const expenseCreateSchema = z.object({
+  expenseDate: expenseDateField,
+  category: expenseCategoryField,
+  businessUnit: expenseUnitField,
+  amountCents: expenseAmountField,
+  paymentMethod: expensePaymentMethodField,
+  reference: optionalExpenseTextDefaultNull,
+  receiptAttachmentUrl: optionalExpenseTextDefaultNull,
+});
+export type ExpenseCreateInput = z.infer<typeof expenseCreateSchema>;
+
+/** Update an expense (Story 35.5 AC2) — every field optional (partial patch). */
+export const expenseUpdateSchema = z
+  .object({
+    expenseDate: expenseDateField.optional(),
+    category: expenseCategoryField.optional(),
+    businessUnit: expenseUnitField.optional(),
+    amountCents: expenseAmountField.optional(),
+    paymentMethod: expensePaymentMethodField.optional(),
+    reference: optionalExpenseText,
+    receiptAttachmentUrl: optionalExpenseText,
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "No fields to update" });
+export type ExpenseUpdateInput = z.infer<typeof expenseUpdateSchema>;
+
+/** day_of_month 1..28 — valid in every calendar month (Story 35.5 AC3). */
+const dayOfMonthField = z
+  .number()
+  .int("day_of_month must be a whole number")
+  .min(1, "day_of_month must be at least 1")
+  .max(28, "day_of_month must be 28 or less (valid in every month)");
+
+/** Create a recurring expense template (Story 35.5 AC3). */
+export const expenseRecurringTemplateCreateSchema = z.object({
+  category: expenseCategoryField,
+  businessUnit: expenseUnitField,
+  amountCents: expenseAmountField,
+  paymentMethod: expensePaymentMethodField,
+  dayOfMonth: dayOfMonthField,
+  reference: optionalExpenseTextDefaultNull,
+  active: z.boolean().optional().default(true),
+});
+export type ExpenseRecurringTemplateCreateInput = z.infer<
+  typeof expenseRecurringTemplateCreateSchema
+>;
+
+/** Update a recurring expense template (Story 35.5 AC2/AC3) — partial patch. */
+export const expenseRecurringTemplateUpdateSchema = z
+  .object({
+    category: expenseCategoryField.optional(),
+    businessUnit: expenseUnitField.optional(),
+    amountCents: expenseAmountField.optional(),
+    paymentMethod: expensePaymentMethodField.optional(),
+    dayOfMonth: dayOfMonthField.optional(),
+    reference: optionalExpenseText,
+    active: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "No fields to update" });
+export type ExpenseRecurringTemplateUpdateInput = z.infer<
+  typeof expenseRecurringTemplateUpdateSchema
+>;
+
+/** Query the expenses list by half-open [fromDate, toDate) period + optional unit. */
+export const expensesListQuerySchema = z.object({
+  fromDate: expenseDateField,
+  toDate: expenseDateField,
+  unit: z.enum(EXPENSE_BUSINESS_UNITS).optional(),
+});
+export type ExpensesListQuery = z.infer<typeof expensesListQuerySchema>;
+
+/** Wire DTO for one expense row (Story 35.5 AC1). All serialisable primitives. */
+export interface ExpenseDto {
+  id: string;
+  expenseDate: string;
+  category: string;
+  businessUnit: ExpenseBusinessUnit | null;
+  amountCents: number;
+  paymentMethod: string;
+  reference: string | null;
+  receiptAttachmentUrl: string | null;
+  recurringTemplateId: string | null;
+  createdAt: string;
+}
+
+/** Wire DTO for one recurring template (Story 35.5 AC3). */
+export interface ExpenseRecurringTemplateDto {
+  id: string;
+  category: string;
+  businessUnit: ExpenseBusinessUnit | null;
+  amountCents: number;
+  paymentMethod: string;
+  dayOfMonth: number;
+  reference: string | null;
+  active: boolean;
+  lastRunMonth: string | null;
+  createdAt: string;
+}
+
+/**
+ * The per-unit expense aggregate the P&L (Story 35.1) consumes (AC4). Mirrors
+ * `ExpensesByUnit` in `@bm/catalog`: per-unit totals (present units only), a
+ * separate shared-overhead bucket (null-unit rows), and the grand total — all in
+ * integer cents. `totalCents` === sum(perUnit) + sharedOverheadCents.
+ */
+export interface ExpensesByUnitDto {
+  perUnit: Partial<Record<ExpenseBusinessUnit, number>>;
+  sharedOverheadCents: number;
+  totalCents: number;
+}

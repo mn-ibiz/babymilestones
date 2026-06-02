@@ -97,6 +97,18 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(canAccessRoute("treasury", "/review-snippets")).toBe(false);
   });
 
+  it("the expenses module is visible to manage-expense roles (admin/accountant/super_admin) (P6-E05-S05 / Story 35.5)", () => {
+    for (const role of ["admin", "accountant", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/expenses");
+      expect(canAccessRoute(role, "/expenses")).toBe(true);
+    }
+    // treasury / reception do not manage expenses.
+    expect(visibleNavFor("treasury").map((i) => i.href)).not.toContain("/expenses");
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/expenses");
+    expect(canAccessRoute("treasury", "/expenses")).toBe(false);
+    expect(canAccessRoute("reception", "/expenses")).toBe(false);
+  });
+
   it("the operations dashboard is visible to admin/super_admin/treasury only (P3-E05-S01 AC4)", () => {
     for (const role of ["admin", "super_admin", "treasury"]) {
       expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations");

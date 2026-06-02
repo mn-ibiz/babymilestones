@@ -279,6 +279,21 @@ export const AUDIT_ACTION_CATALOGUE = {
   /** In-app admin alerts (Epic 34 / P6-E04-S03) — the bell / alerts list. An admin
    * acknowledging (read) or DISMISSING an alert is a state change worth a trail. */
   alert: ["alert.dismissed"],
+  /** Expenses module (Epic 35 / P6-E05-S05 / Story 35.5) — the FOUNDATION the
+   * consolidated P&L (35.1) consumes. Recording / editing / deleting an expense
+   * (or a recurring expense template) is a financial mutation worth a forensic
+   * trail. The recurring-template MATERIALISATION cron creates the concrete
+   * expense rows without an actor; that batch is recorded in `job_runs`, not the
+   * audit log (it is not an interactive mutation), so there is no `*.materialised`
+   * action here. */
+  expense: [
+    "expense.created",
+    "expense.updated",
+    "expense.deleted",
+    "expense.recurring.created",
+    "expense.recurring.updated",
+    "expense.recurring.deleted",
+  ],
   /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
   event: [
     "event.created",

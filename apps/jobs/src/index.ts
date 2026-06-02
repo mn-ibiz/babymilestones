@@ -21,6 +21,7 @@ import { createWcSyncPullJob } from "./jobs/wc-sync-pull.js";
 import { createWcOutboxDrainJob } from "./jobs/wc-outbox-drain.js";
 import { createWcStockReconcileJob } from "./jobs/wc-stock-reconcile.js";
 import { createNegativeFeedbackAlertJob } from "./jobs/negative-feedback-alert.js";
+import { createRecurringExpensesJob } from "./jobs/recurring-expenses.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -105,6 +106,12 @@ export type {
   NegativeFeedbackAlertJobDeps,
   NegativeFeedbackAlertLogger,
 } from "./jobs/negative-feedback-alert.js";
+// P6-E05-S05 (Story 35.5): daily recurring-expenses materialisation cron.
+export { createRecurringExpensesJob } from "./jobs/recurring-expenses.js";
+export type {
+  RecurringExpensesJobDeps,
+  RecurringExpensesLogger,
+} from "./jobs/recurring-expenses.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -245,6 +252,12 @@ export function registerNegativeFeedbackAlertJob(
   deps: Parameters<typeof createNegativeFeedbackAlertJob>[0],
 ): void {
   register(createNegativeFeedbackAlertJob(deps));
+}
+/** Wire the daily recurring-expenses materialisation cron (P6-E05-S05 / Story 35.5). */
+export function registerRecurringExpensesJob(
+  deps: Parameters<typeof createRecurringExpensesJob>[0],
+): void {
+  register(createRecurringExpensesJob(deps));
 }
 
 export { logger } from "./logger.js";

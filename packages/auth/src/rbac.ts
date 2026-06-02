@@ -44,6 +44,11 @@ export const RESOURCES = [
   // admin manual adjustment surface (S03); read access is implicit for the
   // parent's own balance view (handled at the route, not the matrix).
   "loyalty",
+  // P6-E05 (Epic 35 / Story 35.5): the Expenses module. `manage expense` gates
+  // the admin/accountant expense + recurring-template CRUD surface — the FOUNDATION
+  // the consolidated P&L (35.1) consumes. The accountant (otherwise read-heavy)
+  // is granted this management verb because owning the books is their function.
+  "expense",
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -106,6 +111,9 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "read", resource: "reconciliation" },
     { action: "read", resource: "report" },
     { action: "create", resource: "report" },
+    // P6-E05-S05 (Story 35.5): owning the books — the accountant manages expenses
+    // + recurring expense templates (the FOUNDATION the P&L consumes).
+    { action: "manage", resource: "expense" },
   ],
   // Treasury: owns float accounts + reconciliation, plus refunds.
   treasury: [
@@ -131,6 +139,8 @@ export const PERMISSION_MATRIX: Readonly<Record<Role, readonly Permission[]>> = 
     { action: "manage", resource: "config" },
     // P3-E04-S03: managing `loyalty` gates the admin manual points-adjustment.
     { action: "manage", resource: "loyalty" },
+    // P6-E05-S05 (Story 35.5): the admin also manages expenses + recurring templates.
+    { action: "manage", resource: "expense" },
   ],
   // Super admin: everything, including role mutation + impersonation.
   super_admin: [everything],

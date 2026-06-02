@@ -21,6 +21,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
     "role": "accountant",
   },
   {
+    "action": "manage",
+    "resource": "expense",
+    "role": "accountant",
+  },
+  {
     "action": "read",
     "resource": "payment",
     "role": "accountant",
@@ -53,6 +58,11 @@ exports[`permission matrix snapshot (P1-E01-S06 — drift gate) > matches the co
   {
     "action": "manage",
     "resource": "config",
+    "role": "admin",
+  },
+  {
+    "action": "manage",
+    "resource": "expense",
     "role": "admin",
   },
   {

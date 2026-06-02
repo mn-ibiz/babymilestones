@@ -26,7 +26,9 @@ export type NavResource =
   | "user"
   | "audit"
   | "report"
-  | "config";
+  | "config"
+  // P6-E05-S05 (Story 35.5): the Expenses module — `manage expense`.
+  | "expense";
 
 export interface NavPermission {
   action: NavAction;
@@ -52,6 +54,8 @@ const ADMIN_GRANTS: Readonly<Record<string, readonly Grant[]>> = {
     { action: "read", resource: "audit" },
     { action: "read", resource: "report" },
     { action: "manage", resource: "config" },
+    // P6-E05-S05 (Story 35.5): admin manages expenses + recurring templates.
+    { action: "manage", resource: "expense" },
   ],
   treasury: [
     { action: "manage", resource: "float" },
@@ -62,6 +66,8 @@ const ADMIN_GRANTS: Readonly<Record<string, readonly Grant[]>> = {
     { action: "read", resource: "wallet" },
     { action: "read", resource: "reconciliation" },
     { action: "read", resource: "report" },
+    // P6-E05-S05 (Story 35.5): owning the books — accountant manages expenses.
+    { action: "manage", resource: "expense" },
   ],
 };
 
@@ -167,6 +173,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: "/review-snippets",
     label: "Review snippets",
     permission: { action: "manage", resource: "config" },
+  },
+  // P6-E05-S05 (Story 35.5): Expenses module — the FOUNDATION the consolidated
+  // P&L (35.1) consumes. Gated on `manage expense` — admin / accountant /
+  // super_admin. The server re-enforces the same gate.
+  {
+    href: "/expenses",
+    label: "Expenses",
+    permission: { action: "manage", resource: "expense" },
   },
   {
     href: "/treasury/float-accounts",

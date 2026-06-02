@@ -33,6 +33,7 @@ import { registerAdminFeedbackDashboard } from "./feedback-dashboard.js";
 import { registerAdminReviewSnippets } from "./review-snippets.js";
 import { registerAdminAlerts } from "./alerts.js";
 import { registerAdminDailyDispatch } from "./daily-dispatch.js";
+import { registerAdminExpenses } from "./expenses.js";
 import {
   registerAdminWooCommerceConfig,
   type WooCommerceRouteConfig,
@@ -98,6 +99,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminReviewSnippets(app, { db: deps.db, sessions: deps.sessions }); // P6-E04-S04 (Story 34.4)
   registerAdminAlerts(app, deps); // P6-E04-S03 (Story 34.3)
   registerAdminDailyDispatch(app, deps); // P4-E04-S04 (Story 29.4)
+  registerAdminExpenses(app, { db: deps.db, sessions: deps.sessions }); // P6-E05-S05 (Story 35.5)
   registerAdminWooCommerceConfig(app, {
     db: deps.db,
     sessions: deps.sessions,
