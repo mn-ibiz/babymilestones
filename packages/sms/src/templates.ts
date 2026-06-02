@@ -29,6 +29,7 @@ export type SmsTemplateKey =
   | "event.eticket"
   | "event.rsvp"
   | "feedback.invite"
+  | "feedback.negative_alert"
   | "raw";
 
 /** Data bag passed to a template; renderers read the fields they need. */
@@ -98,6 +99,12 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
   // completed paid touchpoint. The `link` carries the invitation token.
   "feedback.invite": (d) =>
     `How was ${str(d, "serviceName")}? Tap to rate it 0–5: ${str(d, "link")} — ${BRAND.name}`,
+  // Negative-feedback alert (P6-E04-S03 AC1): the alert cron texts the configured
+  // ops/admin number when a parent leaves a low (≤2) rating. NEUTRAL copy — the
+  // rating + unit + a link to the feedback detail so an admin can follow up. The
+  // parent's comment TEXT is never quoted here.
+  "feedback.negative_alert": (d) =>
+    `Low feedback alert: a ${str(d, "rating")}/5 rating was left for ${str(d, "unit")}. Review it: ${str(d, "link")} — ${BRAND.name}`,
   raw: (d) => str(d, "body"),
 };
 

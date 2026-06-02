@@ -20,6 +20,7 @@ import { createOutstandingRemindersJob } from "./jobs/outstanding-reminders.js";
 import { createWcSyncPullJob } from "./jobs/wc-sync-pull.js";
 import { createWcOutboxDrainJob } from "./jobs/wc-outbox-drain.js";
 import { createWcStockReconcileJob } from "./jobs/wc-stock-reconcile.js";
+import { createNegativeFeedbackAlertJob } from "./jobs/negative-feedback-alert.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -93,6 +94,17 @@ export type { WcOutboxDrainJobDeps, WcDrainClient, WcOutboxDrainLogger } from ".
 // P4-E04-S05 (Story 29.5): nightly stock reconciliation report.
 export { createWcStockReconcileJob } from "./jobs/wc-stock-reconcile.js";
 export type { WcStockReconcileJobDeps, WcStockReconcileLogger } from "./jobs/wc-stock-reconcile.js";
+// P6-E04-S03 (Story 34.3): negative-feedback alert cron (~5-min cadence).
+export {
+  createNegativeFeedbackAlertJob,
+  ADMIN_ALERT_PHONE_SETTING_KEY,
+  NEGATIVE_FEEDBACK_RATING_MAX,
+  NEGATIVE_FEEDBACK_ALERT_TYPE,
+} from "./jobs/negative-feedback-alert.js";
+export type {
+  NegativeFeedbackAlertJobDeps,
+  NegativeFeedbackAlertLogger,
+} from "./jobs/negative-feedback-alert.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -227,6 +239,12 @@ export function registerWcStockReconcileJob(
   deps: Parameters<typeof createWcStockReconcileJob>[0],
 ): void {
   register(createWcStockReconcileJob(deps));
+}
+/** Wire the negative-feedback alert cron (P6-E04-S03; ~5-min cadence, 5-min SLA). */
+export function registerNegativeFeedbackAlertJob(
+  deps: Parameters<typeof createNegativeFeedbackAlertJob>[0],
+): void {
+  register(createNegativeFeedbackAlertJob(deps));
 }
 
 export { logger } from "./logger.js";

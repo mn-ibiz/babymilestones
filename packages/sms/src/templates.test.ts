@@ -96,3 +96,35 @@ describe("feedback invitation template (P6-E04-S01 AC2)", () => {
     expect(() => renderTemplate("feedback.invite", { serviceName: "x" })).toThrow(/link/);
   });
 });
+
+/**
+ * P6-E04-S03 AC1 — negative-feedback alert SMS-stub. When a parent submits a low
+ * rating (≤2), the alert cron texts the configured ops/admin number a NEUTRAL
+ * heads-up: the rating, the unit, and a link to the feedback detail so an admin
+ * can follow up. Neutral copy — it never quotes the parent's comment text.
+ */
+describe("negative-feedback alert template (P6-E04-S03 AC1)", () => {
+  it("renders the alert with the rating, unit and a link to the detail", () => {
+    expect(
+      renderTemplate("feedback.negative_alert", {
+        rating: "1",
+        unit: "Salon",
+        link: "https://admin.example/feedback",
+      }),
+    ).toBe(
+      "Low feedback alert: a 1/5 rating was left for Salon. Review it: https://admin.example/feedback — Baby Milestones",
+    );
+  });
+
+  it("requires the rating, unit and link fields", () => {
+    expect(() => renderTemplate("feedback.negative_alert", { unit: "Salon", link: "x" })).toThrow(
+      /rating/,
+    );
+    expect(() => renderTemplate("feedback.negative_alert", { rating: "1", link: "x" })).toThrow(
+      /unit/,
+    );
+    expect(() =>
+      renderTemplate("feedback.negative_alert", { rating: "1", unit: "Salon" }),
+    ).toThrow(/link/);
+  });
+});

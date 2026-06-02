@@ -56,6 +56,12 @@ export const feedback = pgTable(
       .default(sql`now()`),
     /** When the parent submitted. NULL = still pending (an open invitation). */
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    /**
+     * Negative-feedback alert stamp (P6-E04-S03 / Story 34.3). NULL until the
+     * alert cron has raised the in-app alert + ops SMS for a LOW (≤2) rating; the
+     * cron only scans `alerted_at IS NULL` rows so each feedback alerts ONCE.
+     */
+    alertedAt: timestamp("alerted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),

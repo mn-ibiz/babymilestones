@@ -3233,6 +3233,66 @@ export function feedbackResponseRows(responses: readonly FeedbackResponseDto[]):
   });
 }
 
+/* --- Admin in-app alerts (P6-E04-S03 / Story 34.3) ------------------------ */
+
+/** Alert severity bucket — drives list ordering / styling. */
+export type AdminAlertSeverity = "info" | "warning" | "critical";
+
+/**
+ * An admin in-app alert on the wire (Story 34.3). A typed, severity-tagged
+ * heads-up that links to a detail view (`linkPath`). The negative-feedback cron
+ * is the only producer today: a LOW (≤2) rating raises one `negative_feedback`
+ * alert linking to the feedback detail (AC2). Never carries the parent's comment
+ * text — ids/labels only.
+ */
+export interface AdminAlertDto {
+  id: string;
+  type: string;
+  severity: AdminAlertSeverity;
+  /** What the alert is about (e.g. 'feedback'). */
+  sourceType: string;
+  /** The source row id (e.g. the feedback id). */
+  sourceId: string;
+  title: string;
+  body: string | null;
+  /** The in-app path the alert links to (the feedback detail view, AC2). */
+  linkPath: string;
+  /** ISO timestamp the alert was raised. */
+  createdAt: string;
+}
+
+/** A render-ready alert row for the bell / alerts list (AC2). */
+export interface AdminAlertRowView {
+  id: string;
+  type: string;
+  severity: AdminAlertSeverity;
+  title: string;
+  body: string | null;
+  /** Where the row links (the feedback detail) — alias of `linkPath` (AC2). */
+  href: string;
+  /** Formatted date (`YYYY-MM-DD`) the alert was raised. */
+  date: string;
+}
+
+/**
+ * Shape the unread alerts into render-ready rows for the bell list (AC2), NEWEST
+ * first. Each row carries `href` (the detail link) so the in-app surface can link
+ * every alert straight to the feedback detail. Pure + framework-free.
+ */
+export function adminAlertRows(alerts: readonly AdminAlertDto[]): AdminAlertRowView[] {
+  return [...alerts]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+    .map((a) => ({
+      id: a.id,
+      type: a.type,
+      severity: a.severity,
+      title: a.title,
+      body: a.body,
+      href: a.linkPath,
+      date: a.createdAt.slice(0, 10),
+    }));
+}
+
 /* --- Revenue by unit, by period (P3-E05-S02 / Story 27.2) ----------------- */
 
 /**

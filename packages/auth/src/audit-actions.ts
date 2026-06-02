@@ -259,8 +259,19 @@ export const AUDIT_ACTION_CATALOGUE = {
    * P6-E04-S02 (Story 34.2): the feedback dashboard shows individual responses
    * ANONYMISED by default; an admin DE-ANONYMISING one (revealing the parent
    * behind a rating) is a sensitive identity disclosure worth a forensic line —
-   * `feedback.deanonymised`. The dashboard READ itself is not audited (a read). */
-  feedback: ["feedback.invited", "feedback.submitted", "feedback.deanonymised"],
+   * `feedback.deanonymised`. The dashboard READ itself is not audited (a read).
+   * P6-E04-S03 (Story 34.3): a LOW (≤2) rating raises an in-app alert + ops SMS;
+   * the cron audits `feedback.negative_alert` once per alerted feedback row, and
+   * an admin DISMISSING an in-app alert is audited as `alert.dismissed`. */
+  feedback: [
+    "feedback.invited",
+    "feedback.submitted",
+    "feedback.deanonymised",
+    "feedback.negative_alert",
+  ],
+  /** In-app admin alerts (Epic 34 / P6-E04-S03) — the bell / alerts list. An admin
+   * acknowledging (read) or DISMISSING an alert is a state change worth a trail. */
+  alert: ["alert.dismissed"],
   /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
   event: [
     "event.created",

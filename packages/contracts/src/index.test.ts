@@ -57,8 +57,10 @@ import {
   feedbackStaffRows,
   feedbackResponseRows,
   feedbackDistributionBars,
+  adminAlertRows,
   type FeedbackDashboardDto,
   type FeedbackResponseDto,
+  type AdminAlertDto,
   staffLeaderboardQuerySchema,
   staffLeaderboardRows,
   staffCommissionDrilldownView,
@@ -1099,6 +1101,39 @@ describe("feedback dashboard contracts (P6-E04-S02 / Story 34.2)", () => {
     ];
     const rows = feedbackResponseRows(responses);
     expect(rows[0]!.parentName).toBe("Pat Doe");
+  });
+});
+
+describe("admin in-app alerts contracts (P6-E04-S03 / Story 34.3)", () => {
+  const alert: AdminAlertDto = {
+    id: "a1",
+    type: "negative_feedback",
+    severity: "warning",
+    sourceType: "feedback",
+    sourceId: "f1",
+    title: "Low rating (1/5) for Salon",
+    body: "A 1/5 rating was submitted.",
+    linkPath: "/feedback?focus=f1",
+    createdAt: "2026-06-12T10:05:00.000Z",
+  };
+
+  it("shapes an alert into a render-ready row carrying its detail link (AC2)", () => {
+    const rows = adminAlertRows([alert]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: "a1",
+      title: "Low rating (1/5) for Salon",
+      href: "/feedback?focus=f1",
+      severity: "warning",
+    });
+    // The row carries a formatted date for the list.
+    expect(rows[0]!.date).toBe("2026-06-12");
+  });
+
+  it("orders alerts newest-first for the bell list", () => {
+    const older: AdminAlertDto = { ...alert, id: "a0", createdAt: "2026-06-10T08:00:00.000Z" };
+    const rows = adminAlertRows([older, alert]);
+    expect(rows.map((r) => r.id)).toEqual(["a1", "a0"]);
   });
 });
 

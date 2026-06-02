@@ -248,6 +248,8 @@ export {
   type LoadFeedbackResponsesOpts,
   type FeedbackResponseDetail,
 } from "./feedback-dashboard-db.js";
+// P6-E04-S03 (Story 34.3): admin in-app alert read model (the bell / alerts list).
+export { listUnreadAdminAlerts, dismissAdminAlert } from "./admin-alerts.js";
 
 // Coach availability + 1:1 booking (P5-E01-S02 / Story 31.2). REUSES the generic
 // staff_availability table; bookable coaching_slots are capacity-1.
