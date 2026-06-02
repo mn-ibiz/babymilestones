@@ -11,6 +11,7 @@ import {
   reorderReviewSnippets,
   updateSnippetAttribution,
   listPublishedSnippets,
+  listLatestPublishedSnippets,
   listSnippetsForAdmin,
   listFiveStarCandidates,
   generateDefaultAttribution,
@@ -19,6 +20,7 @@ import {
   ReviewSnippetNotFoundError,
   REVIEW_QUOTE_MAX,
   REVIEW_ATTRIBUTION_MAX,
+  HOME_TESTIMONIALS_LIMIT,
 } from "./review-snippets.js";
 
 /**
@@ -308,6 +310,66 @@ describe("review-snippets module (P6-E04-S04 / Story 34.4)", () => {
       }
       const published = await listPublishedSnippets(dbh.db, { limit: 3 });
       expect(published.length).toBe(3);
+    });
+  });
+
+  // --- 36.5 AC1: home auto-pulls the LATEST 3 published, by publish recency --
+  describe("listLatestPublishedSnippets (P6-E06-S05 / Story 36.5 AC1)", () => {
+    /** Curate + publish a snippet at an explicit publish time. */
+    async function publishAt(adminId: string, comment: string, at: Date): Promise<string> {
+      const parent = await seedParent({ childCount: 1, place: "Nairobi" });
+      const fid = await seedFeedback({ parentUserId: parent.userId, rating: 5, comment });
+      const s = await curateReviewSnippet(dbh.db, { feedbackId: fid, actor: adminId });
+      await publishReviewSnippet(dbh.db, { snippetId: s.id, actor: adminId, at });
+      return s.id;
+    }
+
+    it("defaults to exactly the latest 3 by published_at DESC (a 4th older one is excluded)", async () => {
+      const adminId = await seedAdmin();
+      // Publish four, oldest → newest. The oldest (q0) must be excluded.
+      await publishAt(adminId, "q0", new Date("2026-06-01T10:00:00Z"));
+      await publishAt(adminId, "q1", new Date("2026-06-02T10:00:00Z"));
+      await publishAt(adminId, "q2", new Date("2026-06-03T10:00:00Z"));
+      await publishAt(adminId, "q3", new Date("2026-06-04T10:00:00Z"));
+
+      const latest = await listLatestPublishedSnippets(dbh.db);
+      expect(latest.map((s) => s.quote)).toEqual(["q3", "q2", "q1"]);
+    });
+
+    it("orders by publish recency, NOT display_order (a newly-published snippet appears first)", async () => {
+      const adminId = await seedAdmin();
+      const idOld = await publishAt(adminId, "old", new Date("2026-06-01T10:00:00Z"));
+      // Give the OLD one a low display_order — recency must still win for the home strip.
+      await reorderReviewSnippets(dbh.db, { orderedIds: [idOld] });
+      await publishAt(adminId, "newer", new Date("2026-06-05T10:00:00Z"));
+
+      const latest = await listLatestPublishedSnippets(dbh.db);
+      expect(latest.map((s) => s.quote)).toEqual(["newer", "old"]);
+    });
+
+    it("excludes unpublished snippets and carries no PII (only id/quote/attribution)", async () => {
+      const adminId = await seedAdmin();
+      await publishAt(adminId, "shown", new Date("2026-06-03T10:00:00Z"));
+      // A curated-but-unpublished snippet must never appear.
+      const parent = await seedParent({ childCount: 1, place: "Mombasa" });
+      const fid = await seedFeedback({ parentUserId: parent.userId, rating: 5, comment: "draft" });
+      await curateReviewSnippet(dbh.db, { feedbackId: fid, actor: adminId });
+
+      const latest = await listLatestPublishedSnippets(dbh.db);
+      expect(latest.map((s) => s.quote)).toEqual(["shown"]);
+      expect(Object.keys(latest[0]!).sort()).toEqual(["attributionLabel", "id", "quote"]);
+    });
+
+    it("honours an explicit limit override", async () => {
+      const adminId = await seedAdmin();
+      await publishAt(adminId, "a", new Date("2026-06-01T10:00:00Z"));
+      await publishAt(adminId, "b", new Date("2026-06-02T10:00:00Z"));
+      const latest = await listLatestPublishedSnippets(dbh.db, { limit: 1 });
+      expect(latest.map((s) => s.quote)).toEqual(["b"]);
+    });
+
+    it("exposes the home-strip limit of 3 (AC1)", () => {
+      expect(HOME_TESTIMONIALS_LIMIT).toBe(3);
     });
   });
 

@@ -29,6 +29,13 @@ export const REVIEW_ATTRIBUTION_MAX = 120;
 /** Default cap on published quotes returned to the public home page. */
 export const PUBLISHED_SNIPPETS_LIMIT = 12;
 
+/**
+ * The home page auto-pulls exactly the LATEST 3 published snippets (Story 36.5 AC1):
+ * social proof is a tight three-card strip ordered by publish recency, not the full
+ * curated list. See {@link listLatestPublishedSnippets}.
+ */
+export const HOME_TESTIMONIALS_LIMIT = 3;
+
 /** The required rating for a feedback comment to be curatable (AC1). */
 const FIVE_STAR = 5;
 
@@ -302,6 +309,34 @@ export async function listPublishedSnippets(
       sql`${reviewSnippets.displayOrder} asc nulls last`,
       desc(reviewSnippets.publishedAt),
     )
+    .limit(limit);
+  return rows.map((r) => ({ id: r.id, quote: r.quote, attributionLabel: r.attributionLabel }));
+}
+
+/**
+ * The HOME-PAGE social-proof projection (Story 36.5 AC1): the LATEST published
+ * snippets ordered STRICTLY by publish recency (`published_at` DESC), capped to
+ * {@link HOME_TESTIMONIALS_LIMIT} (3) by default. This deliberately differs from
+ * {@link listPublishedSnippets} (which honours the admin's `display_order` for the
+ * full curated list): the home strip auto-pulls whatever was most-recently curated &
+ * published, so a fresh publication propagates to the home page within the endpoint's
+ * 1h cache window — no reorder required. Same PII-absence guarantee: only the snippet
+ * id + quote + attribution label cross the boundary.
+ */
+export async function listLatestPublishedSnippets(
+  db: Executor,
+  opts: ListPublishedSnippetsOpts = {},
+): Promise<PublicReviewSnippet[]> {
+  const limit = opts.limit ?? HOME_TESTIMONIALS_LIMIT;
+  const rows = await db
+    .select({
+      id: reviewSnippets.id,
+      quote: reviewSnippets.quote,
+      attributionLabel: reviewSnippets.attributionLabel,
+    })
+    .from(reviewSnippets)
+    .where(isNotNull(reviewSnippets.publishedAt))
+    .orderBy(desc(reviewSnippets.publishedAt), desc(reviewSnippets.createdAt))
     .limit(limit);
   return rows.map((r) => ({ id: r.id, quote: r.quote, attributionLabel: r.attributionLabel }));
 }

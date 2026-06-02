@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HOME_HERO,
+  HOME_TESTIMONIALS_LIMIT,
   HOME_UNITS,
   LCP_BUDGET_MS,
   SIGN_UP_HREF,
@@ -98,6 +99,26 @@ describe("home testimonials (P6-E04-S04 / Story 34.4 AC2)", () => {
 
   it("drops snippets with an empty quote or attribution", () => {
     expect(homeTestimonials(snippets).map((c) => c.id)).toEqual(["a"]);
+  });
+
+  it("renders AT MOST the latest 3 — the home strip is a 3-card social-proof block (Story 36.5 AC1)", () => {
+    const five: PublicReviewSnippet[] = Array.from({ length: 5 }, (_, i) => ({
+      id: `s${i}`,
+      quote: `q${i}`,
+      attributionLabel: "Parent, Nairobi",
+    }));
+    const cards = homeTestimonials(five);
+    expect(cards.length).toBe(HOME_TESTIMONIALS_LIMIT);
+    // Keeps source order (the endpoint already delivers them publish-recency-DESC).
+    expect(cards.map((c) => c.id)).toEqual(["s0", "s1", "s2"]);
+  });
+
+  it("returns an empty list when nothing is published (the section is hidden by the renderer)", () => {
+    expect(homeTestimonials([])).toEqual([]);
+  });
+
+  it("exposes the home-strip limit of 3 (AC1)", () => {
+    expect(HOME_TESTIMONIALS_LIMIT).toBe(3);
   });
 
   it("never carries a parent identity — only id/quote/attribution", () => {

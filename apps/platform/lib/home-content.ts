@@ -121,14 +121,25 @@ export interface PublicReviewSnippet {
 export const TESTIMONIALS_HEADING = "What parents say";
 
 /**
- * Shape the public snippets into home-page testimonial cards (AC2). Drops any
- * snippet missing a quote or attribution defensively, and trims whitespace. Pure so
- * the home-page server component stays a thin render and this is unit-tested in
- * isolation. Carries ONLY the public fields — never a parent identity.
+ * The home page auto-pulls exactly the LATEST 3 published testimonials (Story 36.5
+ * AC1): a tight three-card social-proof strip. The public endpoint already caps to 3
+ * by publish recency; this constant + the cap in {@link homeTestimonials} make the
+ * guarantee explicit and defensive even if the feed ever returns more.
+ */
+export const HOME_TESTIMONIALS_LIMIT = 3;
+
+/**
+ * Shape the public snippets into home-page testimonial cards (AC2 / Story 36.5 AC1).
+ * Drops any snippet missing a quote or attribution defensively, trims whitespace, and
+ * caps the result to the LATEST {@link HOME_TESTIMONIALS_LIMIT} (3) — the feed already
+ * arrives publish-recency-DESC, so source order is preserved. Pure so the home-page
+ * server component stays a thin render and this is unit-tested in isolation. Carries
+ * ONLY the public fields — never a parent identity.
  */
 export function homeTestimonials(snippets: readonly PublicReviewSnippet[]): HomeTestimonial[] {
   return snippets
     .filter((s) => s.quote.trim().length > 0 && s.attributionLabel.trim().length > 0)
+    .slice(0, HOME_TESTIMONIALS_LIMIT)
     .map((s) => ({ id: s.id, quote: s.quote.trim(), attribution: s.attributionLabel.trim() }));
 }
 

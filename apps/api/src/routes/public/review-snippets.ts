@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { listPublishedSnippets, type PublicReviewSnippet } from "@bm/catalog";
+import { listLatestPublishedSnippets, HOME_TESTIMONIALS_LIMIT, type PublicReviewSnippet } from "@bm/catalog";
 import type { Database } from "@bm/db";
 import type { PublicReviewSnippetDto } from "@bm/contracts";
 
@@ -9,10 +9,15 @@ import type { PublicReviewSnippetDto } from "@bm/contracts";
  * 5-star quotes, each under an ANONYMISED attribution label (e.g. "Parent of two,
  * Nairobi") — NEVER a real parent name (AC2).
  *
- * CRITICAL (AC2 PII-absence guarantee): the projection ({@link listPublishedSnippets})
+ * CRITICAL (AC2 PII-absence guarantee): the projection ({@link listLatestPublishedSnippets})
  * selects ONLY the snippet id + quote + attribution label, so a parent name, a
  * parent id, and the underlying feedback id can NEVER cross this internet-reachable
  * boundary. The label is already anonymised at curation time.
+ *
+ * Story 36.5 (P6-E06-S05) — social proof: this endpoint auto-pulls the LATEST 3
+ * published snippets by publish recency ({@link HOME_TESTIMONIALS_LIMIT}), so a fresh
+ * curation appears on the home page without any admin reorder. Combined with the ~1h
+ * cache window below, a newly-published testimonial propagates within 1h (AC2).
  *
  * Two protections sit on this surface (it is internet-reachable without a session):
  * a per-IP rate limit (anti-scrape) and a ~1h cache window so a CDN / browser can
@@ -89,9 +94,12 @@ export function registerPublicReviewSnippets(app: FastifyInstance, deps: PublicR
   }
 
   // Published testimonials only — quote + anonymised attribution, NO PII (AC2).
+  // The LATEST 3 by publish recency (Story 36.5 AC1) — the home-page social-proof strip.
   app.get("/public/review-snippets", async (req: FastifyRequest, reply: FastifyReply) => {
     if (!gate(req, reply)) return reply;
-    const snippets: PublicReviewSnippet[] = await listPublishedSnippets(db);
+    const snippets: PublicReviewSnippet[] = await listLatestPublishedSnippets(db, {
+      limit: HOME_TESTIMONIALS_LIMIT,
+    });
     const dto: PublicReviewSnippetDto[] = snippets.map((s) => ({
       id: s.id,
       quote: s.quote,

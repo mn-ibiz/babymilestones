@@ -114,6 +114,55 @@ describe("public review snippets (P6-E04-S04 / Story 34.4)", () => {
     expect(res.json().snippets).toEqual([]);
   });
 
+  it("auto-pulls the LATEST 3 published by publish recency — a 4th older one is excluded (Story 36.5 AC1)", async () => {
+    // Publish four at increasing publish times; the oldest (q0) must drop out.
+    for (let i = 0; i < 4; i++) {
+      const fid = await seedFiveStarFeedback({
+        firstName: `P${i}`,
+        lastName: "X",
+        place: "Nairobi",
+        childCount: 1,
+        comment: `q${i}`,
+      });
+      const snippet = await curateReviewSnippet(dbh.db, { feedbackId: fid, actor: adminId });
+      await publishReviewSnippet(dbh.db, {
+        snippetId: snippet.id,
+        actor: adminId,
+        at: new Date(`2026-06-0${i + 1}T10:00:00Z`),
+      });
+    }
+    const res = await app.inject({ method: "GET", url: "/public/review-snippets" });
+    expect(res.statusCode).toBe(200);
+    const quotes = res.json().snippets.map((s: { quote: string }) => s.quote);
+    expect(quotes).toEqual(["q3", "q2", "q1"]);
+  });
+
+  it("surfaces a freshly-published snippet at the front (within the 1h cache window) (Story 36.5 AC1+AC2)", async () => {
+    const oldFid = await seedFiveStarFeedback({
+      firstName: "Old",
+      lastName: "X",
+      place: "Nairobi",
+      childCount: 1,
+      comment: "older",
+    });
+    const old = await curateReviewSnippet(dbh.db, { feedbackId: oldFid, actor: adminId });
+    await publishReviewSnippet(dbh.db, { snippetId: old.id, actor: adminId, at: new Date("2026-06-01T10:00:00Z") });
+
+    const freshFid = await seedFiveStarFeedback({
+      firstName: "Fresh",
+      lastName: "X",
+      place: "Nairobi",
+      childCount: 1,
+      comment: "newest",
+    });
+    const fresh = await curateReviewSnippet(dbh.db, { feedbackId: freshFid, actor: adminId });
+    await publishReviewSnippet(dbh.db, { snippetId: fresh.id, actor: adminId, at: new Date("2026-06-09T10:00:00Z") });
+
+    const res = await app.inject({ method: "GET", url: "/public/review-snippets" });
+    const quotes = res.json().snippets.map((s: { quote: string }) => s.quote);
+    expect(quotes[0]).toBe("newest");
+  });
+
   it("sets a public Cache-Control with a ~1h max-age (cacheable)", async () => {
     const res = await app.inject({ method: "GET", url: "/public/review-snippets" });
     const cc = res.headers["cache-control"];
