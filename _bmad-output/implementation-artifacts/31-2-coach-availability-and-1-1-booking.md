@@ -1,6 +1,6 @@
 # Story 31.2: Coach availability and 1:1 booking
 
-Status: in-progress
+Status: review
 
 > Canonical ID: P5-E01-S02 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E01-S02.md
 

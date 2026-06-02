@@ -287,7 +287,7 @@ development_status:
   # Epic 31 — Mom Coaching & Birth Doula  (P5-E01)
   epic-31: in-progress
   31-1-coaching-catalogue-1-1-group: done  # P5-E01-S01
-  31-2-coach-availability-and-1-1-booking: in-progress  # P5-E01-S02
+  31-2-coach-availability-and-1-1-booking: review  # P5-E01-S02
   31-3-group-session-booking: ready-for-dev  # P5-E01-S03
   31-4-coach-session-notes-private: ready-for-dev  # P5-E01-S04
   31-5-sensitive-flow-discreet-billing-labels: ready-for-dev  # P5-E01-S05
