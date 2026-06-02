@@ -1,6 +1,6 @@
 # Story 36.4: Blog / stories (optional)
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E06-S04 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E06-S04.md
 
