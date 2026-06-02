@@ -18,8 +18,13 @@ export type SmsTemplateKey =
   | "payment.mpesa.failed"
   | "parent.data.export.ready"
   | "booking.confirmed"
+  | "coaching.confirmed"
+  | "coaching.reminder"
   | "subscription.confirmed"
   | "subscription.dunning"
+  | "outstanding.day1"
+  | "outstanding.day7"
+  | "outstanding.day30"
   | "pickup.handoff"
   | "event.eticket"
   | "event.rsvp"
@@ -61,10 +66,25 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
     `Your ${BRAND.name} data export is ready. Download (valid 7 days, one-time): ${str(d, "link")}`,
   "booking.confirmed": (d) =>
     `${str(d, "childName")} is booked for ${str(d, "serviceName")} on ${str(d, "date")} at ${str(d, "time")}. — ${BRAND.name}`,
+  // 1:1 coaching booking confirmation (P5-E01-S02 AC5). Transactional.
+  "coaching.confirmed": (d) =>
+    `Your 1:1 ${str(d, "offeringName")} for ${str(d, "childName")} with ${str(d, "coachName")} is booked for ${str(d, "date")} at ${str(d, "time")}. — ${BRAND.name}`,
+  // Day-before 1:1 coaching reminder (P5-E01-S02 AC5). Sent by the daily job.
+  "coaching.reminder": (d) =>
+    `Reminder: ${str(d, "childName")}'s 1:1 ${str(d, "offeringName")} with ${str(d, "coachName")} is tomorrow, ${str(d, "date")} at ${str(d, "time")}. — ${BRAND.name}`,
   "subscription.confirmed": (d) =>
     `${str(d, "childName")} is subscribed to ${str(d, "planName")} (${str(d, "entitlement")} sessions). — ${BRAND.name}`,
   "subscription.dunning": (d) =>
     `We couldn't renew your ${str(d, "planName")} subscription — please top up your ${BRAND.name} wallet to keep it active.`,
+  // Outstanding-balance nudge ladder (P2-E07-S02 AC1). NON-transactional
+  // reminders — the dunning cron gates them on the parent's marketing/
+  // non-transactional opt-out before queuing. Copy escalates with the debt age.
+  "outstanding.day1": (d) =>
+    `You have an outstanding balance of KES ${str(d, "amountKes")} at ${BRAND.name}. Please top up your wallet at your convenience.`,
+  "outstanding.day7": (d) =>
+    `Reminder: your ${BRAND.name} balance of KES ${str(d, "amountKes")} is still outstanding. Please top up your wallet to settle it.`,
+  "outstanding.day30": (d) =>
+    `Your ${BRAND.name} balance of KES ${str(d, "amountKes")} has been outstanding for 30 days. Please settle it to keep your account in good standing.`,
   "pickup.handoff": (d) => `${str(d, "childName")}'s day at ${BRAND.name}: ${str(d, "summary")}`,
   // Guest e-ticket after a paid purchase (30-3): quantity, event, and the link
   // that opens the ticket(s) / door codes. No account — the link is the proof.

@@ -6,6 +6,7 @@ import type { WalletOverview } from "@bm/contracts";
 import { TOP_UP_METHODS, walletTransactionRows } from "../../../lib/wallet";
 import { fetchWalletOverview } from "../../../lib/wallet-api";
 import { downloadStatement } from "../../../lib/statement-api";
+import { AutoCreditStatus } from "@bm/ui";
 import { WalletBalanceCard } from "../../components/WalletBalanceCard";
 
 /** Last 12 months ending today — the default window for the full statement (AC3). */
@@ -78,6 +79,10 @@ export default function WalletPage() {
       <h1>Wallet</h1>
 
       <WalletBalanceCard wallet={wallet} />
+
+      {/* P2-E07-S03: read-only auto-credit visibility. The flag is admin-owned
+          (set in P1-E03-S07) and never editable here — the parent only sees it. */}
+      <AutoCreditStatus enabled={wallet.autoCreditEnabled} />
 
       <button type="button" onClick={() => setShowPicker((v) => !v)} aria-expanded={showPicker}>
         Top up
