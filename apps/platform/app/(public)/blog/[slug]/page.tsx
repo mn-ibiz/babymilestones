@@ -65,7 +65,7 @@ export default async function ArticleDetailPage(props: {
       </p>
 
       <article className="mt-4">
-        <h1 className="text-3xl font-semibold leading-tight text-ink md:text-4xl">{article.title}</h1>
+        <h1 className="text-3xl font-semibold leading-tight text-ink">{article.title}</h1>
         <p className="mt-3 text-sm text-ink/60">By {article.author}</p>
 
         {article.tags.length > 0 && (

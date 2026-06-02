@@ -45,7 +45,7 @@ export default async function MarketingHomePage() {
       {/* Hero (AC1) */}
       <section className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 md:flex-row md:items-center md:gap-10 md:py-16">
         <div className="flex-1">
-          <h1 className="text-3xl font-semibold leading-tight text-ink md:text-4xl">
+          <h1 className="text-3xl font-semibold leading-tight text-ink">
             {headline}
           </h1>
           <p className="mt-4 max-w-prose text-base text-ink/70">{subhead}</p>

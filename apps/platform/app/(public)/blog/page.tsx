@@ -36,7 +36,7 @@ export default async function BlogIndexPage({ searchParams }: BlogParams) {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 md:py-16">
       <header>
-        <h1 className="text-3xl font-semibold leading-tight text-ink md:text-4xl">Parenting stories</h1>
+        <h1 className="text-3xl font-semibold leading-tight text-ink">Parenting stories</h1>
         <p className="mt-3 max-w-prose text-base text-ink/70">
           Practical, gentle advice for every stage — play, development, nutrition, sleep and more.
         </p>

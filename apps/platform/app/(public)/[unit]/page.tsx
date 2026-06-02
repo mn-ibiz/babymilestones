@@ -72,7 +72,7 @@ export default async function UnitPage(props: {
     <main className="mx-auto max-w-5xl px-4 py-10 md:py-16">
       <section className="flex flex-col gap-6 md:flex-row md:items-center md:gap-10">
         <div className="flex-1">
-          <h1 className="text-3xl font-semibold leading-tight text-ink md:text-4xl">
+          <h1 className="text-3xl font-semibold leading-tight text-ink">
             {view.title}
           </h1>
           <p className="mt-4 max-w-prose text-base text-ink/70">{view.heroCopy}</p>
