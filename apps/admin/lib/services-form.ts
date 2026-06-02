@@ -157,6 +157,7 @@ export interface ServiceFormErrors {
   taxTreatment?: string;
   format?: string;
   coachingDurationMinutes?: string;
+  coachingCapacity?: string;
 }
 
 /**
@@ -171,6 +172,7 @@ export function validateServiceForm(input: {
   taxTreatment?: string;
   format?: string;
   coachingDurationMinutes?: number | null;
+  coachingCapacity?: number | null;
 }): ServiceFormErrors {
   const errors: ServiceFormErrors = {};
   if (input.name.trim().length === 0) errors.name = "Name is required";
@@ -196,6 +198,15 @@ export function validateServiceForm(input: {
   const duration = input.coachingDurationMinutes;
   if (duration != null && (!Number.isInteger(duration) || duration <= 0)) {
     errors.coachingDurationMinutes = "Duration must be a positive whole number of minutes";
+  }
+  // Group capacity is optional; when present it must be a positive whole number of
+  // seats (P5-E01-S03 AC1). A `group` offering implies > 1 seat (a single-seat
+  // session is a 1:1 offering, not a group).
+  const capacity = input.coachingCapacity;
+  if (capacity != null && (!Number.isInteger(capacity) || capacity < 1)) {
+    errors.coachingCapacity = "Capacity must be a whole number of seats (at least 1)";
+  } else if (capacity != null && capacity === 1 && format === "group") {
+    errors.coachingCapacity = "A group session needs more than one seat";
   }
   return errors;
 }

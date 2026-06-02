@@ -9,11 +9,13 @@ import {
   COACHING_SLOT_HORIZON_DAYS,
   bookCoachingSlot,
   CoachingServicePriceMissingError,
+  CoachingSlotFullError,
   CoachingSlotNotFoundError,
   CoachingSlotTakenError,
   CoachingCoachMismatchError,
   generateCoachingSlotsForAvailability,
   listAvailableCoachingSlots,
+  listAvailableCoachingSlotsWithSeats,
   listCoachingOfferingDurations,
   listCoachingSlots,
   regenerateCoachingSlots,
@@ -291,5 +293,188 @@ describe("1:1 coaching booking — capacity 1 (AC2/AC3/AC4)", () => {
     await expect(
       bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId, childId }),
     ).rejects.toBeInstanceOf(CoachingCoachMismatchError);
+  });
+});
+
+/**
+ * P5-E01-S03 (Story 31.3) — Group session booking. A group coaching offering is a
+ * coaching slot with capacity > 1 (AC1); parents book INDIVIDUAL seats and the
+ * availability shows SEATS REMAINING (AC2); the payment + reminder flow is the same
+ * as 1:1 (AC3 — each seat raises its own pending invoice via the booking path).
+ */
+describe("group coaching slot generation + seat booking (P5-E01-S03)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  async function seedParentChild() {
+    const [u] = await dbh.db
+      .insert(users)
+      .values({ role: "parent", phone: `+25470000${Math.floor(Math.random() * 9000) + 1000}` })
+      .returning();
+    const [parent] = await dbh.db.insert(parents).values({ userId: u!.id, firstName: "Pat", lastName: "Doe" }).returning();
+    const [child] = await dbh.db
+      .insert(children)
+      .values({ parentId: parent!.id, firstName: "Kid", dateOfBirth: "2022-01-01" })
+      .returning();
+    return { parentId: parent!.id, childId: child!.id, userId: u!.id };
+  }
+
+  /** A priced group coaching offering with `capacity` seats and a 60-min session. */
+  async function priceGroupCoaching(capacity: number, amountCents = 5000) {
+    const svc = await createService(dbh.db, {
+      name: "New-parent group",
+      unit: "coaching",
+      attributionRoleRequired: "coach",
+      format: "group",
+      coachingDurationMinutes: 60,
+      coachingCapacity: capacity,
+    });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents, effectiveFrom: "2020-01-01" });
+    return svc;
+  }
+
+  async function seedGroupCoachWithSlots(serviceId: string, name: string, capacity: number) {
+    const coach = await createStaff(dbh.db, { displayName: name, role: "coach" });
+    const avail = await createStaffAvailability(dbh.db, {
+      staffId: coach.id,
+      dayOfWeek: dayOfWeekIso(FROM),
+      startTime: "09:00",
+      endTime: "10:00",
+      effectiveFrom: FROM,
+    });
+    await generateCoachingSlotsForAvailability(dbh.db, avail, {
+      fromDate: FROM,
+      days: 1,
+      services: [{ id: serviceId, coachingDurationMinutes: 60, capacity }],
+    });
+    return coach;
+  }
+
+  it("generates group slots with capacity = N; a 1:1 offering stays capacity 1 (AC1)", async () => {
+    const group = await priceGroupCoaching(8);
+    const groupCoach = await seedGroupCoachWithSlots(group.id, "Coach Group", 8);
+    const groupSlots = await listCoachingSlots(dbh.db, { staffId: groupCoach.id });
+    expect(groupSlots.length).toBeGreaterThan(0);
+    expect(groupSlots.every((s) => s.capacity === 8)).toBe(true);
+
+    // A 1:1 offering generated with capacity 1 (the default snapshot).
+    const oneToOne = await createService(dbh.db, {
+      name: "Sleep 1:1",
+      unit: "coaching",
+      attributionRoleRequired: "coach",
+      format: "one_to_one",
+      coachingDurationMinutes: 60,
+    });
+    const soloCoach = await createStaff(dbh.db, { displayName: "Coach Solo", role: "coach" });
+    const soloAvail = await createStaffAvailability(dbh.db, {
+      staffId: soloCoach.id,
+      dayOfWeek: dayOfWeekIso(FROM),
+      startTime: "09:00",
+      endTime: "10:00",
+      effectiveFrom: FROM,
+    });
+    await generateCoachingSlotsForAvailability(dbh.db, soloAvail, {
+      fromDate: FROM,
+      days: 1,
+      services: [{ id: oneToOne.id, coachingDurationMinutes: 60 }], // no capacity → 1
+    });
+    const soloSlots = await listCoachingSlots(dbh.db, { staffId: soloCoach.id });
+    expect(soloSlots.every((s) => s.capacity === 1)).toBe(true);
+  });
+
+  it("availability exposes seatsRemaining = capacity − booked; decrements per seat (AC2)", async () => {
+    const svc = await priceGroupCoaching(3);
+    const coach = await seedGroupCoachWithSlots(svc.id, "Coach Group", 3);
+    const [slot] = await listAvailableCoachingSlotsWithSeats(dbh.db, { serviceId: svc.id, fromDate: FROM, toDate: FROM });
+    expect(slot!.capacity).toBe(3);
+    expect(slot!.seatsRemaining).toBe(3);
+
+    const a = await seedParentChild();
+    await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: a.parentId, childId: a.childId, staffId: coach.id });
+    const [afterOne] = await listAvailableCoachingSlotsWithSeats(dbh.db, { serviceId: svc.id, fromDate: FROM, toDate: FROM });
+    expect(afterOne!.seatsRemaining).toBe(2);
+  });
+
+  it("books up to N seats; the (N+1)th is rejected as full; full slots drop from availability (AC2)", async () => {
+    const svc = await priceGroupCoaching(2);
+    const coach = await seedGroupCoachWithSlots(svc.id, "Coach Group", 2);
+    const [slot] = await listAvailableCoachingSlotsWithSeats(dbh.db, { serviceId: svc.id, fromDate: FROM, toDate: FROM });
+
+    const a = await seedParentChild();
+    const b = await seedParentChild();
+    const c = await seedParentChild();
+    await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: a.parentId, childId: a.childId, staffId: coach.id });
+    await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: b.parentId, childId: b.childId, staffId: coach.id });
+
+    // The 3rd seat is rejected — the group session is full.
+    await expect(
+      bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: c.parentId, childId: c.childId, staffId: coach.id }),
+    ).rejects.toBeInstanceOf(CoachingSlotFullError);
+
+    // A full slot (0 seats remaining) is not offered in the seats availability.
+    const remaining = await listAvailableCoachingSlotsWithSeats(dbh.db, { serviceId: svc.id, fromDate: FROM, toDate: FROM });
+    expect(remaining.map((s) => s.id)).not.toContain(slot!.id);
+  });
+
+  it("each booked seat raises its own pending invoice + attribution (AC3)", async () => {
+    const svc = await priceGroupCoaching(4, 3000);
+    const coach = await seedGroupCoachWithSlots(svc.id, "Coach Group", 4);
+    const [slot] = await listAvailableCoachingSlotsWithSeats(dbh.db, { serviceId: svc.id, fromDate: FROM, toDate: FROM });
+
+    const a = await seedParentChild();
+    const b = await seedParentChild();
+    const ra = await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: a.parentId, childId: a.childId, staffId: coach.id });
+    const rb = await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: b.parentId, childId: b.childId, staffId: coach.id });
+    expect(ra.invoiceId).not.toBe(rb.invoiceId);
+
+    for (const r of [ra, rb]) {
+      const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, r.invoiceId));
+      expect(inv!.status).toBe("pending");
+      expect(inv!.amountDue).toBe(3000);
+      const [bk] = await dbh.db.select().from(bookings).where(eq(bookings.id, r.bookingId));
+      expect(bk!.coachingSlotId).toBe(slot!.id);
+      expect(bk!.staffId).toBe(coach.id);
+      expect(bk!.staffNameSnapshot).toBe("Coach Group");
+    }
+
+    // Two bookings → two seats consumed; both audited booking.created.
+    const audits = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "booking.created"));
+    expect(audits.length).toBe(2);
+  });
+
+  it("a 1:1 (capacity 1) slot still rejects a second booker with CoachingSlotTakenError (AC1 unchanged)", async () => {
+    const svc = await createService(dbh.db, {
+      name: "Sleep 1:1",
+      unit: "coaching",
+      attributionRoleRequired: "coach",
+      format: "one_to_one",
+      coachingDurationMinutes: 60,
+    });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 5000, effectiveFrom: "2020-01-01" });
+    const coach = await createStaff(dbh.db, { displayName: "Coach Solo", role: "coach" });
+    const avail = await createStaffAvailability(dbh.db, {
+      staffId: coach.id,
+      dayOfWeek: dayOfWeekIso(FROM),
+      startTime: "09:00",
+      endTime: "10:00",
+      effectiveFrom: FROM,
+    });
+    await generateCoachingSlotsForAvailability(dbh.db, avail, {
+      fromDate: FROM,
+      days: 1,
+      services: [{ id: svc.id, coachingDurationMinutes: 60 }],
+    });
+    const [slot] = await listAvailableCoachingSlots(dbh.db, { serviceId: svc.id, fromDate: FROM, toDate: FROM });
+    const a = await seedParentChild();
+    const b = await seedParentChild();
+    await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: a.parentId, childId: a.childId, staffId: coach.id });
+    await expect(
+      bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: b.parentId, childId: b.childId, staffId: coach.id }),
+    ).rejects.toBeInstanceOf(CoachingSlotTakenError);
   });
 });

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import type { Child, CoachingAvailability, CoachingSlotOption } from "@bm/contracts";
 import { fetchChildren } from "../../../../../lib/children-api";
 import { bookCoachingSlotRequest, fetchCoachingAvailability } from "../../../../../lib/book-slots-api";
-import { groupCoachingSlotsByDate } from "../../../../../lib/coaching-book";
+import { coachingSeatsLabel, groupCoachingSlotsByDate } from "../../../../../lib/coaching-book";
 
 /** Sentinel for "no coach picked yet" — a 1:1 session REQUIRES an explicit pick. */
 const NO_COACH = "" as const;
@@ -184,20 +184,24 @@ export default function BookCoachingPage() {
                 {g.weekdayLabel} · {g.dayLabel}
               </div>
               <ul className="mt-2 flex flex-wrap gap-2">
-                {g.slots.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFlash(null);
-                        setConfirming(s);
-                      }}
-                      className="rounded bg-emerald-50 px-2 py-1 text-left text-xs text-emerald-800 hover:bg-emerald-100"
-                    >
-                      {s.startTime}
-                    </button>
-                  </li>
-                ))}
+                {g.slots.map((s) => {
+                  const seats = coachingSeatsLabel(s);
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFlash(null);
+                          setConfirming(s);
+                        }}
+                        className="rounded bg-emerald-50 px-2 py-1 text-left text-xs text-emerald-800 hover:bg-emerald-100"
+                      >
+                        {s.startTime}
+                        {seats ? <span className="ml-1 text-emerald-600">· {seats}</span> : null}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

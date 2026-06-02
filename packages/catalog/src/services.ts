@@ -112,6 +112,12 @@ export interface CreateServiceInput {
   /** Coaching session length in minutes (P5-E01-S01 AC2). Positive when set; null = unset. */
   coachingDurationMinutes?: number | null;
   /**
+   * Group coaching capacity (P5-E01-S03 AC1): seats per generated slot. Only
+   * meaningful for `unit = 'coaching'`; null/omitted = unset (treated as 1, a 1:1
+   * hold). `1` = a 1:1 offering; `> 1` = a group offering. CHECK-constrained to ≥ 1.
+   */
+  coachingCapacity?: number | null;
+  /**
    * Optional free-set age-stage tags for a coaching offering (P5-E01-S01 AC2),
    * e.g. ["expecting", "0-3mo"]. Null/omitted = no tags; an empty array persists
    * as an empty set (distinct from null).
@@ -133,6 +139,7 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       ageMaxMonths: input.ageMaxMonths ?? null,
       format: input.format ?? null,
       coachingDurationMinutes: input.coachingDurationMinutes ?? null,
+      coachingCapacity: input.coachingCapacity ?? null,
       // An explicit (possibly empty) array is preserved; absent → null (no tags).
       ageStageTags: input.ageStageTags ?? null,
       ...(input.rescheduleCutoffHours !== undefined
@@ -170,6 +177,8 @@ export interface UpdateServiceInput {
   format?: CoachingFormat | null;
   /** Coaching session length in minutes (P5-E01-S01 AC2); null clears it. */
   coachingDurationMinutes?: number | null;
+  /** Group coaching capacity in seats (P5-E01-S03 AC1); null clears it (= 1, a 1:1 hold). */
+  coachingCapacity?: number | null;
   /** Free-set age-stage tags (P5-E01-S01 AC2); null clears them, [] = empty set. */
   ageStageTags?: string[] | null;
 }
@@ -196,6 +205,7 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
   if (patch.format !== undefined) set.format = patch.format;
   if (patch.coachingDurationMinutes !== undefined)
     set.coachingDurationMinutes = patch.coachingDurationMinutes;
+  if (patch.coachingCapacity !== undefined) set.coachingCapacity = patch.coachingCapacity;
   if (patch.ageStageTags !== undefined) set.ageStageTags = patch.ageStageTags;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;

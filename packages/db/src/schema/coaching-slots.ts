@@ -50,6 +50,14 @@ export const coachingSlots = pgTable(
     endTime: text("end_time").notNull(),
     /** Duration snapshot (minutes) from the offering at generation time. */
     durationMinutes: integer("duration_minutes").notNull(),
+    /**
+     * Seats SNAPSHOT taken from the offering's `coachingCapacity` at generation
+     * time (P5-E01-S03 / Story 31.3 AC1). NOT NULL, defaults to 1 so a 1:1
+     * offering keeps its private single-seat hold; a group offering carries N (>
+     * 1). `seatsRemaining` is NOT stored — it is `capacity − (non-cancelled
+     * bookings in the slot)`, computed at read time (mirrors {@link sessionSlots}).
+     */
+    capacity: integer("capacity").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

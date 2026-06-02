@@ -55,8 +55,21 @@ describe("parent coaching booking (P5-E01-S02)", () => {
     return svc;
   }
 
+  /** A priced GROUP coaching offering with `capacity` seats per slot (P5-E01-S03). */
+  async function seedGroupCoachingOffering(capacity: number, name = "New-parent group", priceCents = 2500) {
+    const svc = await createService(dbh.db, {
+      name,
+      unit: "coaching",
+      format: "group",
+      coachingDurationMinutes: 60,
+      coachingCapacity: capacity,
+    });
+    await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: priceCents, effectiveFrom: "2026-01-01" });
+    return svc;
+  }
+
   /** A coach with a Monday 09:00–12:00 window that materialises slots on FROM. */
-  async function seedCoach(serviceId: string, displayName: string) {
+  async function seedCoach(serviceId: string, displayName: string, capacity = 1) {
     const coach = await createStaff(dbh.db, { displayName, role: "coach" });
     const avail = await createStaffAvailability(dbh.db, {
       staffId: coach.id,
@@ -68,7 +81,7 @@ describe("parent coaching booking (P5-E01-S02)", () => {
     await generateCoachingSlotsForAvailability(dbh.db, avail, {
       fromDate: FROM,
       days: 1,
-      services: [{ id: serviceId, coachingDurationMinutes: 60 }],
+      services: [{ id: serviceId, coachingDurationMinutes: 60, capacity }],
     });
     return coach;
   }
@@ -214,5 +227,66 @@ describe("parent coaching booking (P5-E01-S02)", () => {
     expect((await confirm(parent, { coachingSlotId: slot.id, childId, staffId: asha.id }, false)).statusCode).toBe(403);
     const anon = await app.inject({ method: "POST", url: "/parents/me/coaching/bookings", payload: { coachingSlotId: slot.id, childId } });
     expect(anon.statusCode).toBe(401);
+  });
+
+  /* --- Group session booking (P5-E01-S03 / Story 31.3) -------------------- */
+
+  it("group availability exposes capacity + seatsRemaining per slot (AC2)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const svc = await seedGroupCoachingOffering(6);
+    const coach = await seedCoach(svc.id, "Asha", 6);
+    const body = (await availability(parent, svc.id, coach.id)).json();
+    expect(body.slots.length).toBeGreaterThan(0);
+    expect(body.slots.every((s: { capacity: number }) => s.capacity === 6)).toBe(true);
+    expect(body.slots.every((s: { seatsRemaining: number }) => s.seatsRemaining === 6)).toBe(true);
+  });
+
+  it("books an individual seat → pending invoice + SMS + audit; seatsRemaining drops (AC2/AC3)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const svc = await seedGroupCoachingOffering(3, "New-parent group", 2500);
+    const coach = await seedCoach(svc.id, "Asha", 3);
+    const slot = (await availability(parent, svc.id, coach.id)).json().slots[0];
+
+    const res = await confirm(parent, { coachingSlotId: slot.id, childId, staffId: coach.id });
+    expect(res.statusCode).toBe(201);
+    const confirmation = res.json();
+    expect(confirmation.amountCents).toBe(2500);
+
+    const [inv] = await dbh.db.select().from(invoices).where(eq(invoices.id, confirmation.invoiceId));
+    expect(inv!.status).toBe("pending");
+
+    const sms = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "booking.confirmed"));
+    expect(sms).toHaveLength(1);
+    const audits = await dbh.db.select().from(auditOutbox).where(eq(auditOutbox.action, "booking.created"));
+    expect(audits).toHaveLength(1);
+
+    // The same slot is still offered (2 seats left) and reports the decremented count.
+    const after = (await availability(parent, svc.id, coach.id)).json();
+    const sameSlot = after.slots.find((s: { id: string }) => s.id === slot.id);
+    expect(sameSlot.seatsRemaining).toBe(2);
+  });
+
+  it("409s the (N+1)th seat when the group session is full (AC2)", async () => {
+    const svc = await seedGroupCoachingOffering(2, "New-parent group", 2500);
+    const a = await makeParent("+254712345678", "0712345678");
+    const childA = await addChild(a.parentId);
+    const b = await makeParent("+254712000099", "0712000099");
+    const childB = await addChild(b.parentId);
+    const c = await makeParent("+254712000077", "0712000077");
+    const childC = await addChild(c.parentId);
+    const coach = await seedCoach(svc.id, "Asha", 2);
+    const slot = (await availability(a, svc.id, coach.id)).json().slots[0];
+
+    expect((await confirm(a, { coachingSlotId: slot.id, childId: childA, staffId: coach.id })).statusCode).toBe(201);
+    expect((await confirm(b, { coachingSlotId: slot.id, childId: childB, staffId: coach.id })).statusCode).toBe(201);
+
+    const third = await confirm(c, { coachingSlotId: slot.id, childId: childC, staffId: coach.id });
+    expect(third.statusCode).toBe(409);
+    expect(third.json().error).toMatch(/full/i);
+
+    // A full slot is no longer offered in availability.
+    const after = (await availability(c, svc.id, coach.id)).json();
+    expect(after.slots.map((s: { id: string }) => s.id)).not.toContain(slot.id);
   });
 });

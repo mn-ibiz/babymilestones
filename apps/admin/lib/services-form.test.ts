@@ -158,4 +158,22 @@ describe("coaching catalogue form logic (P5-E01-S01 / Story 31.1)", () => {
     expect(parseAgeStageTags("")).toEqual([]);
     expect(parseAgeStageTags("   ")).toEqual([]);
   });
+
+  it("validates the group coaching capacity (positive integer seats) (P5-E01-S03 AC1)", () => {
+    expect(validateServiceForm({ name: "G", unit: "coaching", coachingCapacity: 8 })).toEqual({});
+    expect(validateServiceForm({ name: "G", unit: "coaching", coachingCapacity: 1 })).toEqual({});
+    expect(validateServiceForm({ name: "G", unit: "coaching", coachingCapacity: null })).toEqual({});
+    expect(validateServiceForm({ name: "G", unit: "coaching", coachingCapacity: 0 }).coachingCapacity).toBeDefined();
+    expect(validateServiceForm({ name: "G", unit: "coaching", coachingCapacity: -2 }).coachingCapacity).toBeDefined();
+    expect(validateServiceForm({ name: "G", unit: "coaching", coachingCapacity: 2.5 }).coachingCapacity).toBeDefined();
+  });
+
+  it("flags a group format with capacity 1 (a group implies > 1 seat) (P5-E01-S03 AC1)", () => {
+    expect(
+      validateServiceForm({ name: "G", unit: "coaching", format: "group", coachingCapacity: 1 }).coachingCapacity,
+    ).toBeDefined();
+    // A group with > 1 is fine; one_to_one with 1 is fine.
+    expect(validateServiceForm({ name: "G", unit: "coaching", format: "group", coachingCapacity: 4 })).toEqual({});
+    expect(validateServiceForm({ name: "S", unit: "coaching", format: "one_to_one", coachingCapacity: 1 })).toEqual({});
+  });
 });

@@ -407,4 +407,50 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     });
     expect(res.statusCode).toBe(403);
   });
+
+  /* --- Group coaching capacity (P5-E01-S03 / Story 31.3) ------------------- */
+
+  it("creates a group coaching offering with a seat capacity, round-trips on read (AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "New-parent group",
+      unit: "coaching",
+      format: "group",
+      coachingDurationMinutes: 90,
+      coachingCapacity: 8,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().coachingCapacity).toBe(8);
+
+    const read = await req("GET", `/admin/services/${res.json().id}`, creds);
+    expect(read.json().coachingCapacity).toBe(8);
+  });
+
+  it("rejects a coaching capacity below 1 (AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Bad group",
+      unit: "coaching",
+      format: "group",
+      coachingCapacity: 0,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("coachingCapacity");
+  });
+
+  it("updates a coaching offering's capacity via PATCH (AC1)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (
+      await req("POST", "/admin/services", creds, {
+        name: "Group",
+        unit: "coaching",
+        format: "group",
+        coachingDurationMinutes: 60,
+        coachingCapacity: 4,
+      })
+    ).json();
+    const patched = await req("PATCH", `/admin/services/${svc.id}`, creds, { coachingCapacity: 10 });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().coachingCapacity).toBe(10);
+  });
 });

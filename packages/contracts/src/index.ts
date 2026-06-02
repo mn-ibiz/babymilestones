@@ -1660,6 +1660,29 @@ const coachingDurationField = z
   .optional();
 
 /**
+ * Largest sensible seats-per-slot for a group coaching offering (P5-E01-S03 / Story
+ * 31.3 AC1) — guards typos, not policy. A 1:1 offering is capacity 1; a group
+ * offering is capacity N (> 1).
+ */
+export const COACHING_CAPACITY_MAX = 200;
+
+/**
+ * Group coaching capacity (P5-E01-S03 / Story 31.3 AC1): seats per generated slot.
+ * Optional + integer in `[1, COACHING_CAPACITY_MAX]`; `null` clears it (an absent
+ * field is left untouched on update). `1` is a 1:1 offering; `> 1` is a group.
+ */
+const coachingCapacityField = z
+  .union([
+    z
+      .number()
+      .int("coachingCapacity must be a whole number of seats")
+      .min(1, "coachingCapacity must be at least 1")
+      .max(COACHING_CAPACITY_MAX, "coachingCapacity is too large"),
+    z.null(),
+  ])
+  .optional();
+
+/**
  * Free-set age-stage tags for a coaching offering (P5-E01-S01 AC2): "expecting",
  * "0-3mo", ... A present (possibly empty) array is trimmed, blanks dropped,
  * duplicates removed (order-preserving) + length-bounded; `null` clears them. An
@@ -1715,6 +1738,7 @@ export const serviceCreateSchema = z
     cancellationFeeCents: cancellationFeeField,
     format: coachingFormatField(null),
     coachingDurationMinutes: coachingDurationField,
+    coachingCapacity: coachingCapacityField,
     ageStageTags: ageStageTagsField(null),
   })
   .refine(
@@ -1749,6 +1773,7 @@ export const serviceUpdateSchema = z
     cancellationFeeCents: cancellationFeeField,
     format: coachingFormatField(undefined),
     coachingDurationMinutes: coachingDurationField,
+    coachingCapacity: coachingCapacityField,
     ageStageTags: ageStageTagsField(undefined),
   })
   .refine(
@@ -1764,6 +1789,7 @@ export const serviceUpdateSchema = z
       v.cancellationFeeCents !== undefined ||
       v.format !== undefined ||
       v.coachingDurationMinutes !== undefined ||
+      v.coachingCapacity !== undefined ||
       v.ageStageTags !== undefined,
     "at least one field is required",
   )
@@ -2364,7 +2390,7 @@ export interface CoachOption {
   displayName: string;
 }
 
-/** A bookable 1:1 coaching slot in the parent browse (P5-E01-S02 AC2). */
+/** A bookable coaching slot in the parent browse (P5-E01-S02 AC2 / P5-E01-S03 AC2). */
 export interface CoachingSlotOption {
   id: string;
   staffId: string;
@@ -2373,6 +2399,16 @@ export interface CoachingSlotOption {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  /**
+   * Total seats the slot holds (P5-E01-S03 AC2). 1 for a 1:1 offering; N for a
+   * group offering. Snapshotted onto the slot at generation time.
+   */
+  capacity: number;
+  /**
+   * Seats still open: `capacity − non-cancelled bookings` (P5-E01-S03 AC2). The
+   * parent UI shows "X seats left"; a full slot (0) is not offered.
+   */
+  seatsRemaining: number;
 }
 
 /**

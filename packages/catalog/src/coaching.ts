@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNotNull, lte, ne, notInArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, notInArray, sql } from "drizzle-orm";
 import {
   audit,
   bookings,
@@ -41,24 +41,37 @@ const COACHING_SLOT_INSERT_CHUNK = 500;
 
 /* --- Coaching offering durations (AC1 input) ----------------------------- */
 
-/** A coaching offering the generator materialises slots for: id + its slot duration. */
+/** A coaching offering the generator materialises slots for: id + slot duration + seats. */
 export interface CoachingOfferingDuration {
   id: string;
   /** Session length in minutes (> 0). */
   coachingDurationMinutes: number;
+  /**
+   * Seats per generated slot (P5-E01-S03 / Story 31.3 AC1). Omitted/undefined =
+   * 1 (a 1:1 private hold); a group offering carries N (> 1). Snapshotted onto
+   * each generated slot.
+   */
+  capacity?: number;
+}
+
+/** A coaching offering's group capacity, treating null/unset/<1 as a 1:1 hold (capacity 1). */
+function offeringCapacity(coachingCapacity: number | null): number {
+  return coachingCapacity != null && coachingCapacity > 1 ? coachingCapacity : 1;
 }
 
 /**
  * Load the ACTIVE coaching offerings that carry a positive duration — the
  * catalogue the nightly generator crosses with every active coach availability
  * (AC1). A coaching offering with no duration set (null) is not yet bookable as
- * discrete slots and is skipped.
+ * discrete slots and is skipped. Each offering carries its group `capacity`
+ * (P5-E01-S03 AC1): 1 for a 1:1 offering, N for a group offering.
  */
 export async function listCoachingOfferingDurations(db: Executor): Promise<CoachingOfferingDuration[]> {
   const rows = await db
     .select({
       id: services.id,
       coachingDurationMinutes: services.coachingDurationMinutes,
+      coachingCapacity: services.coachingCapacity,
       isActive: services.isActive,
       unit: services.unit,
     })
@@ -69,7 +82,11 @@ export async function listCoachingOfferingDurations(db: Executor): Promise<Coach
       (r): r is typeof r & { coachingDurationMinutes: number } =>
         r.isActive && r.coachingDurationMinutes !== null && r.coachingDurationMinutes > 0,
     )
-    .map((r) => ({ id: r.id, coachingDurationMinutes: r.coachingDurationMinutes }));
+    .map((r) => ({
+      id: r.id,
+      coachingDurationMinutes: r.coachingDurationMinutes,
+      capacity: offeringCapacity(r.coachingCapacity),
+    }));
 }
 
 /* --- Coaching slot materialisation (AC1) --------------------------------- */
@@ -132,6 +149,7 @@ export async function generateCoachingSlotsForAvailability(
     startTime: string;
     endTime: string;
     durationMinutes: number;
+    capacity: number;
   }[] = [];
   for (const service of opts.services) {
     const windows = slotWindows(
@@ -140,6 +158,8 @@ export async function generateCoachingSlotsForAvailability(
       service.coachingDurationMinutes,
     );
     if (windows.length === 0) continue;
+    // Seats SNAPSHOT (AC1): 1 for a 1:1 offering, N (> 1) for a group offering.
+    const capacity = service.capacity != null && service.capacity > 1 ? service.capacity : 1;
     for (const slotDate of dates) {
       for (const w of windows) {
         values.push({
@@ -151,6 +171,8 @@ export async function generateCoachingSlotsForAvailability(
           endTime: w.endTime,
           // Duration SNAPSHOT taken at generation time.
           durationMinutes: service.coachingDurationMinutes,
+          // Seats SNAPSHOT taken at generation time (P5-E01-S03 AC1).
+          capacity,
         });
       }
     }
@@ -278,25 +300,30 @@ export async function listCoachingSlots(
 }
 
 /**
- * The coaching slot ids a non-cancelled booking already consumes. A 1:1 coaching
- * slot holds ONE seat (capacity = 1, AC3), so a slot referenced by a live booking
- * is no longer offered. A cancelled booking frees its slot. Used as a `NOT IN`
- * sub-select so the browse read is index-backed and race-free; the confirm path
- * re-checks under a lock.
+ * The coaching slot ids that have NO open seat — every seat is consumed by a
+ * non-cancelled booking (`booked >= capacity`). A 1:1 slot (capacity 1) is full
+ * after one booking; a group slot (capacity N) is full after N (P5-E01-S03 AC2).
+ * A cancelled booking frees its seat. Used as a `NOT IN` sub-select so the browse
+ * read is index-backed and race-free; the confirm path re-checks under a lock.
  */
-function bookedCoachingSlotIdsSubquery(db: Executor) {
+function fullCoachingSlotIdsSubquery(db: Executor) {
   return db
     .select({ id: bookings.coachingSlotId })
     .from(bookings)
-    .where(and(isNotNull(bookings.coachingSlotId), ne(bookings.status, "cancelled")));
+    .innerJoin(coachingSlots, eq(bookings.coachingSlotId, coachingSlots.id))
+    .where(and(isNotNull(bookings.coachingSlotId), ne(bookings.status, "cancelled")))
+    .groupBy(bookings.coachingSlotId, coachingSlots.capacity)
+    .having(sql`count(*) >= ${coachingSlots.capacity}`);
 }
 
 /**
  * List the AVAILABLE coaching slots for an offering over a date window (AC2):
- * future slots for `serviceId` that NO live booking consumes, ordered by date then
- * start time. When `staffId` is supplied, only that coach's slots are returned
- * (AC2). `fromDate`/`toDate` are inclusive `YYYY-MM-DD` bounds; pass `fromDate =
- * today` to hide past dates.
+ * future slots for `serviceId` that still have an OPEN SEAT, ordered by date then
+ * start time. A capacity-1 (1:1) slot is offered until its single seat is taken; a
+ * group slot is offered until all N seats are taken (P5-E01-S03 AC2). When
+ * `staffId` is supplied, only that coach's slots are returned (AC2).
+ * `fromDate`/`toDate` are inclusive `YYYY-MM-DD` bounds; pass `fromDate = today` to
+ * hide past dates.
  */
 export async function listAvailableCoachingSlots(
   db: Executor,
@@ -304,7 +331,7 @@ export async function listAvailableCoachingSlots(
 ): Promise<CoachingSlotRow[]> {
   const filters = [
     eq(coachingSlots.serviceId, opts.serviceId),
-    notInArray(coachingSlots.id, bookedCoachingSlotIdsSubquery(db)),
+    notInArray(coachingSlots.id, fullCoachingSlotIdsSubquery(db)),
   ];
   if (opts.staffId !== undefined) filters.push(eq(coachingSlots.staffId, opts.staffId));
   if (opts.fromDate !== undefined) filters.push(gte(coachingSlots.slotDate, opts.fromDate));
@@ -314,6 +341,55 @@ export async function listAvailableCoachingSlots(
     .from(coachingSlots)
     .where(and(...filters))
     .orderBy(asc(coachingSlots.slotDate), asc(coachingSlots.startTime));
+}
+
+/** A coaching slot decorated with its live booking count + seats remaining (AC2). */
+export type CoachingSlotWithSeats = CoachingSlotRow & {
+  /** Non-cancelled bookings consuming the slot. */
+  bookedCount: number;
+  /** Seats still open: `capacity − bookedCount`, clamped ≥ 0 (AC2). */
+  seatsRemaining: number;
+};
+
+/** Count the non-cancelled bookings consuming each of the given coaching slot ids. */
+async function coachingBookingCountsBySlot(
+  db: Executor,
+  slotIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (slotIds.length === 0) return counts;
+  const rows = await db
+    .select({ slotId: bookings.coachingSlotId, n: sql<number>`count(*)::int` })
+    .from(bookings)
+    .where(and(inArray(bookings.coachingSlotId, slotIds), ne(bookings.status, "cancelled")))
+    .groupBy(bookings.coachingSlotId);
+  for (const r of rows) {
+    if (r.slotId) counts.set(r.slotId, Number(r.n));
+  }
+  return counts;
+}
+
+/** Decorate a coaching slot with its booked count + seats remaining (clamped ≥ 0). */
+function withSeats(slot: CoachingSlotRow, booked: number): CoachingSlotWithSeats {
+  return { ...slot, bookedCount: booked, seatsRemaining: Math.max(0, slot.capacity - booked) };
+}
+
+/**
+ * List AVAILABLE coaching slots WITH their seats remaining (P5-E01-S03 AC2): the
+ * same future, not-yet-full slots as {@link listAvailableCoachingSlots}, each
+ * decorated with `capacity`, `bookedCount`, and `seatsRemaining = capacity −
+ * booked`. The parent UI renders "X seats left"; a full slot is already excluded.
+ */
+export async function listAvailableCoachingSlotsWithSeats(
+  db: Executor,
+  opts: { serviceId: string; staffId?: string; fromDate?: string; toDate?: string },
+): Promise<CoachingSlotWithSeats[]> {
+  const slots = await listAvailableCoachingSlots(db, opts);
+  const counts = await coachingBookingCountsBySlot(
+    db,
+    slots.map((s) => s.id),
+  );
+  return slots.map((s) => withSeats(s, counts.get(s.id) ?? 0));
 }
 
 /* --- Parent 1:1 coaching booking (AC2/AC3/AC4) --------------------------- */
@@ -331,6 +407,21 @@ export class CoachingSlotTakenError extends Error {
   constructor(public readonly coachingSlotId: string) {
     super(`Coaching slot already booked: ${coachingSlotId}`);
     this.name = "CoachingSlotTakenError";
+  }
+}
+
+/**
+ * The (group) coaching slot is full — every seat is taken (P5-E01-S03 / Story 31.3
+ * AC2 race guard). Thrown only for capacity > 1; a capacity-1 (1:1) slot keeps
+ * throwing {@link CoachingSlotTakenError} so existing 1:1 behaviour is identical.
+ */
+export class CoachingSlotFullError extends Error {
+  constructor(
+    public readonly coachingSlotId: string,
+    public readonly capacity: number,
+  ) {
+    super(`Coaching session is full (${capacity} seats): ${coachingSlotId}`);
+    this.name = "CoachingSlotFullError";
   }
 }
 
@@ -380,18 +471,24 @@ export interface BookCoachingSlotResult {
 }
 
 /**
- * Book a 1:1 coaching slot for a child (AC2/AC3/AC4). Runs in a transaction that
- * LOCKS the coaching slot row (`SELECT … FOR UPDATE`) before checking that no live
- * booking consumes it, so two parents racing for the one private seat serialize:
- * the first commits, the second is rejected with {@link CoachingSlotTakenError}
- * (capacity = 1, AC3). On success it ATTRIBUTES the slot's coach, snapshots the
- * offering's effective price into a new PENDING invoice + the booking's
- * `staffRateSnapshot`, records the booking against `bookings.coachingSlotId`, and
- * audits `booking.created` — all atomically (reusing the P2-E01 invoice +
- * attribution + audit write semantics).
+ * Book a SEAT in a coaching slot for a child (AC2/AC3/AC4 + P5-E01-S03). Runs in a
+ * transaction that LOCKS the coaching slot row (`SELECT … FOR UPDATE`) before
+ * counting the live (non-cancelled) bookings against it, so concurrent bookers
+ * serialize on the slot:
+ *  - capacity 1 (a 1:1 offering): the first commits, the second is rejected with
+ *    {@link CoachingSlotTakenError} (identical to the prior 1:1 behaviour, AC3);
+ *  - capacity N (a group offering): each parent books ONE seat; the (N+1)th is
+ *    rejected with {@link CoachingSlotFullError} once all seats are taken (AC2).
+ * A cancelled prior booking frees its seat. On success it ATTRIBUTES the slot's
+ * coach, snapshots the offering's effective price into a new PENDING invoice + the
+ * booking's `staffRateSnapshot`, records the booking against
+ * `bookings.coachingSlotId`, and audits `booking.created` — all atomically
+ * (reusing the P2-E01 invoice + attribution + audit write semantics). Each seat
+ * raises its OWN pending invoice (AC3).
  *
  * Throws {@link CoachingSlotNotFoundError} / {@link CoachingSlotTakenError} /
- * {@link CoachingServicePriceMissingError} / {@link CoachingCoachMismatchError}.
+ * {@link CoachingSlotFullError} / {@link CoachingServicePriceMissingError} /
+ * {@link CoachingCoachMismatchError}.
  */
 export async function bookCoachingSlot(
   db: Database,
@@ -410,13 +507,19 @@ export async function bookCoachingSlot(
       throw new CoachingCoachMismatchError();
     }
 
-    // One seat per coaching slot — checked under the slot lock so concurrent
-    // attempts serialize (AC3, capacity = 1). A cancelled prior booking frees it.
-    const [existing] = await tx
-      .select({ id: bookings.id })
+    // Seats are checked under the slot lock so concurrent attempts serialize. A
+    // cancelled prior booking frees its seat. Capacity 1 → the slot holds ONE
+    // private seat (1:1, AC3); capacity N → up to N seats (group, P5-E01-S03 AC2).
+    const [{ booked = 0 } = {}] = await tx
+      .select({ booked: sql<number>`count(*)::int` })
       .from(bookings)
       .where(and(eq(bookings.coachingSlotId, slot.id), ne(bookings.status, "cancelled")));
-    if (existing) throw new CoachingSlotTakenError(slot.id);
+    if (booked >= slot.capacity) {
+      // Capacity-1 keeps the original "taken" error so 1:1 behaviour is unchanged.
+      throw slot.capacity <= 1
+        ? new CoachingSlotTakenError(slot.id)
+        : new CoachingSlotFullError(slot.id, slot.capacity);
+    }
 
     // The attributed coach's display-name snapshot (history-stable, AC4).
     const [coach] = await tx.select().from(staff).where(eq(staff.id, slot.staffId));

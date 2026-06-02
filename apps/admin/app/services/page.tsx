@@ -34,6 +34,7 @@ interface Service {
   taxTreatment: string;
   format: string | null;
   coachingDurationMinutes: number | null;
+  coachingCapacity: number | null;
   ageStageTags: string[] | null;
 }
 
@@ -58,6 +59,7 @@ const EMPTY_SERVICE = {
   taxTreatment: DEFAULT_TAX_TREATMENT as string,
   format: "",
   coachingDurationMinutes: "",
+  coachingCapacity: "",
   ageStageTags: "",
 };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -74,6 +76,7 @@ export default function ServicesPage() {
         taxTreatment: form.taxTreatment,
         format: form.format,
         coachingDurationMinutes: form.coachingDurationMinutes === "" ? null : Number(form.coachingDurationMinutes),
+        coachingCapacity: form.coachingCapacity === "" ? null : Number(form.coachingCapacity),
       }),
     [form],
   );
@@ -125,6 +128,8 @@ export default function ServicesPage() {
                   form.coachingDurationMinutes === ""
                     ? null
                     : Number(form.coachingDurationMinutes),
+                coachingCapacity:
+                  form.coachingCapacity === "" ? null : Number(form.coachingCapacity),
                 ageStageTags: parseAgeStageTags(form.ageStageTags),
               }
             : {}),
@@ -307,6 +312,18 @@ export default function ServicesPage() {
                   setForm((f) => ({ ...f, coachingDurationMinutes: e.target.value }))
                 }
                 aria-invalid={Boolean(serviceErrors.coachingDurationMinutes)}
+              />
+            </label>
+            <label>
+              Group capacity (seats)
+              <input
+                name="coachingCapacity"
+                type="number"
+                min={1}
+                placeholder="1 for 1:1, more for a group"
+                value={form.coachingCapacity}
+                onChange={(e) => setForm((f) => ({ ...f, coachingCapacity: e.target.value }))}
+                aria-invalid={Boolean(serviceErrors.coachingCapacity)}
               />
             </label>
             <label>

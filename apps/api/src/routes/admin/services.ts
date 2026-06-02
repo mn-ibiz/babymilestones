@@ -47,9 +47,10 @@ function serializeService(row: Awaited<ReturnType<typeof getService>>) {
     ageMaxMonths: row.ageMaxMonths,
     rescheduleCutoffHours: row.rescheduleCutoffHours,
     cancellationFeeCents: row.cancellationFeeCents,
-    // Coaching offering attributes (P5-E01-S01 / Story 31.1).
+    // Coaching offering attributes (P5-E01-S01 / Story 31.1 + P5-E01-S03 / Story 31.3).
     format: row.format,
     coachingDurationMinutes: row.coachingDurationMinutes,
+    coachingCapacity: row.coachingCapacity,
     ageStageTags: row.ageStageTags,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

@@ -14,10 +14,11 @@ import {
   bookCoachingSlot,
   CoachingCoachMismatchError,
   CoachingServicePriceMissingError,
+  CoachingSlotFullError,
   CoachingSlotNotFoundError,
   CoachingSlotTakenError,
   getService,
-  listAvailableCoachingSlots,
+  listAvailableCoachingSlotsWithSeats,
 } from "@bm/catalog";
 import { StubSmsSender, type SmsSender } from "@bm/sms";
 import type { ParentsDeps } from "./index.js";
@@ -48,13 +49,16 @@ function addDaysIso(dateIso: string, days: number): string {
 }
 
 /**
- * 1:1 Coaching parent booking (P5-E01-S02 / Story 31.2). The parent flow: pick a
- * coaching offering → a coach (REQUIRED, since a 1:1 session is privately held) →
- * a date → the available coaching slots (AC2). A specific coach filters to only
- * their open slots (AC2). Confirming books the chosen slot, attributing the coach
- * (AC3) and raising a pending invoice, reusing the P2-E01 invoice + attribution +
- * audit write path (AC4). Mirrors the salon flow (Story 25.2) but OMITS salon's
- * "Any available / least-busy" resolution: a coach must be chosen explicitly.
+ * Coaching parent booking (P5-E01-S02 / Story 31.2 + P5-E01-S03 / Story 31.3). The
+ * parent flow: pick a coaching offering → a coach → a date → the available slots
+ * (AC2). A specific coach filters to only their open slots (AC2). Confirming books
+ * the chosen slot, attributing the coach and raising a pending invoice, reusing the
+ * P2-E01 invoice + attribution + audit write path (AC4).
+ *
+ * Capacity-aware (P5-E01-S03): a 1:1 offering holds ONE private seat per slot; a
+ * GROUP offering holds N seats, and the availability reports `seatsRemaining`
+ * ("X seats left"). A parent books an INDIVIDUAL seat — each seat raises its own
+ * pending invoice; the (N+1)th attempt is rejected (the session is full).
  */
 export function registerParentCoaching(app: FastifyInstance, deps: CoachingRoutesDeps): void {
   const { db, sessions } = deps;
@@ -104,8 +108,9 @@ export function registerParentCoaching(app: FastifyInstance, deps: CoachingRoute
       const toDate = addDaysIso(today, COACHING_AVAILABILITY_WINDOW_DAYS);
 
       // The full open-slot set drives the coach picker (every coach with an open
-      // slot), so the picker is stable regardless of the active filter.
-      const allOpen = await listAvailableCoachingSlots(db, { serviceId, fromDate: today, toDate });
+      // seat), so the picker is stable regardless of the active filter. Slots that
+      // are full (0 seats remaining) are already excluded (P5-E01-S03 AC2).
+      const allOpen = await listAvailableCoachingSlotsWithSeats(db, { serviceId, fromDate: today, toDate });
       const byCoach = new Map<string, string>();
       for (const s of allOpen) {
         if (!byCoach.has(s.staffId)) byCoach.set(s.staffId, "");
@@ -119,7 +124,7 @@ export function registerParentCoaching(app: FastifyInstance, deps: CoachingRoute
 
       const filtered =
         staffId !== undefined
-          ? await listAvailableCoachingSlots(db, { serviceId, staffId, fromDate: today, toDate })
+          ? await listAvailableCoachingSlotsWithSeats(db, { serviceId, staffId, fromDate: today, toDate })
           : allOpen;
       const slots: CoachingSlotOption[] = filtered.map((s) => ({
         id: s.id,
@@ -129,6 +134,9 @@ export function registerParentCoaching(app: FastifyInstance, deps: CoachingRoute
         startTime: s.startTime,
         endTime: s.endTime,
         durationMinutes: s.durationMinutes,
+        // Seats for the group flow (1 for a 1:1 offering) (P5-E01-S03 AC2).
+        capacity: s.capacity,
+        seatsRemaining: s.seatsRemaining,
       }));
 
       const body: CoachingAvailability = {
@@ -177,6 +185,9 @@ export function registerParentCoaching(app: FastifyInstance, deps: CoachingRoute
     } catch (err) {
       if (err instanceof CoachingSlotTakenError) {
         return reply.code(409).send({ error: "That slot was just taken — please pick another" });
+      }
+      if (err instanceof CoachingSlotFullError) {
+        return reply.code(409).send({ error: "This group session is full — please pick another" });
       }
       if (err instanceof CoachingCoachMismatchError) {
         return reply.code(409).send({ error: "That coach is no longer available for this slot" });

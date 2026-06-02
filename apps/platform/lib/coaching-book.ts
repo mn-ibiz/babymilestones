@@ -23,6 +23,17 @@ export interface CoachingDateGroup {
   slots: CoachingSlotOption[];
 }
 
+/**
+ * The seats badge for a coaching slot (P5-E01-S03 / Story 31.3 AC2). A 1:1 slot
+ * (capacity 1) gets NO badge (returns null) — seats only matter for a group. A
+ * group slot shows "X seats left" (singular "1 seat left"), or "Full" at 0.
+ */
+export function coachingSeatsLabel(slot: CoachingSlotOption): string | null {
+  if (slot.capacity <= 1) return null;
+  if (slot.seatsRemaining <= 0) return "Full";
+  return `${slot.seatsRemaining} seat${slot.seatsRemaining === 1 ? "" : "s"} left`;
+}
+
 /** Format a `YYYY-MM-DD` date as "Mon · Jun 15" parts. */
 function labelFor(date: string): { weekdayLabel: string; dayLabel: string } {
   const d = new Date(`${date}T00:00:00.000Z`);

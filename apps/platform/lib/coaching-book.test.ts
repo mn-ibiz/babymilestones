@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CoachingSlotOption } from "@bm/contracts";
-import { groupCoachingSlotsByDate } from "./coaching-book";
+import { coachingSeatsLabel, groupCoachingSlotsByDate } from "./coaching-book";
 
-/** P5-E01-S02 (Story 31.2) — coaching booking view model. Pure, DOM-free. */
+/** P5-E01-S02 (Story 31.2) / P5-E01-S03 (Story 31.3) — coaching booking view model. Pure, DOM-free. */
 
 function slot(p: Partial<CoachingSlotOption> & { id: string; slotDate: string; startTime: string }): CoachingSlotOption {
   return {
@@ -10,6 +10,8 @@ function slot(p: Partial<CoachingSlotOption> & { id: string; slotDate: string; s
     staffName: "Asha",
     endTime: "10:00",
     durationMinutes: 60,
+    capacity: 1,
+    seatsRemaining: 1,
     ...p,
   };
 }
@@ -35,5 +37,26 @@ describe("groupCoachingSlotsByDate (AC2)", () => {
 
   it("returns an empty list when there are no slots", () => {
     expect(groupCoachingSlotsByDate([])).toEqual([]);
+  });
+});
+
+describe("coachingSeatsLabel (P5-E01-S03 AC2)", () => {
+  it("returns null for a 1:1 slot (capacity 1) — no seats badge", () => {
+    expect(coachingSeatsLabel(slot({ id: "s", slotDate: "2026-06-15", startTime: "09:00" }))).toBeNull();
+  });
+
+  it("shows 'X seats left' for a group slot with seats remaining", () => {
+    expect(
+      coachingSeatsLabel(slot({ id: "s", slotDate: "2026-06-15", startTime: "09:00", capacity: 6, seatsRemaining: 6 })),
+    ).toBe("6 seats left");
+    expect(
+      coachingSeatsLabel(slot({ id: "s", slotDate: "2026-06-15", startTime: "09:00", capacity: 6, seatsRemaining: 1 })),
+    ).toBe("1 seat left");
+  });
+
+  it("shows 'Full' for a group slot with no seats remaining", () => {
+    expect(
+      coachingSeatsLabel(slot({ id: "s", slotDate: "2026-06-15", startTime: "09:00", capacity: 6, seatsRemaining: 0 })),
+    ).toBe("Full");
   });
 });

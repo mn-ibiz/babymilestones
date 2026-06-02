@@ -110,6 +110,14 @@ export const services = pgTable("services", {
    */
   coachingDurationMinutes: integer("coaching_duration_minutes"),
   /**
+   * Group coaching capacity (P5-E01-S03 / Story 31.3 AC1): seats per generated
+   * slot. Nullable + CHECK >= 1 in migration 0098; only `unit = 'coaching'`
+   * offerings carry one. NULL = unset (treated as 1, a 1:1 private hold). A
+   * `one_to_one` offering is capacity 1; a `group` offering is capacity N (> 1).
+   * The bookable {@link coachingSlots} take a SNAPSHOT of this at generation time.
+   */
+  coachingCapacity: integer("coaching_capacity"),
+  /**
    * Optional, FREE-SET age-stage tags for a coaching offering (P5-E01-S01 AC2):
    * "expecting", "0-3mo", "3-6mo", ... A text[] (nullable); null = no tags. A free
    * set rather than an enum so admin can coin new stages without a migration.
