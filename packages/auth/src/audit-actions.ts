@@ -131,6 +131,7 @@ export const AUDIT_ACTION_CATALOGUE = {
     "report.revenue.export",
     "report.wallet_aging.export",
     "report.dispatch.export",
+    "report.pnl.export",
   ],
   /** Daily DB backup lifecycle (X8-S03) — every run + prune is recorded.
    * `backup.retention.updated` (P2-E06-S01) records an admin changing the

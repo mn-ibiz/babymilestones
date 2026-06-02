@@ -5190,3 +5190,265 @@ export interface ExpensesByUnitDto {
   sharedOverheadCents: number;
   totalCents: number;
 }
+
+// ---------------------------------------------------------------------------
+// Consolidated P&L by period (P6-E05-S01 / Story 35.1) — per-unit REVENUE /
+// DIRECT COSTS / EXPENSES / NET + consolidated totals, with a MoM / YoY
+// comparison (AC1/AC2) and CSV ("Excel") + printable-HTML ("PDF") exports (AC3).
+// ---------------------------------------------------------------------------
+
+/**
+ * The P&L business-unit taxonomy (AC1): the service units plus retail `shop` —
+ * identical to {@link EXPENSE_BUSINESS_UNITS} and `PNL_UNITS` in `@bm/catalog` so
+ * revenue, direct costs and expenses reconcile against one ordered unit list.
+ */
+export const PNL_UNITS = [...SERVICE_UNITS, "shop"] as const;
+export type PnlUnit = (typeof PNL_UNITS)[number];
+
+/** Human label for a P&L unit (extends {@link serviceUnitLabel} with `shop`). */
+export function pnlUnitLabel(unit: PnlUnit): string {
+  return unit === "shop" ? "Retail shop" : serviceUnitLabel(unit);
+}
+
+/** `month` → this month vs last month; `year` → this year vs last year (AC2). */
+export const PNL_GRANULARITIES = ["month", "year"] as const;
+export type PnlGranularity = (typeof PNL_GRANULARITIES)[number];
+
+/**
+ * Consolidated P&L request (Story 35.1 AC1/AC2). An anchor `YYYY-MM-DD` inside the
+ * period of interest plus a granularity; the report returns that calendar
+ * month/year and the prior equal window. `granularity` defaults to `month`.
+ */
+export const pnlReportQuerySchema = z.object({
+  anchor: exportDateSchema,
+  granularity: z.enum(PNL_GRANULARITIES).default("month"),
+});
+export type PnlReportQuery = z.infer<typeof pnlReportQuerySchema>;
+
+/** One unit's P&L row (AC1). Integer KES cents. Mirrors `@bm/catalog` PnlUnitRow. */
+export interface PnlUnitRowDto {
+  unit: PnlUnit;
+  revenueCents: number;
+  directCostsCents: number;
+  expensesCents: number;
+  /** revenue − directCosts − expenses (contribution BEFORE shared overhead). */
+  netCents: number;
+}
+
+/** Consolidated totals across every unit (AC1). */
+export interface PnlTotalsDto {
+  revenueCents: number;
+  directCostsCents: number;
+  /** Sum of the per-UNIT expenses only (shared overhead is the separate line). */
+  expensesCents: number;
+  /** Unallocated null-unit (shared overhead) expenses — a separate line. */
+  sharedOverheadCents: number;
+  /** revenue − directCosts − unitExpenses − sharedOverhead. */
+  netCents: number;
+}
+
+/** The consolidated P&L for one period (AC1). Mirrors `@bm/catalog` PnlReport. */
+export interface PnlReportDto {
+  from: string;
+  to: string;
+  byUnit: PnlUnitRowDto[];
+  totals: PnlTotalsDto;
+}
+
+/** Per-unit period-over-period delta (current − prior), every column (AC2). */
+export interface PnlUnitDeltaDto {
+  unit: PnlUnit;
+  revenueDeltaCents: number;
+  directCostsDeltaCents: number;
+  expensesDeltaCents: number;
+  netDeltaCents: number;
+}
+
+/** Consolidated period-over-period delta (current − prior), every column (AC2). */
+export interface PnlTotalsDeltaDto {
+  revenueDeltaCents: number;
+  directCostsDeltaCents: number;
+  expensesDeltaCents: number;
+  sharedOverheadDeltaCents: number;
+  netDeltaCents: number;
+}
+
+/**
+ * The consolidated-P&L API response (Story 35.1). The current period, the prior
+ * equal period, and the per-unit + consolidated deltas (AC1/AC2). `granularity`
+ * echoes the requested window. Identical shape to `@bm/catalog`'s `PnlComparison`
+ * plus the granularity tag (all primitives, serialisable).
+ */
+export interface PnlComparisonDto {
+  granularity: PnlGranularity;
+  current: PnlReportDto;
+  previous: PnlReportDto;
+  deltaByUnit: PnlUnitDeltaDto[];
+  totalsDelta: PnlTotalsDeltaDto;
+}
+
+/** Header columns of the P&L CSV ("Excel") export, in order (AC3). */
+export const PNL_EXPORT_COLUMNS = [
+  "unit",
+  "revenue_kes",
+  "direct_costs_kes",
+  "expenses_kes",
+  "net_kes",
+  "previous_net_kes",
+  "net_delta_kes",
+] as const;
+
+/**
+ * Render the P&L as an RFC-4180 CSV (AC3 — the "Excel" export; the repo's
+ * established convention is CSV, which spreadsheets open natively — there is no
+ * xlsx writer dependency in the tree). One row per unit (revenue / direct costs /
+ * expenses / net, with the prior-period net + net delta), then a `Subtotal` row, a
+ * `Shared overhead` line, and a `Consolidated net` line. Cents → KES decimals;
+ * CRLF-joined with a trailing CRLF.
+ */
+export function pnlReportToCsv(cmp: PnlComparisonDto): string {
+  const prevNet = new Map(cmp.previous.byUnit.map((u) => [u.unit, u.netCents]));
+  const netDelta = new Map(cmp.deltaByUnit.map((u) => [u.unit, u.netDeltaCents]));
+  const lines: string[] = [PNL_EXPORT_COLUMNS.join(",")];
+
+  for (const u of cmp.current.byUnit) {
+    lines.push(
+      [
+        csvField(pnlUnitLabel(u.unit)),
+        centsToKes(u.revenueCents),
+        centsToKes(u.directCostsCents),
+        centsToKes(u.expensesCents),
+        centsToKes(u.netCents),
+        centsToKes(prevNet.get(u.unit) ?? 0),
+        centsToKes(netDelta.get(u.unit) ?? 0),
+      ].join(","),
+    );
+  }
+
+  const t = cmp.current.totals;
+  const sumUnitNet = cmp.current.byUnit.reduce((a, u) => a + u.netCents, 0);
+  const prevSumUnitNet = cmp.previous.byUnit.reduce((a, u) => a + u.netCents, 0);
+  // Subtotal across the units (contribution before shared overhead).
+  lines.push(
+    [
+      "Subtotal",
+      centsToKes(t.revenueCents),
+      centsToKes(t.directCostsCents),
+      centsToKes(t.expensesCents),
+      centsToKes(sumUnitNet),
+      centsToKes(prevSumUnitNet),
+      centsToKes(cmp.totalsDelta.revenueDeltaCents - cmp.totalsDelta.directCostsDeltaCents - cmp.totalsDelta.expensesDeltaCents),
+    ].join(","),
+  );
+  // Shared overhead — the separate unallocated line.
+  lines.push(
+    ["Shared overhead", "", "", centsToKes(t.sharedOverheadCents), centsToKes(-t.sharedOverheadCents), centsToKes(-cmp.previous.totals.sharedOverheadCents), centsToKes(-cmp.totalsDelta.sharedOverheadDeltaCents)].join(","),
+  );
+  // Consolidated net = subtotal net − shared overhead.
+  lines.push(
+    ["Consolidated net", "", "", "", centsToKes(t.netCents), centsToKes(cmp.previous.totals.netCents), centsToKes(cmp.totalsDelta.netDeltaCents)].join(","),
+  );
+
+  return lines.join("\r\n") + "\r\n";
+}
+
+/** Minimal HTML escape for text interpolated into the printable doc. */
+function pnlHtmlEscape(value: string): string {
+  return value
+    .replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;")
+    .replace(/>/gu, "&gt;")
+    .replace(/"/gu, "&quot;");
+}
+
+/**
+ * Render the P&L as a self-contained, printable A4 HTML document (AC3 — the "PDF"
+ * export). Decision 13 in this codebase: printing is the browser's print dialog,
+ * not a native PDF/print server (the receipt engine uses the same approach), so
+ * the API returns deterministic HTML the browser prints to PDF — no heavy PDF
+ * dependency. Inline styles, no external assets, pure string function (unit-tested
+ * without a DOM). Carries the period, the per-unit table (revenue / direct costs /
+ * expenses / net, + prior net + delta), the consolidated net, and the documented
+ * direct-cost (GRN/COGS) limitation note.
+ */
+export function pnlReportToPrintableHtml(cmp: PnlComparisonDto): string {
+  const prevNet = new Map(cmp.previous.byUnit.map((u) => [u.unit, u.netCents]));
+  const netDelta = new Map(cmp.deltaByUnit.map((u) => [u.unit, u.netDeltaCents]));
+  const periodLabel = cmp.granularity === "year" ? "Financial year" : "Month";
+
+  const bodyRows = cmp.current.byUnit
+    .map((u) => {
+      const cells = [
+        pnlHtmlEscape(pnlUnitLabel(u.unit)),
+        centsToKes(u.revenueCents),
+        centsToKes(u.directCostsCents),
+        centsToKes(u.expensesCents),
+        centsToKes(u.netCents),
+        centsToKes(prevNet.get(u.unit) ?? 0),
+        centsToKes(netDelta.get(u.unit) ?? 0),
+      ];
+      return `<tr>${cells.map((c, i) => (i === 0 ? `<td>${c}</td>` : `<td class="num">${c}</td>`)).join("")}</tr>`;
+    })
+    .join("");
+
+  const t = cmp.current.totals;
+  const sumUnitNet = cmp.current.byUnit.reduce((a, u) => a + u.netCents, 0);
+
+  const footerRows =
+    `<tr class="subtotal"><td>Subtotal</td><td class="num">${centsToKes(t.revenueCents)}</td><td class="num">${centsToKes(t.directCostsCents)}</td><td class="num">${centsToKes(t.expensesCents)}</td><td class="num">${centsToKes(sumUnitNet)}</td><td class="num"></td><td class="num"></td></tr>` +
+    `<tr class="overhead"><td>Shared overhead (unallocated)</td><td class="num"></td><td class="num"></td><td class="num">${centsToKes(t.sharedOverheadCents)}</td><td class="num">-${centsToKes(t.sharedOverheadCents)}</td><td class="num"></td><td class="num"></td></tr>` +
+    `<tr class="net"><td>Consolidated net</td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num">${centsToKes(t.netCents)}</td><td class="num">${centsToKes(cmp.previous.totals.netCents)}</td><td class="num">${centsToKes(cmp.totalsDelta.netDeltaCents)}</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Consolidated P&amp;L ${pnlHtmlEscape(cmp.current.from)} to ${pnlHtmlEscape(cmp.current.to)}</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #111; margin: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .period { color: #555; margin: 0 0 16px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.subtotal td, tr.net td { font-weight: 700; }
+  tr.net td { border-top: 2px solid #111; }
+  .note { color: #666; font-size: 11px; margin-top: 14px; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+<h1>Consolidated P&amp;L</h1>
+<p class="period">${pnlHtmlEscape(periodLabel)}: ${pnlHtmlEscape(cmp.current.from)} &ndash; ${pnlHtmlEscape(cmp.current.to)} &middot; compared with ${pnlHtmlEscape(cmp.previous.from)} &ndash; ${pnlHtmlEscape(cmp.previous.to)}</p>
+<table>
+<thead>
+<tr><th>Unit</th><th class="num">Revenue</th><th class="num">Direct costs</th><th class="num">Expenses</th><th class="num">Net</th><th class="num">Prior net</th><th class="num">Net &Delta;</th></tr>
+</thead>
+<tbody>${bodyRows}</tbody>
+<tfoot>${footerRows}</tfoot>
+</table>
+<p class="note">All figures in KES. Direct costs (COGS) are GRN-based for the retail shop; with no product cost-price recorded yet they show as 0.00. Shared overhead is shown unallocated and deducted once from the consolidated net.</p>
+</body>
+</html>
+`;
+}
+
+/** Suggested download filename for the P&L CSV ("Excel") export (AC3). */
+export function pnlReportCsvFilename(cmp: PnlComparisonDto): string {
+  return `pnl_${cmp.current.from}_${cmp.granularity}.csv`;
+}
+
+/** Suggested download filename for the P&L printable-HTML ("PDF") export (AC3). */
+export function pnlReportPdfFilename(cmp: PnlComparisonDto): string {
+  return `pnl_${cmp.current.from}_${cmp.granularity}.html`;
+}
+
+/** The P&L export endpoint URL for a format + anchor/granularity (AC3). */
+export function pnlReportExportUrl(values: {
+  format: "csv" | "pdf";
+  anchor: string;
+  granularity: PnlGranularity;
+}): string {
+  const params = new URLSearchParams({ anchor: values.anchor, granularity: values.granularity });
+  return `/admin/pnl-report/export.${values.format}?${params.toString()}`;
+}

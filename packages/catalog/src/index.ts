@@ -461,3 +461,28 @@ export {
   type MaterialiseResult,
   type ExpensesByUnit,
 } from "./expenses.js";
+
+// Consolidated P&L by period — per-unit revenue / direct costs / expenses / net +
+// consolidated totals, with MoM / YoY comparison (P6-E05-S01 / Story 35.1).
+export {
+  PNL_UNITS,
+  aggregatePnl,
+  comparePnl,
+  monthWindow,
+  yearWindow,
+  type PnlUnit,
+  type PnlInput,
+  type PnlUnitRow,
+  type PnlTotals,
+  type PnlReport,
+  type PnlUnitDelta,
+  type PnlTotalsDelta,
+  type PnlComparison,
+  type PnlWindow,
+} from "./pnl-report.js";
+export {
+  loadPnlReport,
+  shopCogsByUnitInPeriod,
+  type PnlGranularity,
+  type LoadPnlReportOpts,
+} from "./pnl-report-db.js";

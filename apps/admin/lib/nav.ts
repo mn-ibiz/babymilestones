@@ -182,6 +182,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Expenses",
     permission: { action: "manage", resource: "expense" },
   },
+  // P6-E05-S01 (Story 35.1): consolidated P&L by period — per-unit revenue /
+  // direct costs / expenses / net + MoM/YoY comparison. P&L is the sensitive
+  // owners'-books view, gated on `read report` — admin / accountant / treasury /
+  // super_admin (the same set the server enforces). The server re-enforces it.
+  {
+    href: "/pnl",
+    label: "Consolidated P&L",
+    permission: { action: "read", resource: "report" },
+  },
   {
     href: "/treasury/float-accounts",
     label: "Float accounts",
