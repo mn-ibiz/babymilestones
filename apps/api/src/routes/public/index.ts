@@ -6,6 +6,7 @@ import {
   registerPublicStaffEarnings,
   StaffEarningsRateLimiter,
 } from "./staff-earnings.js";
+import { registerPublicCoachingNotesSummary } from "./coaching-notes-summary.js";
 
 export interface PublicRoutesDeps {
   db: Database;
@@ -21,6 +22,13 @@ export function registerPublicRoutes(app: FastifyInstance, deps: PublicRoutesDep
   registerPublicStaffEarnings(app, {
     db: deps.db,
     now: deps.now,
+    rateLimiter: deps.staffEarningsRateLimiter,
+  });
+  // P5-E01-S04 (Story 31.4, AC2): the coach's CONTENT-FREE session-note summary —
+  // counts + dates only, never note content (the sensitive content stays behind the
+  // authenticated admin/reception path). Same kiosk surface as staff-earnings.
+  registerPublicCoachingNotesSummary(app, {
+    db: deps.db,
     rateLimiter: deps.staffEarningsRateLimiter,
   });
 }

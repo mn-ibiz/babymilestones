@@ -234,6 +234,23 @@ export {
   type BookCoachingSlotResult,
 } from "./coaching.js";
 
+// PRIVATE coach session notes (P5-E01-S04 / Story 31.4). Encrypted at rest
+// (column-level); decryption gated to the authenticated admin/reception path.
+export {
+  recordCoachingSessionNote,
+  getCoachingSessionNotesForAdmin,
+  listCoachingSessionNotesForCoach,
+  listCoachingSessionNoteSummaryForCoach,
+  getCoachById,
+  CoachingSessionNoteBookingNotFoundError,
+  CoachingSessionNoteNotCoachingError,
+  type RecordCoachingSessionNoteInput,
+  type RecordCoachingSessionNoteResult,
+  type DecryptedCoachingSessionNote,
+  type CoachingSessionNoteSummary,
+  type CoachingSessionNoteSummaryLine,
+} from "./coaching-session-notes.js";
+
 // Salon-specific reporting aggregation (P3-E03-S05 / Story 25.5).
 export {
   aggregateSalonDayReport,

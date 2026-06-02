@@ -193,8 +193,15 @@ export const AUDIT_ACTION_CATALOGUE = {
   dunning: ["outstanding.reminder.sent"],
   /** Coaching 1:1 booking (P5-E01-S02 / Story 31.2) — the day-before reminder job
    * records each stub-SMS reminder it queues for a forensic + idempotency trail
-   * (the booking itself reuses `booking.created`). */
-  coaching: ["coaching.reminder.sent"],
+   * (the booking itself reuses `booking.created`). P5-E01-S04 (Story 31.4):
+   * recording a PRIVATE per-session coach note is a sensitive mutation worth a
+   * forensic trail; the 24-month anonymisation worker records each note it clears.
+   * NOTE: the note CONTENT is never put in the audit payload — only ids. */
+  coaching: [
+    "coaching.reminder.sent",
+    "coaching.session_note.recorded",
+    "coaching.session_note.anonymised",
+  ],
   /** Attribution & commission ledger (P3-E01) — rate changes, ledger postings
    * (incl. refund reversals), monthly/ad-hoc runs and the payout export/mark-paid. */
   commission: [

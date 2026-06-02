@@ -12,6 +12,7 @@ import { registerReceipt } from "./receipt.js";
 import { registerAttendance } from "./attendance.js";
 import { registerHandoff } from "./handoff.js";
 import { registerReceptionSalon } from "./salon.js";
+import { registerReceptionCoachingNotes } from "./coaching-notes.js";
 import type { SalonFeedbackHook } from "@bm/catalog";
 import type { MpesaRouteConfig } from "../payments/mpesa/initiate.js";
 import type { PaystackRouteConfig } from "../payments/paystack/init.js";
@@ -33,6 +34,12 @@ export interface ReceptionDeps {
    * 34, NOT yet built). Defaults to a no-op when omitted.
    */
   salonFeedbackHook?: SalonFeedbackHook;
+  /**
+   * Master key for the at-rest PRIVATE coach-note encryption (P5-E01-S04 / Story
+   * 31.4). Reuses the operator-provisioned `WOO_SECRET_KEY`; when absent the coach
+   * session-note routes stay off (notes are never stored unencrypted).
+   */
+  coachingNoteEncryptionKey?: string;
 }
 
 export function registerReceptionRoutes(app: FastifyInstance, deps: ReceptionDeps): void {
@@ -46,4 +53,5 @@ export function registerReceptionRoutes(app: FastifyInstance, deps: ReceptionDep
   registerAttendance(app, deps);
   registerHandoff(app, deps);
   registerReceptionSalon(app, deps);
+  registerReceptionCoachingNotes(app, deps);
 }

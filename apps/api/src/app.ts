@@ -138,6 +138,12 @@ export interface AppDeps {
    * WooCommerce config routes are not registered.
    */
   woocommerce?: WooCommerceRouteConfig;
+  /**
+   * Master key for the PRIVATE coach session-note at-rest encryption (Story 31.4 /
+   * P5-E01-S04). Defaults to the WooCommerce encryption key (same operator-provisioned
+   * `WOO_SECRET_KEY`); when no key is resolvable the coach session-note routes stay off.
+   */
+  coachingNoteEncryptionKey?: string;
 }
 
 /** Build Paystack config from env (production). Returns null if not fully set. */
@@ -323,6 +329,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // (read-only, always on) and the unified top-up (S03), which credits cash
     // synchronously and pushes the M-Pesa/Paystack rails when their wiring is
     // present (a method whose rail is unwired returns 503).
+    // P5-E01-S04 (Story 31.4): the PRIVATE coach-note column-encryption key. Reuses
+    // the same operator-provisioned material as the Woo secret (explicit deps in
+    // tests, `WOO_SECRET_KEY` in production). When absent the coach session-note
+    // routes stay off — a note is never persisted unencrypted.
+    const coachingNoteEncryptionKey =
+      deps.coachingNoteEncryptionKey ??
+      deps.woocommerce?.encryptionKey ??
+      woocommerceConfigFromEnv()?.encryptionKey ??
+      undefined;
+
     registerReceptionRoutes(app, {
       db,
       sessions: deps.sessions,
@@ -330,6 +346,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       paystack: paystack ?? undefined,
       now: deps.now ? () => new Date(deps.now!()) : undefined,
       salonFeedbackHook: deps.salonFeedbackHook,
+      coachingNoteEncryptionKey,
     });
 
     // P2-E04-S02/S04: In-store POS — product catalogue read (always on) + sale

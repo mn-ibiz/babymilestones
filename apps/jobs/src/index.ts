@@ -11,6 +11,7 @@ import { createCoachingSlotGenerationJob } from "./jobs/coaching-slot-generation
 import { createCoachingRemindersJob } from "./jobs/coaching-reminders.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
+import { createAnonymiseCoachingNotesJob } from "./jobs/anonymise-coaching-notes.js";
 import { createSmsRetryJob } from "./jobs/sms-retry.js";
 import { createCommissionRunJob } from "./jobs/commission-run.js";
 import { createEtimsRetryJob } from "./jobs/etims-retry.js";
@@ -46,6 +47,8 @@ export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 export type { AnonymiseObservationsJobDeps } from "./jobs/anonymise-observations.js";
+export { createAnonymiseCoachingNotesJob } from "./jobs/anonymise-coaching-notes.js";
+export type { AnonymiseCoachingNotesJobDeps } from "./jobs/anonymise-coaching-notes.js";
 export { createSmsRetryJob, backoffMs, BACKOFF_MS, MAX_ATTEMPTS } from "./jobs/sms-retry.js";
 export type { SmsRetryJobDeps, SmsResend } from "./jobs/sms-retry.js";
 
@@ -168,6 +171,13 @@ export function registerAnonymiseObservationsJob(
   deps: Parameters<typeof createAnonymiseObservationsJob>[0],
 ): void {
   register(createAnonymiseObservationsJob(deps));
+}
+
+/** Wire the nightly 24-month PRIVATE coach-note anonymisation cron (P5-E01-S04 AC4). */
+export function registerAnonymiseCoachingNotesJob(
+  deps: Parameters<typeof createAnonymiseCoachingNotesJob>[0],
+): void {
+  register(createAnonymiseCoachingNotesJob(deps));
 }
 
 /** Wire the SMS retry worker (P3-E06-S04: backoff retry + dead-letter). */

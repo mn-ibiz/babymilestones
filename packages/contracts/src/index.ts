@@ -2455,6 +2455,55 @@ export interface CoachingBookingConfirmation {
   amountCents: number;
 }
 
+/* --- Coach session notes — PRIVATE (P5-E01-S04 / Story 31.4) --------------- */
+
+/**
+ * Record a PRIVATE coach session note after check-out (AC1). The note is free text
+ * and ENCRYPTED AT REST server-side; this body carries only the booking + plaintext
+ * note (over TLS). A reasonable upper bound guards against accidental dumps.
+ */
+export const coachingSessionNoteCreateSchema = z.object({
+  bookingId: z.string().uuid("bookingId must be a valid id"),
+  note: z
+    .string()
+    .trim()
+    .min(1, "Note cannot be empty")
+    .max(4000, "Note is too long (max 4000 characters)"),
+});
+export type CoachingSessionNoteCreateInput = z.infer<typeof coachingSessionNoteCreateSchema>;
+
+/** Confirmation that a private coach note was recorded (AC1). Carries NO content back. */
+export interface CoachingSessionNoteRecordedDto {
+  id: string;
+  bookingId: string;
+}
+
+/** A decrypted coach session note for the AUTHENTICATED admin/reception view (AC2). */
+export interface CoachingSessionNoteDto {
+  id: string;
+  bookingId: string;
+  staffId: string | null;
+  staffName: string | null;
+  /** Decrypted note text, or null when the row has been anonymised (AC4). */
+  note: string | null;
+  recordedAt: string;
+  anonymised: boolean;
+}
+
+/**
+ * A coach's NON-SENSITIVE session-note summary for the UNAUTHENTICATED coach viewer
+ * (AC2 security decision): counts + dates only — NEVER any note content. The full
+ * decrypted content requires the authenticated admin/reception path.
+ */
+export interface CoachingSessionNoteSummaryDto {
+  staffId: string;
+  staffName: string;
+  /** Number of live (non-anonymised) notes recorded for this coach. */
+  noteCount: number;
+  /** Per-note metadata: id, booking, recorded date — no content. */
+  sessions: Array<{ noteId: string; bookingId: string; recordedAt: string }>;
+}
+
 /* --- Salon counter check-in & service completion (P3-E03-S03 / Story 25.3) - */
 
 /** One salon booking on the reception counter board (AC1). */

@@ -37,6 +37,7 @@ export * from "./subscriptions.js";
 export * from "./staff.js";
 export * from "./staff-availability.js";
 export * from "./coaching-slots.js";
+export * from "./coaching-session-notes.js";
 export * from "./staff-commission-rates.js";
 export * from "./commission-ledger.js";
 export * from "./commission-runs.js";
