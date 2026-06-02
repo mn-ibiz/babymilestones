@@ -54,3 +54,4 @@ export * from "./feedback.js";
 export * from "./review-snippets.js";
 export * from "./admin-alerts.js";
 export * from "./expenses.js";
+export * from "./cms-pages.js";

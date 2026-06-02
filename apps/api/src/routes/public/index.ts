@@ -11,6 +11,7 @@ import {
   registerPublicReviewSnippets,
   ReviewSnippetsRateLimiter,
 } from "./review-snippets.js";
+import { registerPublicCmsPages } from "./cms-pages.js";
 
 export interface PublicRoutesDeps {
   db: Database;
@@ -43,4 +44,8 @@ export function registerPublicRoutes(app: FastifyInstance, deps: PublicRoutesDep
     db: deps.db,
     rateLimiter: deps.reviewSnippetsRateLimiter,
   });
+  // P6-E06-S03 (Story 36.3): the PUBLISHED CMS content for a unit slug, for the
+  // platform per-unit public pages to render (falling back to static content on a
+  // 404). Drafts are NEVER exposed here.
+  registerPublicCmsPages(app, { db: deps.db });
 }

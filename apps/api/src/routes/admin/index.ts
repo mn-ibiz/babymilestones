@@ -37,6 +37,7 @@ import { registerAdminReviewSnippets } from "./review-snippets.js";
 import { registerAdminAlerts } from "./alerts.js";
 import { registerAdminDailyDispatch } from "./daily-dispatch.js";
 import { registerAdminExpenses } from "./expenses.js";
+import { registerAdminCmsPages } from "./cms-pages.js";
 import { registerAdminPnlReport } from "./pnl-report.js";
 import { registerAdminTaxReport } from "./tax-report.js";
 import {
@@ -108,6 +109,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminAlerts(app, deps); // P6-E04-S03 (Story 34.3)
   registerAdminDailyDispatch(app, deps); // P4-E04-S04 (Story 29.4)
   registerAdminExpenses(app, { db: deps.db, sessions: deps.sessions }); // P6-E05-S05 (Story 35.5)
+  registerAdminCmsPages(app, { db: deps.db, sessions: deps.sessions }); // P6-E06-S03 (Story 36.3)
   registerAdminPnlReport(app, deps); // P6-E05-S01 (Story 35.1)
   registerAdminTaxReport(app, deps); // P6-E07-S06 (Story 35.6)
   registerAdminWooCommerceConfig(app, {

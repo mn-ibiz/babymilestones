@@ -508,6 +508,24 @@ export {
   type ExpensesByUnit,
 } from "./expenses.js";
 
+// CMS-driven unit pages — a lightweight, DB-backed CMS so admins edit the public
+// per-unit marketing pages WITHOUT a deploy (P6-E06-S03 / Story 36.3).
+export {
+  CMS_PAGE_SLUGS,
+  isCmsPageSlug,
+  CmsPageValidationError,
+  savePage,
+  publishPage,
+  getPage,
+  getDraftPage,
+  getPublishedPage,
+  listPages,
+  listPageRevisions,
+  type CmsPageSlug,
+  type SavePageInput,
+  type PublishPageInput,
+} from "./cms-pages.js";
+
 // Consolidated P&L by period — per-unit revenue / direct costs / expenses / net +
 // consolidated totals, with MoM / YoY comparison (P6-E05-S01 / Story 35.1).
 export {

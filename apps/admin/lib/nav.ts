@@ -202,6 +202,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Expenses",
     permission: { action: "manage", resource: "expense" },
   },
+  // P6-E06-S03 (Story 36.3): CMS-driven unit pages — admins edit the public per-unit
+  // marketing pages (hero / CTA / body sections) WITHOUT a deploy. Editing the
+  // marketing pages is a content mutation, so it gates on `manage config` — admin /
+  // super_admin only (same as review snippets). The server re-enforces the same gate.
+  {
+    href: "/pages",
+    label: "Pages",
+    permission: { action: "manage", resource: "config" },
+  },
   // P6-E05-S01 (Story 35.1): consolidated P&L by period — per-unit revenue /
   // direct costs / expenses / net + MoM/YoY comparison. P&L is the sensitive
   // owners'-books view, gated on `read report` — admin / accountant / treasury /

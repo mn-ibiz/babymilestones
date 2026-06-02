@@ -5998,3 +5998,119 @@ export function taxReportExportUrl(values: {
   const params = new URLSearchParams({ fromDate: values.fromDate, toDate: values.toDate });
   return `/admin/tax-report/export.${values.format}?${params.toString()}`;
 }
+
+// ---------------------------------------------------------------------------
+// CMS-driven unit pages (P6-E06-S03 / Story 36.3). A lightweight, DB-backed CMS
+// so admins edit the public per-unit marketing pages (hero / CTA / body sections)
+// WITHOUT a deploy. A page has a draft/published lifecycle (AC2) and an
+// append-only revision history (AC3). Schemas mirror the `@bm/catalog` cms-pages
+// validation + the DB CHECKs.
+// ---------------------------------------------------------------------------
+
+/**
+ * The known CMS page slugs (Story 36.3 AC1) — the routable public unit keys
+ * (`/play` … `/coaching`) plus the `shop` landing. Mirrors `CMS_PAGE_SLUGS` in
+ * `@bm/catalog`; the static fallback unit set lives in the platform `unit-content`.
+ */
+export const CMS_PAGE_SLUGS = [
+  "play",
+  "talent",
+  "salon",
+  "events",
+  "coaching",
+  "shop",
+] as const;
+export type CmsPageSlug = (typeof CMS_PAGE_SLUGS)[number];
+
+/** True when `value` is one of the known CMS page slugs. */
+export function isCmsPageSlug(value: unknown): value is CmsPageSlug {
+  return typeof value === "string" && (CMS_PAGE_SLUGS as readonly string[]).includes(value);
+}
+
+/** A page lifecycle status (AC2). */
+export type CmsPageStatus = "draft" | "published";
+
+export const CMS_HERO_COPY_MAX = 2000;
+export const CMS_URL_MAX = 500;
+export const CMS_CTA_LABEL_MAX = 120;
+export const CMS_SECTION_HEADING_MAX = 200;
+export const CMS_SECTION_BODY_MAX = 5000;
+
+/** One ordered body section — a non-empty heading + body text/markdown (AC1). */
+export const cmsBodySectionSchema = z.object({
+  heading: z
+    .string()
+    .trim()
+    .min(1, "Section heading is required")
+    .max(CMS_SECTION_HEADING_MAX, `Heading must be ${CMS_SECTION_HEADING_MAX} characters or fewer`),
+  body: z.string().max(CMS_SECTION_BODY_MAX, `Body must be ${CMS_SECTION_BODY_MAX} characters or fewer`),
+});
+export type CmsBodySectionInput = z.infer<typeof cmsBodySectionSchema>;
+
+/** The editable content of a page (hero / image / CTA / ordered body sections). */
+export const cmsPageContentSchema = z.object({
+  heroCopy: z.string().max(CMS_HERO_COPY_MAX, `Hero copy must be ${CMS_HERO_COPY_MAX} characters or fewer`),
+  heroImageUrl: z.string().max(CMS_URL_MAX, `Image URL must be ${CMS_URL_MAX} characters or fewer`),
+  ctaLabel: z.string().max(CMS_CTA_LABEL_MAX, `CTA label must be ${CMS_CTA_LABEL_MAX} characters or fewer`),
+  ctaHref: z.string().max(CMS_URL_MAX, `CTA href must be ${CMS_URL_MAX} characters or fewer`),
+  bodySections: z.array(cmsBodySectionSchema).default([]),
+});
+export type CmsPageContentInput = z.infer<typeof cmsPageContentSchema>;
+
+/** Create/update (save) a page (AC1): a known slug + the editable content. */
+export const cmsPageSaveSchema = cmsPageContentSchema.extend({
+  slug: z.enum(CMS_PAGE_SLUGS),
+});
+export type CmsPageSaveInput = z.infer<typeof cmsPageSaveSchema>;
+
+/** Wire DTO for one body section. */
+export interface CmsBodySectionDto {
+  heading: string;
+  body: string;
+}
+
+/** Wire DTO for one CMS page (Story 36.3 AC1/AC2). All serialisable primitives. */
+export interface CmsPageDto {
+  id: string;
+  slug: string;
+  status: CmsPageStatus;
+  heroCopy: string;
+  heroImageUrl: string;
+  ctaLabel: string;
+  ctaHref: string;
+  bodySections: CmsBodySectionDto[];
+  /** ISO timestamp the page was last published, or null (never published). */
+  publishedAt: string | null;
+  updatedAt: string;
+}
+
+/** Wire DTO for one retained revision (Story 36.3 AC3). */
+export interface CmsPageRevisionDto {
+  id: string;
+  pageId: string;
+  /** The snapshotted content of the page at this revision. */
+  snapshot: {
+    slug: string;
+    status: string;
+    heroCopy: string;
+    heroImageUrl: string;
+    ctaLabel: string;
+    ctaHref: string;
+    bodySections: CmsBodySectionDto[];
+  };
+  createdAt: string;
+}
+
+/**
+ * The PUBLIC view-model for a published CMS page (Story 36.3) — the shape the
+ * public render reads. Mirrors the static `UnitPage` enough that the platform can
+ * render either source; `examples` is derived from the body-section headings.
+ */
+export interface PublicCmsPageDto {
+  slug: string;
+  heroCopy: string;
+  heroImageUrl: string;
+  ctaLabel: string;
+  ctaHref: string;
+  bodySections: CmsBodySectionDto[];
+}
