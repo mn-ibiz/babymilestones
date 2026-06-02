@@ -22,6 +22,7 @@ import {
 } from "@bm/auth";
 import { InMemoryExportStorage, runExport, type ExportStorage } from "@bm/export";
 import type { SalonFeedbackHook } from "@bm/catalog";
+import { defaultSalonFeedbackHook } from "./feedback.js";
 import { registerAuthRoutes } from "./routes/auth/index.js";
 import { registerParentRoutes } from "./routes/parents/index.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
@@ -345,7 +346,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       mpesa: mpesa ?? undefined,
       paystack: paystack ?? undefined,
       now: deps.now ? () => new Date(deps.now!()) : undefined,
-      salonFeedbackHook: deps.salonFeedbackHook,
+      // P6-E04-S01 (Story 34.1): the salon completion fires the REAL feedback-
+      // invitation creator by default (idempotent invitation row + one-tap SMS-
+      // stub). Tests can still inject a spy via `deps.salonFeedbackHook`.
+      salonFeedbackHook: deps.salonFeedbackHook ?? defaultSalonFeedbackHook(db, app.log),
       coachingNoteEncryptionKey,
     });
 

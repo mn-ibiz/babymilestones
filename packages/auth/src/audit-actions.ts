@@ -252,6 +252,11 @@ export const AUDIT_ACTION_CATALOGUE = {
    * source-of-truth stock and is audited; the POS sale decrement keeps its own
    * `pos.sale.paid` line. */
   stock: ["stock.adjusted"],
+  /** Feedback Engine (Epic 34 / P6-E04) — a 0–5 rating after every paid touchpoint.
+   * An invitation is CREATED on a completed touchpoint (salon checkout, attendance
+   * pickup, order fulfilled, …); the parent SUBMITS the rating once. Both are state
+   * changes worth a forensic trail; the comment TEXT is never put in the payload. */
+  feedback: ["feedback.invited", "feedback.submitted"],
   /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
   event: [
     "event.created",

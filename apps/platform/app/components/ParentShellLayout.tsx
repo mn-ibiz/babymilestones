@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ShellNav } from "./ShellNav";
 import { OutstandingBalanceBannerIsland } from "./OutstandingBalanceBannerIsland";
+import { FeedbackPromptIsland } from "./FeedbackPromptIsland";
 
 /**
  * `ParentShellLayout` (P1-E11-S05) — the mobile-first chrome for the authed
@@ -31,6 +32,9 @@ export function ParentShellLayout({ children }: { children: ReactNode }) {
         {/* P2-E07-S01: the outstanding-balance nudge sits above page content on
             every parent page; it renders nothing while the balance is settled. */}
         <OutstandingBalanceBannerIsland />
+        {/* P6-E04-S01 (Story 34.1): a 0–5 rating prompt for the parent's next
+            pending paid touchpoint; renders nothing when nothing is pending. */}
+        <FeedbackPromptIsland />
         {children}
       </main>
 

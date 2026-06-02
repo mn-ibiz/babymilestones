@@ -209,6 +209,23 @@ export {
   type ReassignSalonBookingResult,
 } from "./salon.js";
 
+// Feedback Engine FOUNDATION: a 0–5 rating after every paid touchpoint (Epic 34 /
+// P6-E04-S01 / Story 34.1). Idempotent invitation per touchpoint + one-tap submit.
+export {
+  createFeedbackInvitation,
+  submitFeedback,
+  listPendingFeedbackForParent,
+  FEEDBACK_COMMENT_MAX,
+  FeedbackInvitationNotFoundError,
+  FeedbackNotOwnedError,
+  InvalidFeedbackRatingError,
+  FeedbackCommentTooLongError,
+  type FeedbackSourceType,
+  type CreateFeedbackInvitationInput,
+  type SubmitFeedbackInput,
+  type PendingFeedback,
+} from "./feedback.js";
+
 // Coach availability + 1:1 booking (P5-E01-S02 / Story 31.2). REUSES the generic
 // staff_availability table; bookable coaching_slots are capacity-1.
 export {

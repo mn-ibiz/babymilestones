@@ -28,6 +28,7 @@ export type SmsTemplateKey =
   | "pickup.handoff"
   | "event.eticket"
   | "event.rsvp"
+  | "feedback.invite"
   | "raw";
 
 /** Data bag passed to a template; renderers read the fields they need. */
@@ -93,6 +94,10 @@ const RENDERERS: Record<SmsTemplateKey, Renderer> = {
   // Free-event RSVP confirmation (30-4): same shape minus the payment.
   "event.rsvp": (d) =>
     `You're confirmed for ${str(d, "eventName")} (${str(d, "quantity")} place(s)). View your pass(es): ${str(d, "link")} — ${BRAND.name}`,
+  // Feedback invitation (P6-E04-S01 AC2): a one-tap 0–5 rating link sent after a
+  // completed paid touchpoint. The `link` carries the invitation token.
+  "feedback.invite": (d) =>
+    `How was ${str(d, "serviceName")}? Tap to rate it 0–5: ${str(d, "link")} — ${BRAND.name}`,
   raw: (d) => str(d, "body"),
 };
 

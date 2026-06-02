@@ -73,3 +73,26 @@ describe("coaching booking templates (P5-E01-S02 AC5)", () => {
     }
   });
 });
+
+/**
+ * P6-E04-S01 AC2 — feedback invitation SMS-stub. After a completed paid
+ * touchpoint the parent gets a one-tap link carrying the invitation token; the
+ * copy names the service and asks for a 0–5 rating, signed off with the brand.
+ */
+describe("feedback invitation template (P6-E04-S01 AC2)", () => {
+  it("renders the one-tap rating link", () => {
+    expect(
+      renderTemplate("feedback.invite", {
+        serviceName: "Kids Cut",
+        link: "https://app.example/feedback/abc",
+      }),
+    ).toBe(
+      "How was Kids Cut? Tap to rate it 0–5: https://app.example/feedback/abc — Baby Milestones",
+    );
+  });
+
+  it("requires the serviceName and link fields", () => {
+    expect(() => renderTemplate("feedback.invite", { link: "x" })).toThrow(/serviceName/);
+    expect(() => renderTemplate("feedback.invite", { serviceName: "x" })).toThrow(/link/);
+  });
+});

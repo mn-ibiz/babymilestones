@@ -17,6 +17,7 @@ import { registerParentSalon } from "./salon.js";
 import { registerParentCoaching } from "./coaching.js";
 import { registerParentSubscriptions } from "./subscriptions.js";
 import { registerParentLoyalty } from "./loyalty.js";
+import { registerParentFeedback } from "./feedback.js";
 
 export interface ParentsDeps {
   db: Database;
@@ -84,4 +85,5 @@ export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDep
     now: deps.now ? () => new Date(deps.now!()) : undefined,
   });
   registerParentLoyalty(app, { db: deps.db, sessions: deps.sessions });
+  registerParentFeedback(app, { db: deps.db, sessions: deps.sessions });
 }
