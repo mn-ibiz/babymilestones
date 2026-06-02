@@ -22,6 +22,13 @@ export type Job = {
   cron?: string;
   /** What the scheduler does after a failed run (AC1). Defaults to retry-next-tick. */
   onFailure?: OnFailurePolicy;
+  /**
+   * Max attempts the handler makes per scheduled run before giving up and
+   * raising an alert (P3-E06-S03 AC2). A handler that wraps its own in-run retry
+   * loop (e.g. the monthly commission run) declares the cap here so the registry
+   * + admin observability can surface it. Omit (or `1`) for one-shot jobs.
+   */
+  maxAttempts?: number;
 };
 
 /** A registry entry's public descriptor (AC1: name, schedule, on-failure policy). */
@@ -30,6 +37,8 @@ export interface JobDescriptor {
   cron: string | null;
   intervalMs: number | null;
   onFailure: OnFailurePolicy;
+  /** Per-run attempt cap before alert (P3-E06-S03 AC2); 1 = single-shot. */
+  maxAttempts: number;
 }
 
 /** Workers register here: SMS retry, commission run, anonymisation, M-Pesa recovery, Woo sync. */
@@ -50,6 +59,7 @@ export function schedule(): JobDescriptor[] {
     cron: j.cron ?? null,
     intervalMs: j.intervalMs ?? null,
     onFailure: j.onFailure ?? "retry-next-tick",
+    maxAttempts: j.maxAttempts ?? 1,
   }));
 }
 

@@ -43,7 +43,7 @@ describe("monthly commission run job (P3-E01-S03)", () => {
     await dbh.close();
   });
 
-  const run = () => createCommissionRunJob({ db: dbh.db, now: () => NOW, logger: { info() {} } }).run();
+  const run = () => createCommissionRunJob({ db: dbh.db, now: () => NOW, logger: { info() {}, error() {} } }).run();
 
   it("closes the prior month: writes a run + per-staff lines, audited (AC2/AC3/AC5)", async () => {
     const a = await seedJune(dbh, "Asha", 1500);
@@ -77,9 +77,55 @@ describe("monthly commission run job (P3-E01-S03)", () => {
     expect(audits).toHaveLength(1); // a no-op re-run does not re-audit
   });
 
-  it("declares a monthly cadence + correct name", () => {
+  it("declares the framework name, cron + max attempts (28-3 AC1/AC2)", () => {
     const job = createCommissionRunJob({ db: dbh.db, now: () => NOW });
-    expect(job.name).toBe("commission-run");
+    // AC1: registered as `commission.monthly` with cron `0 2 1 * *`.
+    expect(job.name).toBe("commission.monthly");
+    expect(job.cron).toBe("0 2 1 * *");
     expect(job.intervalMs).toBeGreaterThan(0);
+    // AC2: max 3 attempts before alert.
+    expect(job.maxAttempts).toBe(3);
+    expect(job.onFailure).toBe("alert-only");
+  });
+
+  it("retries a failing run and succeeds within 3 attempts (28-3 AC2)", async () => {
+    await seedJune(dbh, "Asha", 1500);
+    let calls = 0;
+    // Fail twice, succeed on the 3rd attempt.
+    const flaky = () => {
+      calls += 1;
+      if (calls < 3) throw new Error("transient");
+      return NOW;
+    };
+    await createCommissionRunJob({ db: dbh.db, now: flaky, logger: { info() {}, error() {} } }).run();
+
+    expect(calls).toBe(3);
+    const runs = await dbh.db.select().from(commissionRuns);
+    expect(runs).toHaveLength(1); // the run did eventually complete
+  });
+
+  it("alerts after exhausting 3 attempts and rethrows for the runner (28-3 AC2)", async () => {
+    const errors: Array<Record<string, unknown>> = [];
+    let calls = 0;
+    const alwaysFail = () => {
+      calls += 1;
+      throw new Error("persistent failure");
+    };
+    const job = createCommissionRunJob({
+      db: dbh.db,
+      now: alwaysFail,
+      logger: { info() {}, error: (obj) => errors.push(obj) },
+    });
+
+    await expect(job.run()).rejects.toThrow(/persistent failure/);
+    // AC2: exactly 3 attempts before giving up.
+    expect(calls).toBe(3);
+    // AC2: an alert is raised on exhaustion (logged + audited).
+    expect(errors.some((e) => e.event === "commission.run.failed")).toBe(true);
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "commission.run.failed"));
+    expect(audits).toHaveLength(1);
   });
 });
