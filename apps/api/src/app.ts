@@ -21,6 +21,7 @@ import {
   type SessionStore,
 } from "@bm/auth";
 import { InMemoryExportStorage, runExport, type ExportStorage } from "@bm/export";
+import type { SalonFeedbackHook } from "@bm/catalog";
 import { registerAuthRoutes } from "./routes/auth/index.js";
 import { registerParentRoutes } from "./routes/parents/index.js";
 import { registerAdminRoutes } from "./routes/admin/index.js";
@@ -34,9 +35,11 @@ import { registerBankRoutes } from "./routes/payments/bank/index.js";
 import { registerReceptionRoutes } from "./routes/reception/index.js";
 import { registerPosRoutes } from "./routes/pos/index.js";
 import { registerPublicRoutes } from "./routes/public/index.js";
+import type { StaffEarningsRateLimiter } from "./routes/public/staff-earnings.js";
 import { registerTreasuryRoutes } from "./routes/treasury/index.js";
 import { registerReceiptRoutes } from "./routes/receipts/index.js";
 import { registerHealthRoutes, type ReadinessCheck } from "./routes/health.js";
+import type { WooCommerceRouteConfig } from "./routes/admin/woocommerce-config.js";
 import { sql } from "drizzle-orm";
 
 export interface AppDeps {
@@ -48,6 +51,8 @@ export interface AppDeps {
   resetRateLimiter?: ResetRateLimiter;
   /** Single-use reset-token tracker (P1-E01-S05). Defaults to in-memory. */
   consumedTokens?: ConsumedTokenStore;
+  /** Anti-scrape limiter for the public staff-earnings viewer (P3-E02-S01 AC5). */
+  staffEarningsRateLimiter?: StaffEarningsRateLimiter;
   /** HMAC secret for reset tokens. Defaults to a per-process random secret. */
   resetTokenSecret?: string;
   /** Clock injection for deterministic TTL/expiry tests. Defaults to `Date.now`. */
@@ -120,6 +125,19 @@ export interface AppDeps {
    * run-now endpoint exposes an empty registry (list still 200, run 404).
    */
   jobs?: { name: string; run: () => Promise<void> }[];
+  /**
+   * Forward-compatible salon feedback-prompt hook (P3-E03-S03 AC3 → P5-E04 / Epic
+   * 34, NOT yet built). Defaults to a no-op; the future feedback engine wires a
+   * real implementation. Tests inject a spy to assert it fires on completion.
+   */
+  salonFeedbackHook?: SalonFeedbackHook;
+  /**
+   * WooCommerce credentials-config wiring (Story 29.6 / P4-E04-S06): the at-rest
+   * encryption key + the test-connection HTTP transport (tests pass a fake;
+   * production passes `globalThis.fetch` + the env key). When omitted, the
+   * WooCommerce config routes are not registered.
+   */
+  woocommerce?: WooCommerceRouteConfig;
 }
 
 /** Build Paystack config from env (production). Returns null if not fully set. */
@@ -147,6 +165,18 @@ function mpesaConfigFromEnv(): MpesaRouteConfig | null {
   };
   if (Object.values(config).some((v) => v.trim() === "")) return null;
   return { config, transport: (url, init) => fetch(url, init) };
+}
+
+/**
+ * Build WooCommerce config wiring from env (production, Story 29.6). Requires
+ * `WOO_SECRET_KEY` (the at-rest encryption key); the test-connection transport
+ * is the platform `fetch`. Returns null when the encryption key is unset, so the
+ * config routes stay unregistered until an operator provisions a key.
+ */
+function woocommerceConfigFromEnv(): WooCommerceRouteConfig | null {
+  const encryptionKey = process.env.WOO_SECRET_KEY ?? "";
+  if (encryptionKey.trim() === "") return null;
+  return { encryptionKey, transport: (url, init) => fetch(url, init) };
 }
 
 /** Build the single API surface that serves all front-end apps. */
@@ -265,13 +295,22 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       enqueueStatement: deps.enqueueStatement,
       now,
     });
-    registerAdminRoutes(app, { db, sessions: deps.sessions, jobs: deps.jobs });
+    registerAdminRoutes(app, {
+      db,
+      sessions: deps.sessions,
+      jobs: deps.jobs,
+      now: deps.now ? () => new Date(deps.now!()) : undefined,
+      // P4-E04-S06: explicit deps in tests, env in production. When neither
+      // supplies an encryption key the WooCommerce config routes stay off.
+      woocommerce: deps.woocommerce ?? woocommerceConfigFromEnv() ?? undefined,
+    });
 
     // P4-E05-S02: public, unauthenticated event listing + detail (no account
     // required). Read-only over the events catalogue.
     registerPublicRoutes(app, {
       db,
       now: deps.now ? () => new Date(deps.now!()) : undefined,
+      staffEarningsRateLimiter: deps.staffEarningsRateLimiter,
     });
 
     // Resolve provider wiring once (explicit deps in tests, env in production) so
@@ -290,6 +329,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       mpesa: mpesa ?? undefined,
       paystack: paystack ?? undefined,
       now: deps.now ? () => new Date(deps.now!()) : undefined,
+      salonFeedbackHook: deps.salonFeedbackHook,
     });
 
     // P2-E04-S02/S04: In-store POS — product catalogue read (always on) + sale

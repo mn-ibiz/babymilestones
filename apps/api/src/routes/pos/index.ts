@@ -5,6 +5,8 @@ import type { SmsSender } from "@bm/sms";
 import { registerPosProducts } from "./products.js";
 import { registerPosSales } from "./sales.js";
 import { registerPosCashup } from "./cashup.js";
+import { registerPosOnlineOrders } from "./online-orders.js";
+import { registerPosOrderTransitions } from "./order-transitions.js";
 import type { MpesaRouteConfig } from "../payments/mpesa/initiate.js";
 import type { PaystackRouteConfig } from "../payments/paystack/init.js";
 
@@ -26,4 +28,6 @@ export function registerPosRoutes(app: FastifyInstance, deps: PosDeps): void {
   registerPosProducts(app, deps);
   registerPosSales(app, deps);
   registerPosCashup(app, deps);
+  registerPosOnlineOrders(app, deps);
+  registerPosOrderTransitions(app, deps);
 }

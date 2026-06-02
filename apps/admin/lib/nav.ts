@@ -92,6 +92,16 @@ export interface NavItem {
   label: string;
   /** Permission a role must hold for this item to be visible/reachable. */
   permission: NavPermission;
+  /**
+   * Optional explicit role allow-list. When set, visibility/access is decided by
+   * membership here INSTEAD of the `(action, resource)` permission — used where a
+   * surface is deliberately narrower than any coarse grant (e.g. the operations
+   * dashboard is admin/super_admin/treasury only, narrower than `read report`
+   * which also grants accountant — P3-E05-S01 AC4). The server re-enforces the
+   * same allow-list (`apps/api` operations-dashboard route); the client is never
+   * trusted.
+   */
+  allowRoles?: readonly string[];
 }
 
 /**
@@ -100,11 +110,46 @@ export interface NavItem {
  * same mapping so the rendered nav and the route guard can never disagree.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
+  // P3-E05-S01: daily operations dashboard — today across every unit. Gated to
+  // admin / super_admin / treasury only (read-only, AC4) — narrower than the
+  // `read report` roles, so an explicit allow-list rather than a matrix grant.
+  {
+    href: "/operations",
+    label: "Today at a glance",
+    permission: { action: "read", resource: "report" },
+    allowRoles: ["admin", "super_admin", "treasury"],
+  },
+  // P3-E05-S03: top-staff leaderboard — per-staff revenue / services / avg ticket
+  // over a period, with a per-staff commission drill-down. Same explicit
+  // allow-list as the operations dashboard (admin / super_admin / treasury).
+  {
+    href: "/operations/leaderboard",
+    label: "Top staff leaderboard",
+    permission: { action: "read", resource: "report" },
+    allowRoles: ["admin", "super_admin", "treasury"],
+  },
+  // P3-E05-S05: peak-hours heatmap — active sessions by weekday × hour over a
+  // period (capped at 12 months), filterable by unit. Same explicit allow-list as
+  // the operations dashboard (admin / super_admin / treasury).
+  {
+    href: "/operations/heatmap",
+    label: "Peak hours heatmap",
+    permission: { action: "read", resource: "report" },
+    allowRoles: ["admin", "super_admin", "treasury"],
+  },
   { href: "/staff", label: "Staff", permission: { action: "manage", resource: "user" } },
   // P1-E10-S02: staff LOGIN users (phone/role/PIN) — distinct from the `/staff`
   // attribution data records (P1-E07-S03). Both gate on `manage user`.
   { href: "/users", label: "Staff logins", permission: { action: "manage", resource: "user" } },
   { href: "/services", label: "Services", permission: { action: "manage", resource: "service" } },
+  // P3-E03-S05: salon-specific reporting tile + per-stylist drill-down. Gates on
+  // `read report` — admin / accountant / treasury / super_admin. Forward-compatible
+  // with the operational dashboard (Epic 27), which reuses the same data + tile.
+  {
+    href: "/salon-report",
+    label: "Salon report",
+    permission: { action: "read", resource: "report" },
+  },
   {
     href: "/treasury/float-accounts",
     label: "Float accounts",
@@ -143,11 +188,19 @@ const ADMIN_FAMILY = new Set<string>(["admin", "super_admin", "treasury", "accou
 
 /* ------------------------------------------------------------- nav filtering */
 
+/**
+ * Whether `role` may see/reach a single nav item. An explicit `allowRoles`
+ * list (when present) is authoritative — it overrides the coarse permission so a
+ * surface can be deliberately narrower than any matrix grant (P3-E05-S01 AC4).
+ */
+function canSeeNavItem(role: string, item: NavItem): boolean {
+  if (item.allowRoles) return item.allowRoles.includes(role);
+  return canPerform(role, item.permission.action, item.permission.resource);
+}
+
 /** Side-nav items the role may see, in catalogue order (AC1). Pure + testable. */
 export function visibleNavFor(role: string): NavItem[] {
-  return NAV_ITEMS.filter((item) =>
-    canPerform(role, item.permission.action, item.permission.resource),
-  );
+  return NAV_ITEMS.filter((item) => canSeeNavItem(role, item));
 }
 
 /** Resolve the deepest nav item whose href prefixes `path` (longest match). */
@@ -173,7 +226,7 @@ export function canAccessRoute(role: string, path: string): boolean {
   }
   const item = navItemForPath(path);
   if (!item) return false;
-  return canPerform(role, item.permission.action, item.permission.resource);
+  return canSeeNavItem(role, item);
 }
 
 /* --------------------------------------------------- float status dot (AC3) */

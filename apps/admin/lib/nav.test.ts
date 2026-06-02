@@ -64,6 +64,33 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(visibleNavFor("parent")).toEqual([]);
   });
 
+  it("the salon report is visible to the read-report roles (P3-E03-S05)", () => {
+    // admin / accountant / treasury / super_admin hold read:report.
+    for (const role of ["admin", "accountant", "treasury", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/salon-report");
+    }
+    // reception/parent never reach the admin console.
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/salon-report");
+  });
+
+  it("the operations dashboard is visible to admin/super_admin/treasury only (P3-E05-S01 AC4)", () => {
+    for (const role of ["admin", "super_admin", "treasury"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations");
+    }
+    // Narrower than read-report: accountant holds read:report but NOT this view.
+    expect(visibleNavFor("accountant").map((i) => i.href)).not.toContain("/operations");
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/operations");
+  });
+
+  it("the top-staff leaderboard is visible to admin/super_admin/treasury only (P3-E05-S03)", () => {
+    for (const role of ["admin", "super_admin", "treasury"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations/leaderboard");
+    }
+    // Narrower than read-report: accountant holds read:report but NOT this view.
+    expect(visibleNavFor("accountant").map((i) => i.href)).not.toContain("/operations/leaderboard");
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/operations/leaderboard");
+  });
+
   it("never leaks an item the role lacks permission for", () => {
     for (const role of ["admin", "treasury", "accountant", "super_admin", "parent"]) {
       for (const item of visibleNavFor(role)) {
@@ -88,6 +115,15 @@ describe("canAccessRoute predicate (AC2 — route guard)", () => {
   it("denies a known route when the role lacks the permission", () => {
     expect(canAccessRoute("accountant", "/staff")).toBe(false);
     expect(canAccessRoute("treasury", "/sms-config")).toBe(false);
+  });
+
+  it("gates the operations dashboard route to admin/super_admin/treasury (P3-E05-S01 AC4)", () => {
+    expect(canAccessRoute("admin", "/operations")).toBe(true);
+    expect(canAccessRoute("super_admin", "/operations")).toBe(true);
+    expect(canAccessRoute("treasury", "/operations")).toBe(true);
+    expect(canAccessRoute("treasury", "/operations/revenue")).toBe(true);
+    expect(canAccessRoute("accountant", "/operations")).toBe(false);
+    expect(canAccessRoute("reception", "/operations")).toBe(false);
   });
 
   it("denies the forbidden page is not itself gated (always reachable)", () => {

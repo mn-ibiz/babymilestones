@@ -40,8 +40,30 @@ import {
   TAX_TREATMENTS,
   DEFAULT_TAX_TREATMENT,
   isTaxTreatment,
+  COACHING_FORMATS,
+  isCoachingFormat,
+  salonHourBucket,
+  groupSalonBookingsByStylistAndHour,
+  salonCompleteSchema,
+  salonWalkInSchema,
+  formatSalonRevenue,
+  salonReportTileViewModel,
+  salonReportDrillRows,
+  operationsDashboardTiles,
+  operationsTopStaffRows,
+  staffLeaderboardQuerySchema,
+  staffLeaderboardRows,
+  staffCommissionDrilldownView,
+  staffLeaderboardRoleOptions,
+  attributionRoleLabel,
+  SERVICE_UNITS,
   type ReconciliationExportRow,
   type ParentProfile,
+  type SalonCounterBooking,
+  type SalonDayReportDto,
+  type OperationsDashboardDto,
+  type StaffLeaderboardDto,
+  type StaffCommissionDrilldownDto,
 } from "./index.js";
 
 describe("reconciliation export contract (P1-E06-S04)", () => {
@@ -561,6 +583,81 @@ describe("VAT / tax treatment per service (P1-E07-S04)", () => {
   });
 });
 
+describe("coaching catalogue contracts (P5-E01-S01)", () => {
+  it("coaching is a first-class service unit (AC1)", () => {
+    expect(SERVICE_UNITS).toContain("coaching");
+    expect(serviceCreateSchema.parse({ name: "Sleep coaching", unit: "coaching" }).unit).toBe(
+      "coaching",
+    );
+  });
+
+  it("exposes the constrained coaching-format set + guard (AC2)", () => {
+    expect(COACHING_FORMATS).toEqual(["one_to_one", "group"]);
+    expect(isCoachingFormat("one_to_one")).toBe(true);
+    expect(isCoachingFormat("group")).toBe(true);
+    expect(isCoachingFormat("webinar")).toBe(false);
+    expect(isCoachingFormat(null)).toBe(false);
+  });
+
+  it("serviceCreateSchema accepts format, duration + age-stage tags (AC2)", () => {
+    const parsed = serviceCreateSchema.parse({
+      name: "Sleep coaching",
+      unit: "coaching",
+      format: "one_to_one",
+      coachingDurationMinutes: 45,
+      ageStageTags: ["expecting", "0-3mo"],
+      attributionRoleRequired: "coach",
+    });
+    expect(parsed.format).toBe("one_to_one");
+    expect(parsed.coachingDurationMinutes).toBe(45);
+    expect(parsed.ageStageTags).toEqual(["expecting", "0-3mo"]);
+    expect(parsed.attributionRoleRequired).toBe("coach");
+  });
+
+  it("serviceCreateSchema collapses absent format/tags to null + trims/dedupes tags (AC2)", () => {
+    const bare = serviceCreateSchema.parse({ name: "Group coaching", unit: "coaching" });
+    expect(bare.format).toBeNull();
+    // Duration follows the existing optional-number convention (undefined → DB null).
+    expect(bare.coachingDurationMinutes).toBeUndefined();
+    expect(bare.ageStageTags).toBeNull();
+    // An explicit empty set is preserved as [] (distinct from null).
+    expect(serviceCreateSchema.parse({ name: "C", unit: "coaching", ageStageTags: [] }).ageStageTags).toEqual([]);
+    // Tags are trimmed, blanks dropped, duplicates removed.
+    expect(
+      serviceCreateSchema.parse({
+        name: "C",
+        unit: "coaching",
+        ageStageTags: [" 0-3mo ", "", "0-3mo", "3-6mo"],
+      }).ageStageTags,
+    ).toEqual(["0-3mo", "3-6mo"]);
+  });
+
+  it("serviceCreateSchema rejects a bad format + non-positive duration (AC2)", () => {
+    expect(
+      serviceCreateSchema.safeParse({ name: "C", unit: "coaching", format: "webinar" }).success,
+    ).toBe(false);
+    expect(
+      serviceCreateSchema.safeParse({ name: "C", unit: "coaching", coachingDurationMinutes: 0 })
+        .success,
+    ).toBe(false);
+    expect(
+      serviceCreateSchema.safeParse({ name: "C", unit: "coaching", coachingDurationMinutes: 1.5 })
+        .success,
+    ).toBe(false);
+  });
+
+  it("serviceUpdateSchema validates + only changes coaching fields when present (AC2)", () => {
+    expect(serviceUpdateSchema.parse({ format: "group" }).format).toBe("group");
+    expect(serviceUpdateSchema.parse({ coachingDurationMinutes: 60 }).coachingDurationMinutes).toBe(60);
+    expect(serviceUpdateSchema.parse({ ageStageTags: ["6-12mo"] }).ageStageTags).toEqual(["6-12mo"]);
+    // Untouched on a name-only patch.
+    expect(serviceUpdateSchema.safeParse({ name: "C" }).data?.format).toBeUndefined();
+    // Invalid values rejected.
+    expect(serviceUpdateSchema.safeParse({ format: "webinar" }).success).toBe(false);
+    expect(serviceUpdateSchema.safeParse({ coachingDurationMinutes: -5 }).success).toBe(false);
+  });
+});
+
 describe("audit log viewer contracts (P1-E10-S03)", () => {
   it("defaults limit/offset and accepts an empty query", () => {
     const parsed = auditLogQuerySchema.parse({});
@@ -633,5 +730,296 @@ describe("audit log viewer contracts (P1-E10-S03)", () => {
       },
     ]);
     expect(csv).toContain('"weird,""action"""');
+  });
+});
+
+describe("salon counter board grouping (P3-E03-S03 / Story 25.3 AC1)", () => {
+  function booking(over: Partial<SalonCounterBooking>): SalonCounterBooking {
+    return {
+      bookingId: "b",
+      salonSlotId: "s",
+      staffId: "stylist-1",
+      staffName: "Asha",
+      childId: "c",
+      childName: "Zola",
+      photoConsent: false,
+      serviceId: "svc",
+      serviceName: "Kids Cut",
+      slotDate: "2026-06-15",
+      startTime: "09:00",
+      endTime: "10:00",
+      paidVia: "wallet",
+      checkedInAt: null,
+      completedAt: null,
+      photoRef: null,
+      ...over,
+    };
+  }
+
+  it("buckets a start time to its HH:00 hour", () => {
+    expect(salonHourBucket("09:30")).toBe("09:00");
+    expect(salonHourBucket("14:05")).toBe("14:00");
+  });
+
+  it("groups by stylist then by hour, preserving stylist order (AC1)", () => {
+    const board = groupSalonBookingsByStylistAndHour(
+      [
+        booking({ bookingId: "a1", staffId: "asha", staffName: "Asha", startTime: "09:00" }),
+        booking({ bookingId: "a2", staffId: "asha", staffName: "Asha", startTime: "09:30" }),
+        booking({ bookingId: "a3", staffId: "asha", staffName: "Asha", startTime: "11:00" }),
+        booking({ bookingId: "b1", staffId: "bree", staffName: "Bree", startTime: "10:00" }),
+      ],
+      "2026-06-15",
+    );
+    expect(board.date).toBe("2026-06-15");
+    expect(board.stylists.map((s) => s.staffName)).toEqual(["Asha", "Bree"]);
+
+    const asha = board.stylists[0]!;
+    expect(asha.hours.map((h) => h.hour)).toEqual(["09:00", "11:00"]);
+    expect(asha.hours[0]!.bookings.map((b) => b.bookingId)).toEqual(["a1", "a2"]);
+    expect(asha.hours[1]!.bookings.map((b) => b.bookingId)).toEqual(["a3"]);
+
+    expect(board.stylists[1]!.hours[0]!.hour).toBe("10:00");
+  });
+
+  it("returns an empty board for no bookings", () => {
+    expect(groupSalonBookingsByStylistAndHour([], "2026-06-15")).toEqual({
+      date: "2026-06-15",
+      stylists: [],
+    });
+  });
+
+  it("salonCompleteSchema accepts an optional photoRef and rejects an empty one", () => {
+    expect(salonCompleteSchema.safeParse({ bookingId: "00000000-0000-0000-0000-000000000000" }).success).toBe(true);
+    expect(
+      salonCompleteSchema.safeParse({ bookingId: "00000000-0000-0000-0000-000000000000", photoRef: "k" }).success,
+    ).toBe(true);
+    expect(
+      salonCompleteSchema.safeParse({ bookingId: "00000000-0000-0000-0000-000000000000", photoRef: "" }).success,
+    ).toBe(false);
+  });
+
+  it("salonWalkInSchema requires parent + child + salon visit fields (AC4)", () => {
+    const ok = salonWalkInSchema.safeParse({
+      firstName: "Pat",
+      lastName: "Doe",
+      phone: "0712345678",
+      childFirstName: "Kid",
+      childDateOfBirth: "2022-01-01",
+      serviceId: "00000000-0000-0000-0000-000000000001",
+      staffId: "00000000-0000-0000-0000-000000000002",
+    });
+    expect(ok.success).toBe(true);
+    // Missing service/staff is rejected.
+    expect(
+      salonWalkInSchema.safeParse({ firstName: "Pat", lastName: "Doe", phone: "0712345678", childFirstName: "Kid", childDateOfBirth: "2022-01-01" }).success,
+    ).toBe(false);
+    // Bad DOB shape rejected.
+    expect(
+      salonWalkInSchema.safeParse({
+        firstName: "Pat",
+        lastName: "Doe",
+        phone: "0712345678",
+        childFirstName: "Kid",
+        childDateOfBirth: "01/01/2022",
+        serviceId: "00000000-0000-0000-0000-000000000001",
+        staffId: "00000000-0000-0000-0000-000000000002",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("salon reporting tile + drill-down view-models (P3-E03-S05 / Story 25.5)", () => {
+  const report: SalonDayReportDto = {
+    date: "2026-06-15",
+    bookings: 3,
+    noShows: 1,
+    revenueCents: 7500,
+    stylists: [
+      { staffId: "asha", staffName: "Asha", bookings: 2, noShows: 1, revenueCents: 5000 },
+      { staffId: "bree", staffName: "Bree", bookings: 1, noShows: 0, revenueCents: 2500 },
+    ],
+  };
+
+  it("formats revenue cents as a KES amount", () => {
+    expect(formatSalonRevenue(7500)).toBe("KES 75.00");
+    expect(formatSalonRevenue(0)).toBe("KES 0.00");
+    expect(formatSalonRevenue(123456)).toBe("KES 1,234.56");
+  });
+
+  it("shapes the headline tile: bookings / no-shows / revenue (AC1)", () => {
+    const vm = salonReportTileViewModel(report);
+    expect(vm.date).toBe("2026-06-15");
+    expect(vm.isEmpty).toBe(false);
+    expect(vm.stats).toEqual([
+      { label: "Bookings", value: "3" },
+      { label: "No-shows", value: "1" },
+      { label: "Revenue", value: "KES 75.00" },
+    ]);
+  });
+
+  it("flags an empty day so the tile can render an empty state (AC1)", () => {
+    const vm = salonReportTileViewModel({ date: "2026-06-15", bookings: 0, noShows: 0, revenueCents: 0, stylists: [] });
+    expect(vm.isEmpty).toBe(true);
+    expect(vm.stats.map((s) => s.value)).toEqual(["0", "0", "KES 0.00"]);
+  });
+
+  it("shapes the per-stylist drill-down rows in server order (AC2)", () => {
+    const rows = salonReportDrillRows(report);
+    expect(rows).toEqual([
+      { staffId: "asha", staffName: "Asha", bookings: "2", noShows: "1", revenue: "KES 50.00" },
+      { staffId: "bree", staffName: "Bree", bookings: "1", noShows: "0", revenue: "KES 25.00" },
+    ]);
+  });
+
+  it("an empty day has no drill-down rows (AC2)", () => {
+    expect(salonReportDrillRows({ date: "2026-06-15", bookings: 0, noShows: 0, revenueCents: 0, stylists: [] })).toEqual([]);
+  });
+});
+
+describe("operations dashboard tiles view-model (P3-E05-S01 / Story 27.1)", () => {
+  const dto: OperationsDashboardDto = {
+    date: "2026-06-15",
+    revenue: {
+      totalCents: 12_500,
+      byUnit: [
+        { unit: "play", revenueCents: 5000 },
+        { unit: "talent", revenueCents: 0 },
+        { unit: "salon", revenueCents: 7500 },
+        { unit: "coaching", revenueCents: 0 },
+        { unit: "event", revenueCents: 0 },
+      ],
+    },
+    bookingsCount: 4,
+    activeSessions: 2,
+    outstandingCents: 30_000,
+    topStaff: [
+      { staffId: "s1", staffName: "Asha", bookings: 2, revenueCents: 7500 },
+      { staffId: "s2", staffName: "Bree", bookings: 1, revenueCents: 5000 },
+    ],
+  };
+
+  it("shapes the five headline tiles, each with a drill-down href (AC1/AC2)", () => {
+    const vm = operationsDashboardTiles(dto);
+    expect(vm.date).toBe("2026-06-15");
+    const byKey = Object.fromEntries(vm.tiles.map((t) => [t.key, t]));
+
+    expect(byKey.revenue).toMatchObject({ label: "Today's revenue", value: "KES 125.00" });
+    expect(byKey.bookings).toMatchObject({ label: "Bookings today", value: "4" });
+    expect(byKey.activeSessions).toMatchObject({ label: "Active sessions", value: "2" });
+    expect(byKey.outstanding).toMatchObject({ label: "Outstanding balances", value: "KES 300.00" });
+    expect(byKey.topStaff).toMatchObject({ label: "Top staff today", value: "Asha" });
+
+    // AC2: every tile clicks through to a drill-down route.
+    for (const tile of vm.tiles) {
+      expect(tile.href.startsWith("/")).toBe(true);
+    }
+  });
+
+  it("breaks the revenue tile down per unit, each linking to a drill-down (AC1/AC2)", () => {
+    const vm = operationsDashboardTiles(dto);
+    expect(vm.revenueByUnit).toEqual([
+      { unit: "play", label: "Play", value: "KES 50.00", href: "/operations/revenue?unit=play" },
+      { unit: "talent", label: "Talent", value: "KES 0.00", href: "/operations/revenue?unit=talent" },
+      { unit: "salon", label: "Salon", value: "KES 75.00", href: "/salon-report" },
+      { unit: "coaching", label: "Coaching", value: "KES 0.00", href: "/operations/revenue?unit=coaching" },
+      { unit: "event", label: "Event", value: "KES 0.00", href: "/operations/revenue?unit=event" },
+    ]);
+  });
+
+  it("shapes the top-staff drill-down rows in server order (AC1/AC2)", () => {
+    const rows = operationsTopStaffRows(dto);
+    expect(rows).toEqual([
+      { staffId: "s1", staffName: "Asha", bookings: "2", revenue: "KES 75.00", href: "/staff-earnings" },
+      { staffId: "s2", staffName: "Bree", bookings: "1", revenue: "KES 50.00", href: "/staff-earnings" },
+    ]);
+  });
+
+  it("an empty day renders zeroed tiles + an em-dash top-staff value (AC1)", () => {
+    const empty: OperationsDashboardDto = {
+      date: "2026-06-15",
+      revenue: { totalCents: 0, byUnit: SERVICE_UNITS.map((unit) => ({ unit, revenueCents: 0 })) },
+      bookingsCount: 0,
+      activeSessions: 0,
+      outstandingCents: 0,
+      topStaff: [],
+    };
+    const vm = operationsDashboardTiles(empty);
+    const byKey = Object.fromEntries(vm.tiles.map((t) => [t.key, t]));
+    expect(byKey.revenue!.value).toBe("KES 0.00");
+    expect(byKey.bookings!.value).toBe("0");
+    expect(byKey.topStaff!.value).toBe("—");
+    expect(operationsTopStaffRows(empty)).toEqual([]);
+  });
+});
+
+describe("top-staff leaderboard contracts (P3-E05-S03 / Story 27.3)", () => {
+  const dto: StaffLeaderboardDto = {
+    from: "2026-06-01",
+    to: "2026-06-07",
+    rows: [
+      { staffId: "s1", staffName: "Asha", role: "stylist", revenueCents: 12_000, serviceCount: 4, avgTicketCents: 3000 },
+      { staffId: "s2", staffName: "Bree", role: "stylist", revenueCents: 0, serviceCount: 0, avgTicketCents: 0 },
+    ],
+  };
+
+  it("validates the range; role is optional but must be an attribution role (AC1/AC2)", () => {
+    expect(staffLeaderboardQuerySchema.safeParse({ fromDate: "2026-06-01", toDate: "2026-06-07" }).success).toBe(true);
+    const withRole = staffLeaderboardQuerySchema.safeParse({ fromDate: "2026-06-01", toDate: "2026-06-07", role: "stylist" });
+    expect(withRole.success).toBe(true);
+    // Bad range — fromDate after toDate.
+    expect(staffLeaderboardQuerySchema.safeParse({ fromDate: "2026-06-08", toDate: "2026-06-01" }).success).toBe(false);
+    // Unknown role.
+    expect(staffLeaderboardQuerySchema.safeParse({ fromDate: "2026-06-01", toDate: "2026-06-07", role: "ceo" }).success).toBe(false);
+  });
+
+  it("treats an empty role string as no filter (AC2)", () => {
+    const parsed = staffLeaderboardQuerySchema.safeParse({ fromDate: "2026-06-01", toDate: "2026-06-07", role: "" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.role).toBeUndefined();
+  });
+
+  it("shapes the leaderboard rows: formatted revenue / count / avg ticket + a drill-down href (AC1/AC3)", () => {
+    const rows = staffLeaderboardRows(dto);
+    expect(rows[0]).toMatchObject({
+      staffId: "s1",
+      staffName: "Asha",
+      roleLabel: "Stylist",
+      revenue: "KES 120.00",
+      serviceCount: "4",
+      avgTicket: "KES 30.00",
+    });
+    // AC3: each row clicks through to the per-staff commission drill-down.
+    expect(rows[0]!.href).toContain("/operations/leaderboard/s1");
+    expect(rows[0]!.href).toContain("fromDate=2026-06-01");
+    expect(rows[0]!.href).toContain("toDate=2026-06-07");
+    // Zero-service staff: avg ticket reads zero, not NaN.
+    expect(rows[1]).toMatchObject({ staffName: "Bree", serviceCount: "0", avgTicket: "KES 0.00" });
+  });
+
+  it("offers a role filter control including an 'all roles' option (AC2)", () => {
+    const opts = staffLeaderboardRoleOptions();
+    expect(opts[0]).toEqual({ value: "", label: "All roles" });
+    expect(opts.map((o) => o.value)).toContain("stylist");
+    expect(opts.map((o) => o.value)).toContain("instructor");
+    expect(opts.map((o) => o.value)).toContain("attendant");
+    expect(attributionRoleLabel("event_staff")).toBe("Event staff");
+  });
+
+  it("shapes the per-staff commission drill-down totals (AC3)", () => {
+    const drill: StaffCommissionDrilldownDto = {
+      staffId: "s1",
+      staffName: "Asha",
+      role: "stylist",
+      from: "2026-06-01",
+      to: "2026-06-07",
+      totals: { netCents: 1800, accruedCents: 2300, reversedCents: 500, entryCount: 3 },
+    };
+    const view = staffCommissionDrilldownView(drill);
+    expect(view.staffName).toBe("Asha");
+    expect(view.roleLabel).toBe("Stylist");
+    expect(view.netCommission).toBe("KES 18.00");
+    expect(view.accruedCommission).toBe("KES 23.00");
+    expect(view.reversedCommission).toBe("KES 5.00");
   });
 });

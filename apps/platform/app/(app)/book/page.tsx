@@ -35,7 +35,9 @@ export default function BookIndexPage() {
           {services.map((s) => (
             <li key={s.id}>
               <Link
-                href={`/book/service/${s.id}`}
+                // Salon services use the stylist-keyed salon flow (P3-E03-S02);
+                // Play/Talent use the session-slot grid.
+                href={s.unit === "salon" ? `/book/salon/${s.id}` : `/book/service/${s.id}`}
                 className="block rounded border border-gray-200 p-3 hover:border-gray-300"
               >
                 <span className="font-medium">{s.name}</span>

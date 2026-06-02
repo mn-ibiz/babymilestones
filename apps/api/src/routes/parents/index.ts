@@ -13,6 +13,7 @@ import { registerParentStatement } from "./statement.js";
 import { registerParentWallet } from "./wallet.js";
 import { registerParentAvailability } from "./availability.js";
 import { registerParentBooking } from "./booking.js";
+import { registerParentSalon } from "./salon.js";
 import { registerParentSubscriptions } from "./subscriptions.js";
 import { registerParentLoyalty } from "./loyalty.js";
 
@@ -62,6 +63,11 @@ export function registerParentRoutes(app: FastifyInstance, deps: ParentRoutesDep
     now: deps.now ? () => new Date(deps.now!()) : undefined,
   });
   registerParentBooking(app, {
+    db: deps.db,
+    sessions: deps.sessions,
+    now: deps.now ? () => new Date(deps.now!()) : undefined,
+  });
+  registerParentSalon(app, {
     db: deps.db,
     sessions: deps.sessions,
     now: deps.now ? () => new Date(deps.now!()) : undefined,

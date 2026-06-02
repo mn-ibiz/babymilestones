@@ -101,6 +101,8 @@ export const AUDIT_ACTION_CATALOGUE = {
     "treasury.float_account.create",
     "treasury.float_account.update",
     "treasury.float_account.delete",
+    "woocommerce.config.update",
+    "woocommerce.test_connection",
   ],
   /** Child-record lifecycle & consent. */
   child: [
@@ -126,6 +128,9 @@ export const AUDIT_ACTION_CATALOGUE = {
     "wallet.statement.export.enqueued",
     "wallet.statement.export.completed",
     "treasury.reconciliation.export",
+    "report.revenue.export",
+    "report.wallet_aging.export",
+    "report.dispatch.export",
   ],
   /** Daily DB backup lifecycle (X8-S03) — every run + prune is recorded.
    * `backup.retention.updated` (P2-E06-S01) records an admin changing the
@@ -157,6 +162,10 @@ export const AUDIT_ACTION_CATALOGUE = {
     "attendance.checked_out",
     "observation.anonymised",
   ],
+  /** Kids-Only Salon counter (P3-E03-S03 / Story 25.3) — marking a salon service
+   * complete (check-in reuses `attendance.checked_in`). Reassigning a booking
+   * between stylists (P3-E03-S04 / Story 25.4) records `salon.booking.reassigned`. */
+  salon: ["salon.service.completed", "salon.booking.reassigned"],
   /** In-store POS sales (P2-E04-S04) + end-of-day cash-up (P2-E04-S05). */
   pos: [
     "pos.sale.initiated",
@@ -179,6 +188,13 @@ export const AUDIT_ACTION_CATALOGUE = {
    * audit log. The SMS-retry worker dead-lettering a message (P3-E06-S04 AC3) is
    * a state change worth a forensic trail. */
   jobs: ["job.run_now", "sms.retry.dead_lettered"],
+  /** Outstanding-balance dunning (P2-E07-S02) — the daily reminder job records
+   * each stub-SMS nudge it queues (day-1/day-7/day-30) for a forensic trail. */
+  dunning: ["outstanding.reminder.sent"],
+  /** Coaching 1:1 booking (P5-E01-S02 / Story 31.2) — the day-before reminder job
+   * records each stub-SMS reminder it queues for a forensic + idempotency trail
+   * (the booking itself reuses `booking.created`). */
+  coaching: ["coaching.reminder.sent"],
   /** Attribution & commission ledger (P3-E01) — rate changes, ledger postings
    * (incl. refund reversals), monthly/ad-hoc runs and the payout export/mark-paid. */
   commission: [
@@ -186,6 +202,7 @@ export const AUDIT_ACTION_CATALOGUE = {
     "commission.ledger.posted",
     "commission.ledger.reversed",
     "commission.run.created",
+    "commission.run.failed",
     "commission.run.export",
     "commission.run.paid_out",
   ],
@@ -197,6 +214,37 @@ export const AUDIT_ACTION_CATALOGUE = {
     "etims.flag.changed",
     "etims.vat_metadata.updated",
   ],
+  /** WooCommerce sync (P4-E04-S07 / Story 29.7). Pull + writeback are audited at
+   * the SUMMARY level (counts, not per-item — AC6); the dead-letter actions and a
+   * manual "Sync now" are admin mutations worth a forensic trail (AC4/AC7). */
+  woocommerce: [
+    "woocommerce.sync.pulled",
+    "woocommerce.writeback.processed",
+    "woocommerce.deadletter.replayed",
+    "woocommerce.deadletter.resolved",
+    "woocommerce.deadletter.discarded",
+    "woocommerce.sync.triggered",
+    // P4-E04-S02 (Story 29.2): a POS order-status transition is a mutation —
+    // audited at the action level. The reversal (admin-only, AC4) is a distinct,
+    // higher-trust action worth its own forensic line.
+    "woocommerce.order.transition",
+    "woocommerce.order.transition_reversed",
+    // P4-E04-S05 (Story 29.5): a stock-mutation enqueues a Woo stock push. The
+    // burst is coalesced, so we record a SINGLE summary line per drain in the
+    // outbox-drain worker; this action names that enqueue side for the catalogue.
+    "woocommerce.stock.push_enqueued",
+    // P4-E04-S05 (Story 29.5): the admin SKU → Woo product-id mapping edit
+    // (manual entry + bulk CSV import) is a mutation worth a forensic trail.
+    "woocommerce.sku_mapping.updated",
+    // P4-E04-S05 (Story 29.5): the nightly reconciliation run records a summary
+    // line (compared count + drift count) — reads Woo for comparison only.
+    "woocommerce.stock.reconciled",
+  ],
+  /** Non-POS stock mutations (P4-E04-S05 / Story 29.5): goods-received / restock,
+   * stock-take adjustment, and a manual admin adjustment. Each adjusts the local
+   * source-of-truth stock and is audited; the POS sale decrement keeps its own
+   * `pos.sale.paid` line. */
+  stock: ["stock.adjusted"],
   /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
   event: [
     "event.created",

@@ -102,6 +102,15 @@ export function registerAdminSettings(app: FastifyInstance, deps: AdminSettingsD
         accessible: true,
       },
       {
+        // Story 29.6 (P4-E04-S06): WooCommerce REST connection — its own
+        // dedicated screen (secrets encrypted at rest), so the index links out.
+        key: "woocommerce",
+        label: "WooCommerce",
+        href: "/woocommerce-config",
+        kind: "linked",
+        accessible: true,
+      },
+      {
         key: "float_accounts",
         label: "Float accounts",
         href: "/treasury/float-accounts",

@@ -1540,6 +1540,25 @@ export function isTaxTreatment(value: unknown): value is TaxTreatment {
   return typeof value === "string" && (TAX_TREATMENTS as readonly string[]).includes(value);
 }
 
+/**
+ * Coaching session formats a coaching offering may declare (P5-E01-S01 / Story
+ * 31.1 AC2). A nullable ENUM on `services`: only `unit = 'coaching'` offerings
+ * carry one. CHECK-constrained in migration 0096; the snapshot keeps code + DB
+ * aligned. The coach is a `staff` record assigned via `attributionRoleRequired =
+ * 'coach'` (P1-E07-S02; no login — AC3).
+ */
+export const COACHING_FORMATS = ["one_to_one", "group"] as const;
+export type CoachingFormat = (typeof COACHING_FORMATS)[number];
+
+/** True when `value` is one of the allowed coaching formats (narrowing guard). */
+export function isCoachingFormat(value: unknown): value is CoachingFormat {
+  return typeof value === "string" && (COACHING_FORMATS as readonly string[]).includes(value);
+}
+
+/** Max number of age-stage tags + max length of a single tag (guards typos, not policy). */
+export const AGE_STAGE_TAGS_MAX = 24;
+export const AGE_STAGE_TAG_MAX_LEN = 40;
+
 /** Max length of a service display name + description. */
 export const SERVICE_NAME_MAX = 120;
 export const SERVICE_DESCRIPTION_MAX = 500;
@@ -1612,6 +1631,63 @@ const rescheduleCutoffField = z
   .max(168, "rescheduleCutoffHours cannot exceed a week")
   .optional();
 
+/**
+ * Coaching session format field (P5-E01-S01 AC2). Empty/absent collapses to null
+ * (unset, for CREATE) / undefined (untouched, for UPDATE); a present value MUST
+ * be one of {@link COACHING_FORMATS}. `presentDefault` is what an absent field
+ * resolves to: `null` on create, `undefined` on update.
+ */
+function coachingFormatField(presentDefault: null | undefined) {
+  return z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? presentDefault : (v ?? "").trim() === "" ? null : v!.trim()))
+    .refine((v) => v === undefined || v === null || isCoachingFormat(v), {
+      message: `format must be one of: ${COACHING_FORMATS.join(", ")}`,
+    });
+}
+
+/** Coaching session length in minutes (P5-E01-S01 AC2). Positive when set; null clears it. */
+const coachingDurationField = z
+  .union([
+    z
+      .number()
+      .int("coachingDurationMinutes must be a whole number of minutes")
+      .min(1, "coachingDurationMinutes must be positive")
+      .max(24 * 60, "coachingDurationMinutes cannot exceed a day"),
+    z.null(),
+  ])
+  .optional();
+
+/**
+ * Free-set age-stage tags for a coaching offering (P5-E01-S01 AC2): "expecting",
+ * "0-3mo", ... A present (possibly empty) array is trimmed, blanks dropped,
+ * duplicates removed (order-preserving) + length-bounded; `null` clears them. An
+ * absent field resolves to `presentDefault` (`null` on create, `undefined` on
+ * update). A free set — NOT an enum — so admin can coin new stages migration-free.
+ */
+function ageStageTagsField(presentDefault: null | undefined) {
+  return z
+    .union([z.array(z.string().trim().max(AGE_STAGE_TAG_MAX_LEN, "age-stage tag is too long")), z.null()])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return presentDefault;
+      if (v === null) return null;
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const raw of v) {
+        const tag = raw.trim();
+        if (tag === "" || seen.has(tag)) continue;
+        seen.add(tag);
+        out.push(tag);
+      }
+      return out;
+    })
+    .refine((v) => v == null || v.length <= AGE_STAGE_TAGS_MAX, {
+      message: `at most ${AGE_STAGE_TAGS_MAX} age-stage tags`,
+    });
+}
+
 /** True when a child of `ageMonths` fits a service's `[min, max]` month range (null bounds = open). */
 export function slotFitsAge(
   ageMonths: number,
@@ -1637,6 +1713,9 @@ export const serviceCreateSchema = z
     ageMaxMonths: optionalAgeMonths,
     rescheduleCutoffHours: rescheduleCutoffField,
     cancellationFeeCents: cancellationFeeField,
+    format: coachingFormatField(null),
+    coachingDurationMinutes: coachingDurationField,
+    ageStageTags: ageStageTagsField(null),
   })
   .refine(
     (v) =>
@@ -1668,6 +1747,9 @@ export const serviceUpdateSchema = z
     ageMaxMonths: optionalAgeMonths,
     rescheduleCutoffHours: rescheduleCutoffField,
     cancellationFeeCents: cancellationFeeField,
+    format: coachingFormatField(undefined),
+    coachingDurationMinutes: coachingDurationField,
+    ageStageTags: ageStageTagsField(undefined),
   })
   .refine(
     (v) =>
@@ -1679,7 +1761,10 @@ export const serviceUpdateSchema = z
       v.ageMinMonths !== undefined ||
       v.ageMaxMonths !== undefined ||
       v.rescheduleCutoffHours !== undefined ||
-      v.cancellationFeeCents !== undefined,
+      v.cancellationFeeCents !== undefined ||
+      v.format !== undefined ||
+      v.coachingDurationMinutes !== undefined ||
+      v.ageStageTags !== undefined,
     "at least one field is required",
   )
   .refine(
@@ -1856,6 +1941,52 @@ export interface PublicEventDto {
   venue: string | null;
   capacity: number;
   tiers: PublicEventTierDto[];
+}
+
+/**
+ * Public (unauthenticated) staff-earnings viewer (P3-E02-S01). The reception-PC
+ * dropdown entry: an active staff member's id + display name. NO PII beyond the
+ * display name — no phone, no role, no parent/booking detail (AC4).
+ */
+export interface PublicStaffOptionDto {
+  id: string;
+  displayName: string;
+}
+
+/** One service in the earnings breakdown ranked by completed-visit count (P3-E02-S02 AC1). */
+export interface PublicServiceCountDto {
+  serviceName: string;
+  count: number;
+}
+
+/** One service in the earnings breakdown ranked by net commission revenue (P3-E02-S02 AC1). */
+export interface PublicServiceRevenueDto {
+  serviceName: string;
+  revenueCents: number;
+}
+
+/**
+ * Public (unauthenticated) earnings figures for one staff member (P3-E02-S01
+ * AC3). Display name plus the three numbers: month-to-date net commission, last
+ * calendar month's net, and the most recent confirmed payout (amount + ISO date,
+ * both null if never paid out). Plus the earnings breakdown (P3-E02-S02 AC1)
+ * scoped to the same month-to-date window: completed-visit count and the top 3
+ * services by count and by revenue. Carries ONLY service names + numbers — NO
+ * parent/child/booking PII (S01 AC4 / S02 AC2).
+ */
+export interface PublicStaffEarningsDto {
+  staffId: string;
+  displayName: string;
+  monthToDateCents: number;
+  lastMonthCents: number;
+  lastPayoutCents: number | null;
+  lastPayoutAt: string | null;
+  /** Completed visits in the month-to-date window (P3-E02-S02 AC1). */
+  completedVisits: number;
+  /** Top 3 services by completed-visit count this period (P3-E02-S02 AC1). */
+  topServicesByCount: PublicServiceCountDto[];
+  /** Top 3 services by net commission revenue this period (P3-E02-S02 AC1). */
+  topServicesByRevenue: PublicServiceRevenueDto[];
 }
 
 /** Max tickets a single guest order/RSVP may request (sane bound on a free flow). */
@@ -2154,6 +2285,1028 @@ export interface BookingConfirmation {
   endTime: string;
   /** Service price snapshotted onto the pending invoice (AC3), integer KES cents. */
   amountCents: number;
+}
+
+/* --- Kids-Only Salon booking (P3-E03-S02 / Story 25.2) ------------------- */
+
+/** How many days ahead the parent salon-slot browse window spans. */
+export const SALON_AVAILABILITY_WINDOW_DAYS = 60;
+
+/** A salon stylist a parent can pick for a service (P3-E03-S02 AC1). */
+export interface SalonStylistOption {
+  id: string;
+  displayName: string;
+}
+
+/** A bookable salon slot in the parent browse (P3-E03-S02 AC1). */
+export interface SalonSlotOption {
+  id: string;
+  staffId: string;
+  staffName: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+}
+
+/**
+ * Parent salon-availability response for a service (P3-E03-S02 AC1/AC2). When a
+ * `staffId` filter is supplied only that stylist's open slots are returned (AC2);
+ * otherwise every stylist's open slots are listed for the "Any available" flow.
+ */
+export interface SalonAvailability {
+  serviceId: string;
+  /** First day of the browse window (`YYYY-MM-DD`, server clock). */
+  windowStart: string;
+  /** The stylists with at least one open slot in the window — the stylist picker. */
+  stylists: SalonStylistOption[];
+  /** The active stylist filter, or null for "Any available". */
+  staffId: string | null;
+  slots: SalonSlotOption[];
+}
+
+/**
+ * Confirm a salon booking (P3-E03-S02 AC4). `salonSlotId` + `childId` are the
+ * chosen slot + child. `staffId` is the picked stylist; omit it for "Any
+ * available" (the server resolves the least-busy stylist's slot, AC3) — when
+ * supplied it must match the slot's stylist (AC2).
+ */
+export const salonBookingCreateSchema = z.object({
+  salonSlotId: z.string().uuid("salonSlotId must be a valid id"),
+  childId: z.string().uuid("childId must be a valid id"),
+  staffId: z.string().uuid("staffId must be a valid id").optional(),
+});
+export type SalonBookingCreateInput = z.infer<typeof salonBookingCreateSchema>;
+
+/** Successful salon-booking confirmation returned to the parent (P3-E03-S02 AC4). */
+export interface SalonBookingConfirmation {
+  bookingId: string;
+  invoiceId: string;
+  salonSlotId: string;
+  serviceId: string;
+  /** The stylist the booking was attributed to (resolved — AC3/AC4). */
+  staffId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  /** Service price snapshotted onto the pending invoice (AC4), integer KES cents. */
+  amountCents: number;
+}
+
+/* --- Salon counter check-in & service completion (P3-E03-S03 / Story 25.3) - */
+
+/** One salon booking on the reception counter board (AC1). */
+export interface SalonCounterBooking {
+  bookingId: string;
+  salonSlotId: string;
+  staffId: string;
+  staffName: string;
+  childId: string;
+  childName: string;
+  /** Per-child photo consent (P1-E02-S04) — gates the completion photo (AC3). */
+  photoConsent: boolean;
+  serviceId: string | null;
+  serviceName: string | null;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  paidVia: "wallet" | "subscription";
+  /** Set once the child has been checked in (AC2), else null. */
+  checkedInAt: string | null;
+  /** Set once the salon service has been marked complete (AC3), else null. */
+  completedAt: string | null;
+  /** The completion photo reference, when captured under consent (AC3). */
+  photoRef: string | null;
+}
+
+/** An hour-bucketed group of one stylist's bookings on the board (AC1). */
+export interface SalonHourGroup {
+  /** The hour bucket label, `HH:00` (derived from each booking's start time). */
+  hour: string;
+  bookings: SalonCounterBooking[];
+}
+
+/** A stylist's column on the counter board, their bookings bucketed by hour (AC1). */
+export interface SalonStylistGroup {
+  staffId: string;
+  staffName: string;
+  hours: SalonHourGroup[];
+}
+
+/** The day's salon counter board (AC1). */
+export interface SalonCounterBoard {
+  /** The board date (`YYYY-MM-DD`, server clock). */
+  date: string;
+  stylists: SalonStylistGroup[];
+}
+
+/** The `HH:00` hour bucket a slot's start time falls in (AC1). */
+export function salonHourBucket(startTime: string): string {
+  return `${startTime.slice(0, 2)}:00`;
+}
+
+/**
+ * Group flat salon bookings into the counter board: by stylist, then by hour
+ * (AC1). Stylists keep the input order (the query orders by stylist name then
+ * start time), so the board renders deterministically. Within a stylist, hours
+ * ascend and bookings keep their start-time order.
+ */
+export function groupSalonBookingsByStylistAndHour(
+  bookings: readonly SalonCounterBooking[],
+  date: string,
+): SalonCounterBoard {
+  const stylistOrder: string[] = [];
+  const byStylist = new Map<string, { staffName: string; hours: Map<string, SalonCounterBooking[]> }>();
+  for (const b of bookings) {
+    let entry = byStylist.get(b.staffId);
+    if (!entry) {
+      entry = { staffName: b.staffName, hours: new Map() };
+      byStylist.set(b.staffId, entry);
+      stylistOrder.push(b.staffId);
+    }
+    const hour = salonHourBucket(b.startTime);
+    const bucket = entry.hours.get(hour) ?? [];
+    bucket.push(b);
+    entry.hours.set(hour, bucket);
+  }
+  const stylists: SalonStylistGroup[] = stylistOrder.map((staffId) => {
+    const entry = byStylist.get(staffId)!;
+    const hours: SalonHourGroup[] = [...entry.hours.entries()]
+      .sort(([a], [c]) => (a < c ? -1 : a > c ? 1 : 0))
+      .map(([hour, hb]) => ({ hour, bookings: hb }));
+    return { staffId, staffName: entry.staffName, hours };
+  });
+  return { date, stylists };
+}
+
+/** Check a salon booking in at the counter (AC2). */
+export const salonCheckInSchema = z.object({
+  bookingId: z.string().uuid("bookingId must be a UUID"),
+  /** ISO drop-off / arrival time captured at check-in (optional). */
+  droppedOffAt: z.string().datetime({ message: "droppedOffAt must be an ISO timestamp" }).optional(),
+});
+export type SalonCheckInInput = z.infer<typeof salonCheckInSchema>;
+
+/** Max length of a completion photo reference (an object-store key / id). */
+export const SALON_PHOTO_REF_MAX = 512;
+
+/**
+ * Mark a salon service complete (AC3). `photoRef` is the OPTIONAL reference to a
+ * captured photo — the server stores it only when the child's photo consent is
+ * true (consent-gated), otherwise it is dropped.
+ */
+export const salonCompleteSchema = z.object({
+  bookingId: z.string().uuid("bookingId must be a UUID"),
+  photoRef: z.string().trim().min(1).max(SALON_PHOTO_REF_MAX).optional(),
+});
+export type SalonCompleteInput = z.infer<typeof salonCompleteSchema>;
+
+/** Result of marking a salon service complete (AC3). */
+export interface SalonCompleteResult {
+  bookingId: string;
+  attendanceId: string;
+  completedAt: string;
+  /** True only when a photo reference was stored (consent satisfied). */
+  photoStored: boolean;
+  /** True when the photo was dropped because the child has no photo consent (AC3). */
+  photoSkippedNoConsent: boolean;
+}
+
+/** Max minutes a walk-in "book now" salon slot can span. */
+export const SALON_WALKIN_MAX_DURATION_MIN = 240;
+
+/**
+ * Reception salon walk-in (AC4): create a parent (REUSES the P1-E02-S02 walk-in
+ * shape), add a child, book a one-off salon slot for now with the chosen stylist,
+ * and immediately check the child in. Names + phone identify the new family; the
+ * child's `photoConsent` defaults off unless explicitly granted.
+ */
+export const salonWalkInSchema = z.object({
+  // Parent (REUSES the walk-in fields).
+  firstName: z.string().trim().min(1, "First name is required").max(80),
+  lastName: z.string().trim().min(1, "Last name is required").max(80),
+  phone: z.string().trim().min(1, "Phone is required"),
+  email: z.string().trim().email("Enter a valid email").max(160).optional(),
+  residentialArea: z.string().trim().max(120).optional(),
+  // Child.
+  childFirstName: z.string().trim().min(1, "Child first name is required").max(80),
+  childLastName: z.string().trim().max(80).optional(),
+  childDateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u, "childDateOfBirth must be YYYY-MM-DD"),
+  photoConsent: z.boolean().optional(),
+  // Salon visit.
+  serviceId: z.string().uuid("serviceId must be a valid id"),
+  staffId: z.string().uuid("staffId must be a valid id"),
+  /** Slot window start, `HH:MM` (defaults to the server's current hour). */
+  startTime: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/u, "startTime must be HH:MM").optional(),
+});
+export type SalonWalkInInput = z.infer<typeof salonWalkInSchema>;
+
+/** Result of a reception salon walk-in (AC4): the new family + booking + check-in. */
+export interface SalonWalkInResult {
+  userId: string;
+  parentId: string;
+  childId: string;
+  bookingId: string;
+  invoiceId: string;
+  salonSlotId: string;
+  attendanceId: string;
+  /** Check-in resolution (mirrors the attendant check-in). */
+  outcome: CheckInOutcome;
+}
+
+/**
+ * Reassign a salon booking to a different stylist on the day (P3-E03-S04 / Story
+ * 25.4). The select-and-reassign control sends the booking + the chosen target
+ * stylist; the server picks an open slot for that stylist, moves the booking,
+ * updates attribution, and moves any settled commission.
+ */
+export const salonReassignSchema = z.object({
+  bookingId: z.string().uuid("bookingId must be a UUID"),
+  toStaffId: z.string().uuid("toStaffId must be a UUID"),
+});
+export type SalonReassignInput = z.infer<typeof salonReassignSchema>;
+
+/** Result of reassigning a salon booking between stylists (Story 25.4). */
+export interface SalonReassignResult {
+  bookingId: string;
+  /** The stylist the booking was attributed to before the move. */
+  fromStaffId: string;
+  /** The stylist the booking is attributed to after the move. */
+  toStaffId: string;
+  /** The salon slot the booking now occupies. */
+  newSalonSlotId: string;
+  /** True when the booking was already on the target stylist (no-op). */
+  unchanged: boolean;
+  /** True when settled commission was moved old → new (AC4). */
+  commissionMoved: boolean;
+}
+
+/* --- Salon-specific reporting tile + drill-down (P3-E03-S05 / Story 25.5) - */
+
+/**
+ * One stylist's slice of the salon day in the drill-down (AC2). Mirrors
+ * `@bm/catalog`'s `SalonStylistDayStats` — kept here as the transport contract.
+ */
+export interface SalonStylistDayStatsDto {
+  staffId: string;
+  staffName: string;
+  /** Non-cancelled salon bookings attributed to this stylist on the day. */
+  bookings: number;
+  /** Of those, how many were no-shows (slot passed + never checked in). */
+  noShows: number;
+  /** Total invoiced revenue (cents) for this stylist's bookings on the day. */
+  revenueCents: number;
+}
+
+/**
+ * The salon-report API response (P3-E03-S05): the headline tile totals (AC1) and
+ * the per-stylist drill-down (AC2). Returned by `GET /admin/salon-report`. The
+ * shape is identical to `@bm/catalog`'s `SalonDayReport` (all primitives, already
+ * serialisable) — this is the wire contract the admin tile + drill-down read.
+ */
+export interface SalonDayReportDto {
+  /** The report date (`YYYY-MM-DD`). */
+  date: string;
+  /** Total non-cancelled salon bookings on the day (AC1). */
+  bookings: number;
+  /** Total no-shows on the day (AC1). */
+  noShows: number;
+  /** Total invoiced revenue (cents) on the day (AC1). */
+  revenueCents: number;
+  /** Per-stylist breakdown, ordered by stylist name then id (AC2). */
+  stylists: SalonStylistDayStatsDto[];
+}
+
+/** Format integer KES cents for the salon tile, e.g. `KES 7,500.00`. */
+export function formatSalonRevenue(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  const major = Math.trunc(abs / 100);
+  const minor = String(abs % 100).padStart(2, "0");
+  return `${sign}KES ${major.toLocaleString("en-KE")}.${minor}`;
+}
+
+/** A render-ready stat for the tile: a label + its formatted value. */
+export interface SalonTileStat {
+  label: string;
+  value: string;
+}
+
+/** The headline tile view-model (AC1): the three at-a-glance figures. */
+export interface SalonReportTileViewModel {
+  date: string;
+  stats: SalonTileStat[];
+  /** True when the day has no salon bookings (renders an empty state). */
+  isEmpty: boolean;
+}
+
+/**
+ * Shape the salon report into the headline tile view-model (AC1): bookings,
+ * no-shows, and revenue as render-ready label/value pairs. Pure + framework-free
+ * so it unit-tests without React — and so the operational dashboard (Epic 27) can
+ * reuse the exact tile shaping.
+ */
+export function salonReportTileViewModel(report: SalonDayReportDto): SalonReportTileViewModel {
+  return {
+    date: report.date,
+    isEmpty: report.bookings === 0,
+    stats: [
+      { label: "Bookings", value: report.bookings.toLocaleString("en-KE") },
+      { label: "No-shows", value: report.noShows.toLocaleString("en-KE") },
+      { label: "Revenue", value: formatSalonRevenue(report.revenueCents) },
+    ],
+  };
+}
+
+/** A render-ready per-stylist drill-down row (AC2). */
+export interface SalonStylistDrillRow {
+  staffId: string;
+  staffName: string;
+  bookings: string;
+  noShows: string;
+  revenue: string;
+}
+
+/**
+ * Shape the per-stylist breakdown into render-ready drill-down rows (AC2). The
+ * server already orders the stylists by name; this only formats the figures.
+ */
+export function salonReportDrillRows(report: SalonDayReportDto): SalonStylistDrillRow[] {
+  return report.stylists.map((s) => ({
+    staffId: s.staffId,
+    staffName: s.staffName,
+    bookings: s.bookings.toLocaleString("en-KE"),
+    noShows: s.noShows.toLocaleString("en-KE"),
+    revenue: formatSalonRevenue(s.revenueCents),
+  }));
+}
+
+/* --- Daily operations dashboard (P3-E05-S01 / Story 27.1) ---------------- */
+
+/** Today's revenue for one service unit (always present; zero when none). */
+export interface OperationsUnitRevenueDto {
+  unit: ServiceUnit;
+  revenueCents: number;
+}
+
+/** Today's revenue: the grand total + the per-unit breakdown (AC1). */
+export interface OperationsRevenueDto {
+  totalCents: number;
+  /** One row per unit, in {@link SERVICE_UNITS} order; sums to {@link totalCents}. */
+  byUnit: OperationsUnitRevenueDto[];
+}
+
+/** One staff member in the top-staff-today ranking (AC1). */
+export interface OperationsTopStaffDto {
+  staffId: string;
+  staffName: string;
+  bookings: number;
+  revenueCents: number;
+}
+
+/**
+ * The daily-operations dashboard API response (P3-E05-S01). The five tile data
+ * points (AC1) returned by `GET /admin/operations-dashboard`. Identical shape to
+ * `@bm/catalog`'s `OperationsDashboard` (all primitives, serialisable) — this is
+ * the wire contract the admin dashboard tiles read.
+ */
+export interface OperationsDashboardDto {
+  /** The report date (`YYYY-MM-DD`). */
+  date: string;
+  /** Today's revenue: total + per-unit (AC1). */
+  revenue: OperationsRevenueDto;
+  /** Non-cancelled bookings today (AC1). */
+  bookingsCount: number;
+  /** In-progress sessions (checked in, not yet out / completed) (AC1). */
+  activeSessions: number;
+  /** Centre-wide outstanding balance, integer cents (AC1). */
+  outstandingCents: number;
+  /** Top staff today by attributed revenue (AC1). */
+  topStaff: OperationsTopStaffDto[];
+}
+
+/** Human label for a service unit, used by the dashboard + drill-down. */
+export function serviceUnitLabel(unit: ServiceUnit): string {
+  switch (unit) {
+    case "play":
+      return "Play";
+    case "talent":
+      return "Talent";
+    case "salon":
+      return "Salon";
+    case "coaching":
+      return "Coaching";
+    case "event":
+      return "Event";
+  }
+}
+
+/**
+ * Drill-down route for a per-unit revenue figure (AC2). The salon unit reuses the
+ * existing salon-report surface; every other unit clicks through to the generic
+ * per-unit revenue drill-down on the operations dashboard.
+ */
+export function unitRevenueHref(unit: ServiceUnit): string {
+  return unit === "salon" ? "/salon-report" : `/operations/revenue?unit=${unit}`;
+}
+
+/** One headline tile: a stable key, a label, a formatted value, and a drill-down. */
+export interface OperationsTile {
+  key: "revenue" | "bookings" | "activeSessions" | "outstanding" | "topStaff";
+  label: string;
+  value: string;
+  /** Drill-down route the tile's number clicks through to (AC2). */
+  href: string;
+}
+
+/** A render-ready per-unit revenue row (AC1/AC2). */
+export interface OperationsUnitRevenueRow {
+  unit: ServiceUnit;
+  label: string;
+  value: string;
+  href: string;
+}
+
+/** The dashboard view-model: the five tiles + the per-unit revenue breakdown. */
+export interface OperationsDashboardViewModel {
+  date: string;
+  tiles: OperationsTile[];
+  revenueByUnit: OperationsUnitRevenueRow[];
+}
+
+/**
+ * Shape the operations dashboard into the five headline tiles (AC1) — each
+ * carrying the drill-down route its number clicks through to (AC2) — plus the
+ * per-unit revenue breakdown. Pure + framework-free so it unit-tests without
+ * React and the page renders the identical tiles. Revenue reuses
+ * {@link formatSalonRevenue} (the shared KES formatter).
+ */
+export function operationsDashboardTiles(
+  dto: OperationsDashboardDto,
+): OperationsDashboardViewModel {
+  const top = dto.topStaff[0];
+  return {
+    date: dto.date,
+    tiles: [
+      {
+        key: "revenue",
+        label: "Today's revenue",
+        value: formatSalonRevenue(dto.revenue.totalCents),
+        href: "/operations/revenue",
+      },
+      {
+        key: "bookings",
+        label: "Bookings today",
+        value: dto.bookingsCount.toLocaleString("en-KE"),
+        href: "/operations/bookings",
+      },
+      {
+        key: "activeSessions",
+        label: "Active sessions",
+        value: dto.activeSessions.toLocaleString("en-KE"),
+        href: "/reception/attendance",
+      },
+      {
+        key: "outstanding",
+        label: "Outstanding balances",
+        value: formatSalonRevenue(dto.outstandingCents),
+        href: "/treasury/reconciliation",
+      },
+      {
+        key: "topStaff",
+        label: "Top staff today",
+        value: top ? top.staffName : "—",
+        href: "/staff-earnings",
+      },
+    ],
+    revenueByUnit: dto.revenue.byUnit.map((u) => ({
+      unit: u.unit,
+      label: serviceUnitLabel(u.unit),
+      value: formatSalonRevenue(u.revenueCents),
+      href: unitRevenueHref(u.unit),
+    })),
+  };
+}
+
+/** A render-ready top-staff drill-down row (AC1/AC2). */
+export interface OperationsTopStaffRow {
+  staffId: string;
+  staffName: string;
+  bookings: string;
+  revenue: string;
+  /** Drill-down to the staff-earnings surface (AC2). */
+  href: string;
+}
+
+/** Shape the top-staff ranking into render-ready drill-down rows (AC1/AC2). */
+export function operationsTopStaffRows(dto: OperationsDashboardDto): OperationsTopStaffRow[] {
+  return dto.topStaff.map((s) => ({
+    staffId: s.staffId,
+    staffName: s.staffName,
+    bookings: s.bookings.toLocaleString("en-KE"),
+    revenue: formatSalonRevenue(s.revenueCents),
+    href: "/staff-earnings",
+  }));
+}
+
+/* --- Revenue by unit, by period (P3-E05-S02 / Story 27.2) ----------------- */
+
+/**
+ * Revenue-by-period request (Story 27.2 AC1/AC2). The owner picks an inclusive
+ * date range (`YYYY-MM-DD`); the report returns the per-unit NET revenue series
+ * over `[fromDate, toDate]` plus the period-over-period delta, and the CSV export
+ * uses the SAME filter (AC2). Both bounds are validated calendar dates and
+ * `fromDate <= toDate`. Reuses the shared {@link exportDateSchema}.
+ */
+export const revenueByPeriodQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type RevenueByPeriodQuery = z.infer<typeof revenueByPeriodQuerySchema>;
+
+/** Net revenue for one unit over the selected period (always present). */
+export interface RevenueByPeriodUnitDto {
+  unit: ServiceUnit;
+  revenueCents: number;
+}
+
+/** Period-over-period delta for one unit (this period − previous). */
+export interface RevenueByPeriodDeltaDto {
+  unit: ServiceUnit;
+  deltaCents: number;
+}
+
+/**
+ * The revenue-by-unit-by-period API response (Story 27.2). NET revenue per unit
+ * for the selected period (refunds excluded, AC3), the preceding equal-length
+ * period, and the delta — per unit + total. Identical shape to `@bm/catalog`'s
+ * `RevenueByPeriod` (all primitives, serialisable).
+ */
+export interface RevenueByPeriodDto {
+  from: string;
+  to: string;
+  /** This period's net revenue per unit (chart series), in SERVICE_UNITS order. */
+  byUnit: RevenueByPeriodUnitDto[];
+  totalCents: number;
+  /** The preceding equal-length period's net revenue per unit. */
+  previousByUnit: RevenueByPeriodUnitDto[];
+  previousTotalCents: number;
+  /** Per-unit delta (this − previous), in SERVICE_UNITS order. */
+  deltaByUnit: RevenueByPeriodDeltaDto[];
+  totalDeltaCents: number;
+}
+
+/** Header columns of the revenue-by-period CSV export, in order (AC2). */
+export const REVENUE_BY_PERIOD_EXPORT_COLUMNS = [
+  "unit",
+  "revenue_kes",
+  "previous_revenue_kes",
+  "delta_kes",
+] as const;
+
+/**
+ * Render the report as an RFC-4180 CSV using the same date-range filter (AC2/AC3):
+ * a header row, then one NET-revenue row per unit (current, previous, delta as KES
+ * decimals), then a closing `Total` row. Refunds are already excluded upstream so
+ * every figure is net. Lines are CRLF-joined with a trailing CRLF.
+ */
+export function revenueByPeriodToCsv(report: RevenueByPeriodDto): string {
+  const prevByUnit = new Map(report.previousByUnit.map((u) => [u.unit, u.revenueCents]));
+  const deltaByUnit = new Map(report.deltaByUnit.map((u) => [u.unit, u.deltaCents]));
+  const lines: string[] = [REVENUE_BY_PERIOD_EXPORT_COLUMNS.join(",")];
+  for (const u of report.byUnit) {
+    lines.push(
+      [
+        csvField(serviceUnitLabel(u.unit)),
+        centsToKes(u.revenueCents),
+        centsToKes(prevByUnit.get(u.unit) ?? 0),
+        centsToKes(deltaByUnit.get(u.unit) ?? 0),
+      ].join(","),
+    );
+  }
+  lines.push(
+    [
+      "Total",
+      centsToKes(report.totalCents),
+      centsToKes(report.previousTotalCents),
+      centsToKes(report.totalDeltaCents),
+    ].join(","),
+  );
+  return lines.join("\r\n") + "\r\n";
+}
+
+/** Up / down / flat — drives the delta arrow + colour on the chart legend. */
+export type RevenueDeltaDirection = "up" | "down" | "flat";
+
+/** Format a signed delta as a KES decimal with an explicit + / − sign. */
+function formatDelta(cents: number): string {
+  if (cents === 0) return "KES 0.00";
+  const sign = cents > 0 ? "+" : "-";
+  return `${sign}${formatSalonRevenue(Math.abs(cents))}`;
+}
+
+function deltaDirection(cents: number): RevenueDeltaDirection {
+  return cents > 0 ? "up" : cents < 0 ? "down" : "flat";
+}
+
+/** One chart-series point: a unit with its formatted value + delta (AC1). */
+export interface RevenueSeriesPoint {
+  unit: ServiceUnit;
+  label: string;
+  /** Formatted net revenue, e.g. `KES 35.00`. */
+  value: string;
+  /** Raw net revenue cents — for the chart's numeric axis. */
+  revenueCents: number;
+  /** Formatted period-over-period delta, e.g. `+KES 25.00`. */
+  deltaValue: string;
+  /** Raw delta cents. */
+  deltaCents: number;
+  deltaDirection: RevenueDeltaDirection;
+}
+
+/** The headline total + its period-over-period delta (AC1). */
+export interface RevenueTotalView {
+  value: string;
+  previousValue: string;
+  deltaValue: string;
+  deltaCents: number;
+  deltaDirection: RevenueDeltaDirection;
+}
+
+/** The revenue-by-period view-model: a chart series + the headline total (AC1). */
+export interface RevenueByPeriodViewModel {
+  from: string;
+  to: string;
+  series: RevenueSeriesPoint[];
+  total: RevenueTotalView;
+}
+
+/**
+ * Shape the report into the chart series + headline total (Story 27.2 AC1). Pure +
+ * framework-free so it unit-tests without React and the admin page renders the
+ * identical figures. Every unit is present (zero-filled) so the chart is stable;
+ * deltas carry an explicit sign + a direction for the up/down arrow. Revenue reuses
+ * {@link formatSalonRevenue} (the shared KES formatter).
+ */
+export function revenueByPeriodViewModel(report: RevenueByPeriodDto): RevenueByPeriodViewModel {
+  const deltaByUnit = new Map(report.deltaByUnit.map((u) => [u.unit, u.deltaCents]));
+  return {
+    from: report.from,
+    to: report.to,
+    series: report.byUnit.map((u) => {
+      const deltaCents = deltaByUnit.get(u.unit) ?? 0;
+      return {
+        unit: u.unit,
+        label: serviceUnitLabel(u.unit),
+        value: formatSalonRevenue(u.revenueCents),
+        revenueCents: u.revenueCents,
+        deltaValue: formatDelta(deltaCents),
+        deltaCents,
+        deltaDirection: deltaDirection(deltaCents),
+      };
+    }),
+    total: {
+      value: formatSalonRevenue(report.totalCents),
+      previousValue: formatSalonRevenue(report.previousTotalCents),
+      deltaValue: formatDelta(report.totalDeltaCents),
+      deltaCents: report.totalDeltaCents,
+      deltaDirection: deltaDirection(report.totalDeltaCents),
+    },
+  };
+}
+
+/** The export endpoint URL carrying the same date-range filter (AC2). */
+export function revenueByPeriodExportUrl(values: { fromDate: string; toDate: string }): string {
+  const params = new URLSearchParams({ fromDate: values.fromDate, toDate: values.toDate });
+  return `/admin/revenue-by-period/export?${params.toString()}`;
+}
+
+/** Suggested download filename for the revenue CSV. */
+export function revenueByPeriodFilename(values: { fromDate: string; toDate: string }): string {
+  return `revenue_by_unit_${values.fromDate}_to_${values.toDate}.csv`;
+}
+
+/* --- Daily dispatch report (P4-E04-S04 / Story 29.4) --------------------- */
+
+/**
+ * Daily dispatch report request (Story 29.4 AC4). Shop ops pick ONE calendar day
+ * (`YYYY-MM-DD`); the report covers the WooCommerce-originated orders for that day.
+ * The date is OPTIONAL on the wire — absent means "today" (resolved server-side via
+ * {@link resolveDispatchDate}). When present it must be a valid calendar date.
+ */
+export const dailyDispatchQuerySchema = z.object({
+  date: exportDateSchema.optional(),
+});
+export type DailyDispatchQuery = z.infer<typeof dailyDispatchQuerySchema>;
+
+/** Resolve the report date: the supplied `YYYY-MM-DD`, or today (UTC) when absent (AC4). */
+export function resolveDispatchDate(date: string | undefined, now: Date = new Date()): string {
+  return date ?? now.toISOString().slice(0, 10);
+}
+
+/** The six POS workflow statuses, in canonical ladder order (counts are zero-filled). */
+export const DISPATCH_STATUS_ORDER = [
+  "new",
+  "packing",
+  "ready",
+  "dispatched",
+  "fulfilled",
+  "cancelled",
+] as const;
+export type DispatchReportStatus = (typeof DISPATCH_STATUS_ORDER)[number];
+
+/** One status bucket of the report (always present, zero-filled). */
+export interface DispatchStatusCountDto {
+  status: DispatchReportStatus;
+  count: number;
+}
+
+/**
+ * The daily dispatch report API response (Story 29.4). Status counts + total value
+ * (KES cents) + pack/dispatch averages (whole seconds, null when no order qualifies)
+ * + the sync-health (dead-letter) count. Identical shape to `@bm/catalog`'s
+ * `DailyDispatchReport` (all primitives, serialisable).
+ */
+export interface DailyDispatchReportDto {
+  date: string;
+  countsByStatus: DispatchStatusCountDto[];
+  totalOrders: number;
+  totalValueCents: number;
+  avgPackSeconds: number | null;
+  avgDispatchSeconds: number | null;
+  syncHealthCount: number;
+}
+
+/** Header columns of the daily dispatch CSV export, in order (AC3). */
+export const DAILY_DISPATCH_EXPORT_COLUMNS = ["metric", "value"] as const;
+
+/** Human label for a workflow status, capitalised. */
+function dispatchStatusLabel(status: DispatchReportStatus): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+/** Whole seconds → minutes with one decimal, e.g. 900 → "15.0"; null → "n/a". */
+function secondsToMinutes(seconds: number | null): string {
+  if (seconds === null) return "n/a";
+  return (seconds / 60).toFixed(1);
+}
+
+/**
+ * Render the report as an RFC-4180 CSV (AC3): a `metric,value` header, then one row
+ * per local_status count, then the total-orders / total-value (KES) / pack-time /
+ * dispatch-time rows, and finally the sync-health row. Labels are escaped; lines are
+ * CRLF-joined with a trailing CRLF. Null averages render as `n/a`.
+ */
+export function dailyDispatchToCsv(report: DailyDispatchReportDto): string {
+  const lines: string[] = [DAILY_DISPATCH_EXPORT_COLUMNS.join(",")];
+  const countByStatus = new Map(report.countsByStatus.map((c) => [c.status, c.count]));
+  for (const status of DISPATCH_STATUS_ORDER) {
+    lines.push([csvField(dispatchStatusLabel(status)), String(countByStatus.get(status) ?? 0)].join(","));
+  }
+  lines.push(["Total orders", String(report.totalOrders)].join(","));
+  lines.push([csvField("Total value (KES)"), centsToKes(report.totalValueCents)].join(","));
+  lines.push([csvField("Average pack time (min)"), secondsToMinutes(report.avgPackSeconds)].join(","));
+  lines.push([csvField("Average dispatch time (min)"), secondsToMinutes(report.avgDispatchSeconds)].join(","));
+  lines.push([csvField("Sync health: stuck writebacks"), String(report.syncHealthCount)].join(","));
+  return lines.join("\r\n") + "\r\n";
+}
+
+/** The 29.7 dead-letter admin view the sync-health row links to (AC5). */
+export const DISPATCH_DEAD_LETTER_HREF = "/woocommerce-sync";
+
+/** One row of the status-count table. */
+export interface DispatchStatusRow {
+  status: DispatchReportStatus;
+  label: string;
+  count: number;
+}
+
+/** The sync-health row: the stuck-writeback count + the dead-letter view link (AC5). */
+export interface DispatchSyncHealth {
+  count: number;
+  href: string;
+}
+
+/** The daily dispatch view-model: the status table + formatted headline figures (AC2/AC5). */
+export interface DailyDispatchViewModel {
+  date: string;
+  rows: DispatchStatusRow[];
+  totalOrders: number;
+  /** Formatted total value, e.g. `KES 1234.56`. */
+  totalValue: string;
+  /** Formatted average pack time, e.g. `15.0 min` / `n/a`. */
+  avgPack: string;
+  /** Formatted average dispatch time, e.g. `20.0 min` / `n/a`. */
+  avgDispatch: string;
+  syncHealth: DispatchSyncHealth;
+}
+
+/**
+ * Shape the report into the status table + headline figures (Story 29.4 AC2/AC5).
+ * Pure + framework-free so it unit-tests without React and the admin page renders
+ * the identical figures. Every status is present; averages render as minutes (one
+ * decimal) or `n/a`; the sync-health row carries the dead-letter view link.
+ */
+export function dailyDispatchViewModel(report: DailyDispatchReportDto): DailyDispatchViewModel {
+  const countByStatus = new Map(report.countsByStatus.map((c) => [c.status, c.count]));
+  const fmtAvg = (s: number | null) => (s === null ? "n/a" : `${secondsToMinutes(s)} min`);
+  return {
+    date: report.date,
+    rows: DISPATCH_STATUS_ORDER.map((status) => ({
+      status,
+      label: dispatchStatusLabel(status),
+      count: countByStatus.get(status) ?? 0,
+    })),
+    totalOrders: report.totalOrders,
+    totalValue: `KES ${centsToKes(report.totalValueCents)}`,
+    avgPack: fmtAvg(report.avgPackSeconds),
+    avgDispatch: fmtAvg(report.avgDispatchSeconds),
+    syncHealth: { count: report.syncHealthCount, href: DISPATCH_DEAD_LETTER_HREF },
+  };
+}
+
+/** The export endpoint URL carrying the date filter (AC3/AC4). */
+export function dailyDispatchExportUrl(values: { date: string }): string {
+  const params = new URLSearchParams({ date: values.date });
+  return `/admin/daily-dispatch/export?${params.toString()}`;
+}
+
+/** Suggested download filename for the dispatch CSV. */
+export function dailyDispatchFilename(values: { date: string }): string {
+  return `daily_dispatch_${values.date}.csv`;
+}
+
+/* --- Top-staff leaderboard (P3-E05-S03 / Story 27.3) --------------------- */
+
+/** Human label for a staff attribution role, used by the leaderboard surface. */
+export function attributionRoleLabel(role: AttributionRole): string {
+  switch (role) {
+    case "stylist":
+      return "Stylist";
+    case "instructor":
+      return "Instructor";
+    case "attendant":
+      return "Attendant";
+    case "coach":
+      return "Coach";
+    case "event_staff":
+      return "Event staff";
+  }
+}
+
+/**
+ * Top-staff-leaderboard request (Story 27.3 AC1/AC2). The admin picks an inclusive
+ * date range (`YYYY-MM-DD`) and, optionally, a single attribution role to filter
+ * the roster by (AC2). Both bounds are validated calendar dates with
+ * `fromDate <= toDate`. An empty/absent role string means "all roles" (no filter).
+ * Reuses the shared {@link exportDateSchema}.
+ */
+export const staffLeaderboardQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+    role: z
+      .union([z.enum(ATTRIBUTION_ROLES), z.literal("")])
+      .optional()
+      .transform((v) => (v === "" || v === undefined ? undefined : v)),
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type StaffLeaderboardQuery = z.infer<typeof staffLeaderboardQuerySchema>;
+
+/** One staff member's leaderboard slice over the period (AC1). */
+export interface StaffLeaderboardRowDto {
+  staffId: string;
+  staffName: string;
+  role: AttributionRole;
+  /** Total attributed revenue (cents) over the period. */
+  revenueCents: number;
+  /** Count of services performed. */
+  serviceCount: number;
+  /** Average ticket (revenue ÷ service count), integer cents; 0 when no services. */
+  avgTicketCents: number;
+}
+
+/**
+ * The top-staff-leaderboard API response (Story 27.3). Per-staff revenue, service
+ * count, and average ticket over the selected period, ranked by revenue (AC1).
+ * Identical shape to `@bm/catalog`'s `StaffLeaderboard` (all primitives,
+ * serialisable).
+ */
+export interface StaffLeaderboardDto {
+  from: string;
+  to: string;
+  rows: StaffLeaderboardRowDto[];
+}
+
+/** A staff member's commission totals over the period (drill-down, AC3). */
+export interface StaffCommissionTotalsDto {
+  netCents: number;
+  accruedCents: number;
+  reversedCents: number;
+  entryCount: number;
+}
+
+/** The per-staff commission drill-down API response (Story 27.3 AC3). */
+export interface StaffCommissionDrilldownDto {
+  staffId: string;
+  staffName: string;
+  role: AttributionRole;
+  from: string;
+  to: string;
+  totals: StaffCommissionTotalsDto;
+}
+
+/** A render-ready leaderboard row: formatted metrics + the drill-down href (AC1/AC3). */
+export interface StaffLeaderboardRow {
+  staffId: string;
+  staffName: string;
+  roleLabel: string;
+  revenue: string;
+  serviceCount: string;
+  avgTicket: string;
+  /** Drill-down to this staff member's commission totals for the same period (AC3). */
+  href: string;
+}
+
+/** The per-staff commission drill-down link for the same period (AC3). */
+export function staffCommissionDrilldownHref(
+  staffId: string,
+  range: { from: string; to: string },
+): string {
+  const params = new URLSearchParams({ fromDate: range.from, toDate: range.to });
+  return `/operations/leaderboard/${encodeURIComponent(staffId)}?${params.toString()}`;
+}
+
+/**
+ * Shape the leaderboard into render-ready rows in server (ranked) order (AC1/AC3).
+ * Pure + framework-free so it unit-tests without React and the admin page renders
+ * the identical figures. Revenue + average ticket reuse {@link formatSalonRevenue}
+ * (the shared KES formatter); each row carries a drill-down href to its commission
+ * totals over the same period (AC3).
+ */
+export function staffLeaderboardRows(dto: StaffLeaderboardDto): StaffLeaderboardRow[] {
+  return dto.rows.map((r) => ({
+    staffId: r.staffId,
+    staffName: r.staffName,
+    roleLabel: attributionRoleLabel(r.role),
+    revenue: formatSalonRevenue(r.revenueCents),
+    serviceCount: r.serviceCount.toLocaleString("en-KE"),
+    avgTicket: formatSalonRevenue(r.avgTicketCents),
+    href: staffCommissionDrilldownHref(r.staffId, { from: dto.from, to: dto.to }),
+  }));
+}
+
+/** One option in the role-filter control (AC2). */
+export interface StaffLeaderboardRoleOption {
+  /** Empty string = "all roles" (no filter); otherwise an attribution role. */
+  value: "" | AttributionRole;
+  label: string;
+}
+
+/** The role-filter options: an "all roles" entry then every attribution role (AC2). */
+export function staffLeaderboardRoleOptions(): StaffLeaderboardRoleOption[] {
+  return [
+    { value: "", label: "All roles" },
+    ...ATTRIBUTION_ROLES.map((role) => ({ value: role, label: attributionRoleLabel(role) })),
+  ];
+}
+
+/** The per-staff commission drill-down view-model: formatted totals (AC3). */
+export interface StaffCommissionDrilldownView {
+  staffId: string;
+  staffName: string;
+  roleLabel: string;
+  from: string;
+  to: string;
+  netCommission: string;
+  accruedCommission: string;
+  reversedCommission: string;
+  entryCount: number;
+}
+
+/** Shape the per-staff commission drill-down into formatted totals (AC3). Pure. */
+export function staffCommissionDrilldownView(
+  dto: StaffCommissionDrilldownDto,
+): StaffCommissionDrilldownView {
+  return {
+    staffId: dto.staffId,
+    staffName: dto.staffName,
+    roleLabel: attributionRoleLabel(dto.role),
+    from: dto.from,
+    to: dto.to,
+    netCommission: formatSalonRevenue(dto.totals.netCents),
+    accruedCommission: formatSalonRevenue(dto.totals.accruedCents),
+    reversedCommission: formatSalonRevenue(dto.totals.reversedCents),
+    entryCount: dto.totals.entryCount,
+  };
 }
 
 /* --- Staff data records (P1-E07-S03) ------------------------------------- */
@@ -2733,6 +3886,26 @@ export * from "./utm.js";
 export * from "./pricing.js";
 
 // ---------------------------------------------------------------------------
+// WooCommerce REST payload + credential-config contracts (P4-E04-S06 / 29.6)
+// ---------------------------------------------------------------------------
+export * from "./woocommerce.js";
+
+// ---------------------------------------------------------------------------
+// POS "Online orders" view-model — local mirror → cards (P4-E04-S01 / 29.1)
+// ---------------------------------------------------------------------------
+export * from "./woocommerce-orders.js";
+
+// ---------------------------------------------------------------------------
+// Packing-slip view-model — local mirror → printable slip (P4-E04-S03 / 29.3)
+// ---------------------------------------------------------------------------
+export * from "./packing-slip.js";
+
+// ---------------------------------------------------------------------------
+// POS order-status transition state machine + local→Woo mapping (P4-E04-S02 / 29.2)
+// ---------------------------------------------------------------------------
+export * from "./order-transitions.js";
+
+// ---------------------------------------------------------------------------
 // POS payment / sale (P2-E04-S04)
 // ---------------------------------------------------------------------------
 
@@ -2929,3 +4102,300 @@ export const DEFAULT_BACKUP_RETENTION_POLICY: BackupRetentionPolicy = {
   monthlyKeep: 12,
   graceDays: 7,
 };
+
+/* --- Wallet aging report (P3-E05-S04 / Story 27.4) ----------------------- */
+
+/**
+ * Wallet-aging-report request (Story 27.4). The accountant optionally pins the
+ * report to a specific `asOf` calendar date (`YYYY-MM-DD`); absent, the server
+ * uses "now". The CSV export takes the SAME (optional) filter (AC3). Reuses the
+ * shared {@link exportDateSchema} for the date validation.
+ */
+export const walletAgingQuerySchema = z.object({
+  asOf: exportDateSchema.optional(),
+});
+export type WalletAgingQuery = z.infer<typeof walletAgingQuerySchema>;
+
+/** One parent's outstanding slice within a single aging bucket (AC2). */
+export interface WalletAgingRowDto {
+  parentId: string;
+  /** Profile-link key — the row clicks through to `/parents/:userId/...` (AC2). */
+  userId: string;
+  parentName: string;
+  /** Summed outstanding for this parent within this bucket, integer cents. */
+  amountCents: number;
+}
+
+/** One aging bucket with its per-parent rows + total (AC1/AC2). */
+export interface WalletAgingBucketDto {
+  key: string;
+  label: string;
+  minDays: number;
+  maxDays: number | null;
+  rows: WalletAgingRowDto[];
+  totalCents: number;
+}
+
+/**
+ * The wallet-aging-report API response (Story 27.4). Outstanding balances bucketed
+ * by age (0–7 / 8–30 / 31–60 / 61–90 / 90+ days, AC1) with a per-parent row under
+ * each bucket (AC2). Identical shape to `@bm/catalog`'s `WalletAgingReport` (all
+ * primitives, serialisable).
+ */
+export interface WalletAgingReportDto {
+  /** The report instant as an ISO string. */
+  asOf: string;
+  buckets: WalletAgingBucketDto[];
+  /** Grand total outstanding across every bucket, integer cents. */
+  totalCents: number;
+}
+
+/** Header columns of the wallet-aging CSV export, in order (AC3). */
+export const WALLET_AGING_EXPORT_COLUMNS = [
+  "bucket",
+  "parent",
+  "outstanding_kes",
+] as const;
+
+/**
+ * Render the aging report as an RFC-4180 CSV (AC3): a column header, then for each
+ * non-empty bucket one line per parent row (`bucket label, parent name, KES
+ * outstanding`), then a closing `Total` row for the grand total. Parent names are
+ * RFC-4180 escaped. Lines are CRLF-joined with a trailing CRLF — the same shape as
+ * the revenue / reconciliation exports.
+ */
+export function walletAgingToCsv(report: WalletAgingReportDto): string {
+  const lines: string[] = [WALLET_AGING_EXPORT_COLUMNS.join(",")];
+  for (const bucket of report.buckets) {
+    for (const row of bucket.rows) {
+      lines.push(
+        [csvField(bucket.label), csvField(row.parentName), centsToKes(row.amountCents)].join(","),
+      );
+    }
+  }
+  lines.push(["Total", "", centsToKes(report.totalCents)].join(","));
+  return lines.join("\r\n") + "\r\n";
+}
+
+/** The parent-profile link target for an aging row (AC2) — reuses the wallet statement surface. */
+export function walletAgingParentProfileHref(userId: string): string {
+  return `/parents/${userId}/statement`;
+}
+
+/** A render-ready aging row: formatted amount + the parent-profile href (AC2). */
+export interface WalletAgingRowView {
+  parentId: string;
+  parentName: string;
+  /** Formatted outstanding, e.g. `KES 15.00`. */
+  amount: string;
+  amountCents: number;
+  /** Click-through to the parent's profile / statement (AC2). */
+  href: string;
+}
+
+/** A render-ready aging bucket: its label + per-parent rows + formatted total. */
+export interface WalletAgingBucketView {
+  key: string;
+  label: string;
+  rows: WalletAgingRowView[];
+  /** Formatted bucket total, e.g. `KES 20.00`. */
+  total: string;
+  totalCents: number;
+}
+
+/** The wallet-aging view-model: every bucket with its per-parent rows (AC1/AC2). */
+export interface WalletAgingViewModel {
+  asOf: string;
+  buckets: WalletAgingBucketView[];
+  /** Formatted grand total. */
+  total: string;
+  totalCents: number;
+}
+
+/**
+ * Shape the aging report into render-ready buckets + rows (Story 27.4 AC1/AC2).
+ * Pure + framework-free so it unit-tests without React and the admin page renders
+ * the identical figures. Every bucket is present in display order; each row carries
+ * a click-through href to the parent's profile/statement (AC2). Amounts reuse
+ * {@link formatSalonRevenue} (the shared KES formatter).
+ */
+export function walletAgingViewModel(report: WalletAgingReportDto): WalletAgingViewModel {
+  return {
+    asOf: report.asOf,
+    buckets: report.buckets.map((bucket) => ({
+      key: bucket.key,
+      label: bucket.label,
+      rows: bucket.rows.map((row) => ({
+        parentId: row.parentId,
+        parentName: row.parentName,
+        amount: formatSalonRevenue(row.amountCents),
+        amountCents: row.amountCents,
+        href: walletAgingParentProfileHref(row.userId),
+      })),
+      total: formatSalonRevenue(bucket.totalCents),
+      totalCents: bucket.totalCents,
+    })),
+    total: formatSalonRevenue(report.totalCents),
+    totalCents: report.totalCents,
+  };
+}
+
+/** The CSV export endpoint URL carrying the same (optional) `asOf` filter (AC3). */
+export function walletAgingExportUrl(values: { asOf?: string }): string {
+  if (!values.asOf) return "/admin/wallet-aging/export";
+  const params = new URLSearchParams({ asOf: values.asOf });
+  return `/admin/wallet-aging/export?${params.toString()}`;
+}
+
+/** Suggested download filename for the aging CSV. */
+export function walletAgingFilename(values: { asOf: string }): string {
+  return `wallet_aging_${values.asOf}.csv`;
+}
+
+/* --- Peak-hours heatmap (P3-E05-S05 / Story 27.5) ------------------------ */
+
+/**
+ * The longest range the peak-hours heatmap accepts: 12 months, as an inclusive day
+ * count (366 to allow a leap year — same cap the reconciliation export uses, AC3).
+ * Ranges longer than this are rejected by {@link peakHoursHeatmapQuerySchema}.
+ */
+export const PEAK_HOURS_MAX_DAYS = 366;
+
+/** Inclusive count of calendar days in `[fromDate, toDate]` (both `YYYY-MM-DD`, UTC). */
+export function peakHoursRangeDayCount(fromDate: string, toDate: string): number {
+  const from = Date.parse(`${fromDate}T00:00:00Z`);
+  const to = Date.parse(`${toDate}T00:00:00Z`);
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return 0;
+  return Math.floor((to - from) / 86_400_000) + 1;
+}
+
+/**
+ * Peak-hours-heatmap request (Story 27.5 AC1/AC2/AC3). The admin picks an inclusive
+ * date range (`YYYY-MM-DD`) and, optionally, a single service unit to filter by
+ * (AC2 — an empty/absent unit means "all units"). Both bounds are validated
+ * calendar dates with `fromDate <= toDate`, and the range is capped at 12 months
+ * (AC3 — {@link PEAK_HOURS_MAX_DAYS}). Reuses the shared {@link exportDateSchema}.
+ */
+export const peakHoursHeatmapQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+    unit: z
+      .union([z.enum(SERVICE_UNITS), z.literal("")])
+      .optional()
+      .transform((v) => (v === "" || v === undefined ? undefined : v)),
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  })
+  .refine((v) => peakHoursRangeDayCount(v.fromDate, v.toDate) <= PEAK_HOURS_MAX_DAYS, {
+    message: "Date range may not exceed 12 months",
+    path: ["toDate"],
+  });
+export type PeakHoursHeatmapQuery = z.infer<typeof peakHoursHeatmapQuerySchema>;
+
+/** The single hottest weekday+hour cell (null when no sessions fell in the range). */
+export interface PeakHoursCellDto {
+  /** 0=Sun … 6=Sat (UTC). */
+  weekday: number;
+  /** 0 … 23 (UTC). */
+  hour: number;
+  count: number;
+}
+
+/**
+ * The peak-hours-heatmap API response (Story 27.5). A 7×24 weekday×hour grid of
+ * active-session counts over the selected range (AC1), the unit it was filtered by
+ * (null = all units, AC2), the total, and the hottest cell. Identical grid shape to
+ * `@bm/catalog`'s `PeakHoursHeatmap`, plus the echoed `unit` filter.
+ */
+export interface PeakHoursHeatmapDto {
+  from: string;
+  to: string;
+  /** The unit this grid was filtered to, or null for all units (AC2). */
+  unit: ServiceUnit | null;
+  /** 7×24 grid: `cells[weekday][hour]` = active sessions in that bucket (AC1). */
+  cells: number[][];
+  totalSessions: number;
+  peak: PeakHoursCellDto | null;
+}
+
+/** Weekday row labels in heatmap order (0=Sun … 6=Sat), for the grid + peak label. */
+export const HEATMAP_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** Number of intensity buckets (0 = empty, 1..N shade hotter) for the grid cells. */
+export const HEATMAP_INTENSITY_LEVELS = 4;
+
+/** A render-ready cell: its hour, raw count, and a 0..N intensity bucket. */
+export interface PeakHoursCellView {
+  hour: number;
+  count: number;
+  /** 0 when empty; 1..{@link HEATMAP_INTENSITY_LEVELS} scaled against the peak. */
+  intensity: number;
+}
+
+/** A render-ready weekday row: its label + 24 cells. */
+export interface PeakHoursRowView {
+  weekday: number;
+  label: string;
+  cells: PeakHoursCellView[];
+}
+
+/** The peak-hours-heatmap view-model: a labelled 7×24 grid + the peak summary (AC1). */
+export interface PeakHoursHeatmapViewModel {
+  from: string;
+  to: string;
+  rows: PeakHoursRowView[];
+  totalSessions: number;
+  /** Human peak label e.g. `Wed 10:00 (4 sessions)`, or null when empty. */
+  peakLabel: string | null;
+}
+
+/** Format an hour-of-day (0..23) as a `HH:00` 24-hour clock label. */
+function hourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+/**
+ * Map a raw cell count to a 0..{@link HEATMAP_INTENSITY_LEVELS} intensity bucket,
+ * scaled against the grid's peak so the hottest cell is always full intensity and
+ * empty cells are 0. Pure — drives the cell's shade on the rendered heatmap.
+ */
+function cellIntensity(count: number, peakCount: number): number {
+  if (count <= 0 || peakCount <= 0) return 0;
+  const scaled = Math.ceil((count / peakCount) * HEATMAP_INTENSITY_LEVELS);
+  return Math.min(HEATMAP_INTENSITY_LEVELS, Math.max(1, scaled));
+}
+
+/**
+ * Shape the heatmap into a labelled 7×24 grid + peak summary (Story 27.5 AC1). Pure
+ * + framework-free so it unit-tests without React and the admin page renders the
+ * identical grid. Every weekday row + every hour cell is present (zero-filled) so
+ * the grid is stable; each cell carries a 0..N intensity bucket scaled against the
+ * peak for shading; the peak label names the hottest weekday+hour (null when empty).
+ */
+export function peakHoursHeatmapViewModel(dto: PeakHoursHeatmapDto): PeakHoursHeatmapViewModel {
+  const peakCount = dto.peak?.count ?? 0;
+  const rows: PeakHoursRowView[] = HEATMAP_WEEKDAY_LABELS.map((label, weekday) => ({
+    weekday,
+    label,
+    cells: Array.from({ length: 24 }, (_unused, hour) => {
+      const count = dto.cells[weekday]?.[hour] ?? 0;
+      return { hour, count, intensity: cellIntensity(count, peakCount) };
+    }),
+  }));
+
+  const peakLabel = dto.peak
+    ? `${HEATMAP_WEEKDAY_LABELS[dto.peak.weekday] ?? "?"} ${hourLabel(dto.peak.hour)} (${dto.peak.count.toLocaleString("en-KE")} sessions)`
+    : null;
+
+  return { from: dto.from, to: dto.to, rows, totalSessions: dto.totalSessions, peakLabel };
+}
+
+/** The peak-hours-heatmap API URL carrying the date range + optional unit filter. */
+export function peakHoursHeatmapUrl(values: { fromDate: string; toDate: string; unit?: string }): string {
+  const params = new URLSearchParams({ fromDate: values.fromDate, toDate: values.toDate });
+  if (values.unit) params.set("unit", values.unit);
+  return `/admin/peak-hours-heatmap?${params.toString()}`;
+}

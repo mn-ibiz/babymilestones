@@ -102,13 +102,15 @@ export type { ClawbackForRefundInput, ClawbackForRefundResult } from "./loyalty-
 export { adjustLoyaltyPoints, LoyaltyAdjustmentError } from "./loyalty-adjust.js";
 export type { AdjustLoyaltyPointsInput, AdjustLoyaltyPointsResult } from "./loyalty-adjust.js";
 
-// Commission accrual + refund reversal hook (P3-E01-S02).
+// Commission accrual + refund reversal hook (P3-E01-S02). Reassign move (P3-E03-S04).
 export {
   recordBookingCommission,
   reverseBookingCommission,
+  reassignBookingCommission,
   type CommissionExecutor,
   type RecordBookingCommissionResult,
   type ReverseBookingCommissionResult,
+  type ReassignBookingCommissionResult,
 } from "./commission-hook.js";
 
 /** A drizzle handle that can read the ledger (the pooled db or a transaction). */

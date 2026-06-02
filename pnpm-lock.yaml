@@ -102,6 +102,9 @@ importers:
       '@bm/wallet':
         specifier: workspace:*
         version: link:../../packages/wallet
+      '@bm/woocommerce':
+        specifier: workspace:*
+        version: link:../../packages/woocommerce
       drizzle-orm:
         specifier: ^0.38.2
         version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
@@ -139,6 +142,9 @@ importers:
       '@bm/wallet':
         specifier: workspace:*
         version: link:../../packages/wallet
+      '@bm/woocommerce':
+        specifier: workspace:*
+        version: link:../../packages/woocommerce
       drizzle-orm:
         specifier: ^0.38.2
         version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
@@ -235,6 +241,9 @@ importers:
       '@bm/db':
         specifier: workspace:*
         version: link:../db
+      '@bm/woocommerce':
+        specifier: workspace:*
+        version: link:../woocommerce
       drizzle-orm:
         specifier: ^0.38.2
         version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
@@ -359,6 +368,21 @@ importers:
       '@bm/db':
         specifier: workspace:*
         version: link:../db
+      drizzle-orm:
+        specifier: ^0.38.2
+        version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)
+
+  packages/woocommerce:
+    dependencies:
+      '@bm/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@bm/db':
+        specifier: workspace:*
+        version: link:../db
+      '@bm/observability':
+        specifier: workspace:*
+        version: link:../observability
       drizzle-orm:
         specifier: ^0.38.2
         version: 0.38.4(@electric-sql/pglite@0.2.17)(@types/react@19.2.15)(postgres@3.4.9)(react@19.2.6)

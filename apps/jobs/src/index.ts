@@ -6,12 +6,19 @@ import { createMpesaReconcileJob } from "./jobs/mpesa-reconcile.js";
 import { createAuditDrainJob } from "./jobs/audit-drain.js";
 import { createDbBackupJob } from "./jobs/db-backup.js";
 import { createSlotGenerationJob } from "./jobs/slot-generation.js";
+import { createSalonSlotGenerationJob } from "./jobs/salon-slot-generation.js";
+import { createCoachingSlotGenerationJob } from "./jobs/coaching-slot-generation.js";
+import { createCoachingRemindersJob } from "./jobs/coaching-reminders.js";
 import { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 import { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
 import { createSmsRetryJob } from "./jobs/sms-retry.js";
 import { createCommissionRunJob } from "./jobs/commission-run.js";
 import { createEtimsRetryJob } from "./jobs/etims-retry.js";
 import { createBackupPruneJob } from "./jobs/backup-prune.js";
+import { createOutstandingRemindersJob } from "./jobs/outstanding-reminders.js";
+import { createWcSyncPullJob } from "./jobs/wc-sync-pull.js";
+import { createWcOutboxDrainJob } from "./jobs/wc-outbox-drain.js";
+import { createWcStockReconcileJob } from "./jobs/wc-stock-reconcile.js";
 
 export { createDataExportJob } from "./jobs/data-export.js";
 export { createWalletStatementJob } from "./jobs/wallet-statement.js";
@@ -29,6 +36,12 @@ export type {
 } from "./jobs/db-backup.js";
 export { createSlotGenerationJob } from "./jobs/slot-generation.js";
 export type { SlotGenerationJobDeps } from "./jobs/slot-generation.js";
+export { createSalonSlotGenerationJob } from "./jobs/salon-slot-generation.js";
+export type { SalonSlotGenerationJobDeps } from "./jobs/salon-slot-generation.js";
+export { createCoachingSlotGenerationJob } from "./jobs/coaching-slot-generation.js";
+export type { CoachingSlotGenerationJobDeps } from "./jobs/coaching-slot-generation.js";
+export { createCoachingRemindersJob } from "./jobs/coaching-reminders.js";
+export type { CoachingRemindersJobDeps, CoachingRemindersLogger } from "./jobs/coaching-reminders.js";
 export { createSubscriptionRenewJob } from "./jobs/subscription-renew.js";
 export type { SubscriptionRenewJobDeps } from "./jobs/subscription-renew.js";
 export { createAnonymiseObservationsJob } from "./jobs/anonymise-observations.js";
@@ -67,6 +80,16 @@ export {
   selectBackupsToPrune,
   type PrunableBackup,
 } from "./jobs/backup-retention.js";
+export { createOutstandingRemindersJob } from "./jobs/outstanding-reminders.js";
+export type { OutstandingRemindersJobDeps } from "./jobs/outstanding-reminders.js";
+// P4-E04-S07 (Story 29.7): WooCommerce sync pull + writeback outbox drain.
+export { createWcSyncPullJob } from "./jobs/wc-sync-pull.js";
+export type { WcSyncPullJobDeps, WcPullClient, WcSyncPullLogger } from "./jobs/wc-sync-pull.js";
+export { createWcOutboxDrainJob } from "./jobs/wc-outbox-drain.js";
+export type { WcOutboxDrainJobDeps, WcDrainClient, WcOutboxDrainLogger } from "./jobs/wc-outbox-drain.js";
+// P4-E04-S05 (Story 29.5): nightly stock reconciliation report.
+export { createWcStockReconcileJob } from "./jobs/wc-stock-reconcile.js";
+export type { WcStockReconcileJobDeps, WcStockReconcileLogger } from "./jobs/wc-stock-reconcile.js";
 
 /**
  * Wire the data-export worker (P1-E02-S05) given a live db + storage. The boot
@@ -112,6 +135,27 @@ export function registerSlotGenerationJob(
   register(createSlotGenerationJob(deps));
 }
 
+/** Wire the nightly salon slot-generation cron (P3-E03-S01 AC2: daily, 60-day horizon). */
+export function registerSalonSlotGenerationJob(
+  deps: Parameters<typeof createSalonSlotGenerationJob>[0],
+): void {
+  register(createSalonSlotGenerationJob(deps));
+}
+
+/** Wire the nightly coaching slot-generation cron (P5-E01-S02 AC1: daily, 60-day horizon). */
+export function registerCoachingSlotGenerationJob(
+  deps: Parameters<typeof createCoachingSlotGenerationJob>[0],
+): void {
+  register(createCoachingSlotGenerationJob(deps));
+}
+
+/** Wire the daily day-before 1:1 coaching reminder cron (P5-E01-S02 AC5). */
+export function registerCoachingRemindersJob(
+  deps: Parameters<typeof createCoachingRemindersJob>[0],
+): void {
+  register(createCoachingRemindersJob(deps));
+}
+
 /** Wire the daily subscription renewal / dunning cron (P2-E02-S05). */
 export function registerSubscriptionRenewJob(
   deps: Parameters<typeof createSubscriptionRenewJob>[0],
@@ -149,6 +193,30 @@ export function registerBackupPruneJob(
   deps: Parameters<typeof createBackupPruneJob>[0],
 ): void {
   register(createBackupPruneJob(deps));
+}
+/** Wire the daily outstanding-balance reminder cron (P2-E07-S02). */
+export function registerOutstandingRemindersJob(
+  deps: Parameters<typeof createOutstandingRemindersJob>[0],
+): void {
+  register(createOutstandingRemindersJob(deps));
+}
+/** Wire the WooCommerce order pull scheduler (P4-E04-S07; default 2-min cadence). */
+export function registerWcSyncPullJob(
+  deps: Parameters<typeof createWcSyncPullJob>[0],
+): void {
+  register(createWcSyncPullJob(deps));
+}
+/** Wire the WooCommerce writeback outbox drain worker (P4-E04-S07; bounded concurrency). */
+export function registerWcOutboxDrainJob(
+  deps: Parameters<typeof createWcOutboxDrainJob>[0],
+): void {
+  register(createWcOutboxDrainJob(deps));
+}
+/** Wire the nightly WooCommerce stock-reconciliation report job (P4-E04-S05). */
+export function registerWcStockReconcileJob(
+  deps: Parameters<typeof createWcStockReconcileJob>[0],
+): void {
+  register(createWcStockReconcileJob(deps));
 }
 
 export { logger } from "./logger.js";

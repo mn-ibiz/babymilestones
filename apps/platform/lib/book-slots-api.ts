@@ -3,6 +3,8 @@ import type {
   BookableService,
   BookingConfirmation,
   ParentBooking,
+  SalonAvailability,
+  SalonBookingConfirmation,
   ServiceAvailability,
 } from "@bm/contracts";
 
@@ -116,4 +118,62 @@ export async function fetchAvailability(
     throw new Error(err.error ?? `Failed to load availability (${res.status})`);
   }
   return (await res.json()) as ServiceAvailability;
+}
+
+/* --- Kids-Only Salon booking (P3-E03-S02 / Story 25.2) ------------------- */
+
+/**
+ * GET the salon availability for a service over the browse window (AC1/AC2). When
+ * `staffId` is supplied only that stylist's open slots are returned; otherwise
+ * every stylist's open slots are listed for the "Any available" flow.
+ */
+export async function fetchSalonAvailability(
+  serviceId: string,
+  staffId?: string,
+): Promise<SalonAvailability> {
+  const qs = staffId ? `?staffId=${encodeURIComponent(staffId)}` : "";
+  const res = await fetch(
+    `/parents/me/salon/services/${encodeURIComponent(serviceId)}/availability${qs}`,
+    { credentials: "include" },
+  );
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `Failed to load salon availability (${res.status})`);
+  }
+  return (await res.json()) as SalonAvailability;
+}
+
+/**
+ * Resolve the least-busy stylist for an "Any available" pick on a date (AC3).
+ * Returns the stylist id whose open slot the client should then confirm.
+ */
+export async function fetchLeastBusyStylist(serviceId: string, date: string): Promise<string> {
+  const res = await fetch(
+    `/parents/me/salon/services/${encodeURIComponent(serviceId)}/least-busy?date=${encodeURIComponent(date)}`,
+    { credentials: "include" },
+  );
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new BookingError(res.status, err.error ?? `Failed to resolve stylist (${res.status})`);
+  }
+  return ((await res.json()) as { staffId: string }).staffId;
+}
+
+/** POST a salon booking for a slot + child (AC4). Throws {@link BookingError} on a non-2xx. */
+export async function bookSalonSlotRequest(
+  salonSlotId: string,
+  childId: string,
+  staffId?: string,
+): Promise<SalonBookingConfirmation> {
+  const res = await fetch("/parents/me/salon/bookings", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
+    body: JSON.stringify({ salonSlotId, childId, ...(staffId ? { staffId } : {}) }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new BookingError(res.status, err.error ?? `Salon booking failed (${res.status})`);
+  }
+  return (await res.json()) as SalonBookingConfirmation;
 }

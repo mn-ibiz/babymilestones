@@ -44,6 +44,21 @@ export const bookings = pgTable(
      */
     slotId: uuid("slot_id"),
     /**
+     * The salon slot this booking consumes (P3-E03-S01 / Story 25.1) — nullable
+     * uuid with a FK to `salon_slots`. A salon slot referenced by a booking is
+     * protected from deletion when stylist availability is regenerated (AC3 —
+     * historical bookings are never disturbed). NULL for non-salon bookings.
+     */
+    salonSlotId: uuid("salon_slot_id"),
+    /**
+     * The coaching slot this booking consumes (P5-E01-S02 / Story 31.2) — nullable
+     * uuid with a FK to `coaching_slots`. A 1:1 coaching slot holds its single seat
+     * (capacity = 1) so a booked slot is private to this booking; the slot is
+     * protected from deletion when coach availability is regenerated. NULL for
+     * non-coaching bookings.
+     */
+    coachingSlotId: uuid("coaching_slot_id"),
+    /**
      * Booking lifecycle (P2-E01-S06): `confirmed` (default) | `cancelled`. A
      * cancelled booking is excluded from a slot's capacity count, freeing the
      * seat without deleting history. CHECK-constrained in migration 0045.
@@ -66,6 +81,8 @@ export const bookings = pgTable(
     parentIdCreatedAtIdx: index("bookings_parent_id_created_at_idx").on(t.parentId, t.createdAt),
     invoiceIdUniq: uniqueIndex("bookings_invoice_id_uniq").on(t.invoiceId),
     slotIdIdx: index("bookings_slot_id_idx").on(t.slotId),
+    salonSlotIdIdx: index("bookings_salon_slot_id_idx").on(t.salonSlotId),
+    coachingSlotIdIdx: index("bookings_coaching_slot_id_idx").on(t.coachingSlotId),
   }),
 );
 

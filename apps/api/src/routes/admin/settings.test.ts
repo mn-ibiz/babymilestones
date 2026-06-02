@@ -82,12 +82,21 @@ describe("Settings admin API (P1-E10-S04)", () => {
       expect(keys).toEqual(
         expect.arrayContaining([
           "sms_config",
+          "woocommerce",
           "float_accounts",
           "loyalty",
           "branding",
           "receipt_branding",
         ]),
       );
+    });
+
+    it("links the WooCommerce panel from the index (Story 29.6)", async () => {
+      const res = await req("GET", "/admin/settings", admin);
+      const body = res.json() as { sections: { key: string; href: string; accessible: boolean }[] };
+      const woo = body.sections.find((s) => s.key === "woocommerce")!;
+      expect(woo.href).toBe("/woocommerce-config");
+      expect(woo.accessible).toBe(true);
     });
 
     it("marks the float-accounts section treasury-gated for a non-treasury admin", async () => {

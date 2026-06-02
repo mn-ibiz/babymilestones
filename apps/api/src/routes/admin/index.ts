@@ -23,6 +23,19 @@ import { registerAdminEvents } from "./events.js";
 import { registerDoorCheckIn } from "./door.js";
 import { registerAdminLoyalty } from "./loyalty.js";
 import { registerAdminBackupRetention } from "./backup-retention.js";
+import { registerAdminSalonReport } from "./salon-report.js";
+import { registerAdminOperationsDashboard } from "./operations-dashboard.js";
+import { registerAdminRevenueByPeriod } from "./revenue-by-period.js";
+import { registerAdminStaffLeaderboard } from "./staff-leaderboard.js";
+import { registerAdminWalletAging } from "./wallet-aging.js";
+import { registerAdminPeakHoursHeatmap } from "./peak-hours-heatmap.js";
+import { registerAdminDailyDispatch } from "./daily-dispatch.js";
+import {
+  registerAdminWooCommerceConfig,
+  type WooCommerceRouteConfig,
+} from "./woocommerce-config.js";
+import { registerAdminWooCommerceSync } from "./woocommerce-sync.js";
+import { registerAdminWooCommerceStock } from "./woocommerce-stock.js";
 
 export interface AdminDeps {
   db: Database;
@@ -35,6 +48,18 @@ export interface AdminDeps {
    * worker (the run-now endpoint then exposes an empty registry).
    */
   jobs?: RunnableJob[];
+  /**
+   * Clock injection for deterministic reporting (e.g. the salon-report no-show
+   * derivation, P3-E03-S05). Defaults to the wall clock.
+   */
+  now?: () => Date;
+  /**
+   * WooCommerce credentials-config wiring (Story 29.6): the at-rest encryption
+   * key + the test-connection HTTP transport. When omitted, the WooCommerce
+   * config routes are not registered (no real network is ever attempted from
+   * config defaults).
+   */
+  woocommerce?: WooCommerceRouteConfig;
 }
 
 /** Admin-only API surface (P1-E03-S06+). All routes guard with the rbac matrix. */
@@ -60,4 +85,26 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerDoorCheckIn(app, deps);
   registerAdminLoyalty(app, deps);
   registerAdminBackupRetention(app, deps);
+  registerAdminSalonReport(app, deps); // P3-E03-S05 (Story 25.5)
+  registerAdminOperationsDashboard(app, deps); // P3-E05-S01 (Story 27.1)
+  registerAdminRevenueByPeriod(app, deps); // P3-E05-S02 (Story 27.2)
+  registerAdminStaffLeaderboard(app, deps); // P3-E05-S03 (Story 27.3)
+  registerAdminWalletAging(app, deps); // P3-E05-S04 (Story 27.4)
+  registerAdminPeakHoursHeatmap(app, deps); // P3-E05-S05 (Story 27.5)
+  registerAdminDailyDispatch(app, deps); // P4-E04-S04 (Story 29.4)
+  registerAdminWooCommerceConfig(app, {
+    db: deps.db,
+    sessions: deps.sessions,
+    woocommerce: deps.woocommerce,
+  }); // P4-E04-S06 (Story 29.6)
+  registerAdminWooCommerceSync(app, {
+    db: deps.db,
+    sessions: deps.sessions,
+    jobs: deps.jobs,
+    now: deps.now,
+  }); // P4-E04-S07 (Story 29.7)
+  registerAdminWooCommerceStock(app, {
+    db: deps.db,
+    sessions: deps.sessions,
+  }); // P4-E04-S05 (Story 29.5)
 }
