@@ -70,6 +70,9 @@ export default function OperationsDashboardPage() {
         <a href="/operations/wallet-aging">Wallet aging report &rarr;</a>
       </p>
       <p>
+        <a href="/operations/float-vs-revenue">Wallet float vs revenue &rarr;</a>
+      </p>
+      <p>
         <a href="/operations/heatmap">Peak hours heatmap &rarr;</a>
       </p>
       <p>

@@ -153,6 +153,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: { action: "read", resource: "report" },
     allowRoles: ["admin", "super_admin", "treasury"],
   },
+  // P5-E05-S04 (Story 35.4): wallet float vs revenue — the accountant's daily
+  // treasury report (customer-wallet liability vs the segregated float backing it,
+  // prior-day delta, revenue earned that day, + a 90-day chart). Gates on
+  // `read report` — admin / accountant / treasury / super_admin (the same set the
+  // server enforces). The server re-enforces it.
+  {
+    href: "/operations/float-vs-revenue",
+    label: "Float vs revenue",
+    permission: { action: "read", resource: "report" },
+  },
   { href: "/staff", label: "Staff", permission: { action: "manage", resource: "user" } },
   // P1-E10-S02: staff LOGIN users (phone/role/PIN) — distinct from the `/staff`
   // attribution data records (P1-E07-S03). Both gate on `manage user`.

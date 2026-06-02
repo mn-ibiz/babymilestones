@@ -28,6 +28,7 @@ import { registerAdminOperationsDashboard } from "./operations-dashboard.js";
 import { registerAdminRevenueByPeriod } from "./revenue-by-period.js";
 import { registerAdminStaffLeaderboard } from "./staff-leaderboard.js";
 import { registerAdminWalletAging } from "./wallet-aging.js";
+import { registerAdminFloatVsRevenue } from "./float-vs-revenue.js";
 import { registerAdminPeakHoursHeatmap } from "./peak-hours-heatmap.js";
 import { registerAdminCohortRetention } from "./cohort-retention.js";
 import { registerAdminRepeatAttendance } from "./repeat-attendance.js";
@@ -97,6 +98,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminRevenueByPeriod(app, deps); // P3-E05-S02 (Story 27.2)
   registerAdminStaffLeaderboard(app, deps); // P3-E05-S03 (Story 27.3)
   registerAdminWalletAging(app, deps); // P3-E05-S04 (Story 27.4)
+  registerAdminFloatVsRevenue(app, deps); // P5-E05-S04 (Story 35.4)
   registerAdminPeakHoursHeatmap(app, deps); // P3-E05-S05 (Story 27.5)
   registerAdminCohortRetention(app, deps); // Story 35.2
   registerAdminRepeatAttendance(app, deps); // Story 35.3

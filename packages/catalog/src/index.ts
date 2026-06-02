@@ -419,6 +419,20 @@ export {
   type LoadWalletAgingOpts,
 } from "./wallet-aging-db.js";
 
+// Wallet float vs revenue — daily liability/segregated snapshot + 90-day series (P5-E05-S04 / Story 35.4).
+export {
+  aggregateFloatVsRevenue,
+  type FloatVsRevenueDayInput,
+  type FloatVsRevenueInput,
+  type FloatVsRevenuePoint,
+  type FloatVsRevenueSnapshot,
+  type FloatVsRevenue,
+} from "./float-vs-revenue.js";
+export {
+  loadFloatVsRevenue,
+  type LoadFloatVsRevenueOpts,
+} from "./float-vs-revenue-db.js";
+
 // Cohort retention by signup month — triangular retention matrix (Story 35.2).
 export {
   aggregateCohortRetention,

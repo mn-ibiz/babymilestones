@@ -73,6 +73,18 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/salon-report");
   });
 
+  it("float vs revenue is visible to the read-report roles (P5-E05-S04 / Story 35.4)", () => {
+    // admin / accountant / treasury / super_admin hold read:report — the accountant
+    // is the story's actor, so unlike /operations this surface includes accountant.
+    for (const role of ["admin", "accountant", "treasury", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations/float-vs-revenue");
+      expect(canAccessRoute(role, "/operations/float-vs-revenue")).toBe(true);
+    }
+    // reception/parent never reach the admin console.
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/operations/float-vs-revenue");
+    expect(canAccessRoute("reception", "/operations/float-vs-revenue")).toBe(false);
+  });
+
   it("the feedback dashboard is visible to the read-report roles (P6-E04-S02 / Story 34.2)", () => {
     // admin / accountant / treasury / super_admin hold read:report.
     for (const role of ["admin", "accountant", "treasury", "super_admin"]) {

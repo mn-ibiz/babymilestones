@@ -3475,6 +3475,143 @@ export function revenueByPeriodFilename(values: { fromDate: string; toDate: stri
   return `revenue_by_unit_${values.fromDate}_to_${values.toDate}.csv`;
 }
 
+/* --- Wallet float vs revenue snapshot (P5-E05-S04 / Story 35.4) ----------- */
+
+/** The default chart window — 90 days of float vs revenue (AC2). */
+export const FLOAT_VS_REVENUE_DEFAULT_DAYS = 90;
+
+/** Hard cap on the requested window (a year), to keep a single read bounded. */
+export const FLOAT_VS_REVENUE_MAX_DAYS = 366;
+
+/**
+ * Float-vs-revenue request (Story 35.4 AC1/AC2). The accountant optionally picks a
+ * snapshot day (`asOf`, `YYYY-MM-DD`; defaults to today) and a window length
+ * (`days`, defaults to 90 — the chart range, AC2). `days` accepts a string (query
+ * param) and is coerced to an integer in `[1, FLOAT_VS_REVENUE_MAX_DAYS]`. The
+ * report returns the daily snapshot for `asOf` + the trailing `days`-day series.
+ */
+export const floatVsRevenueQuerySchema = z.object({
+  asOf: exportDateSchema.optional(),
+  days: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(FLOAT_VS_REVENUE_MAX_DAYS)
+    .default(FLOAT_VS_REVENUE_DEFAULT_DAYS),
+});
+export type FloatVsRevenueQuery = z.infer<typeof floatVsRevenueQuerySchema>;
+
+/** One chart-series point: a day's float, revenue + its prior-day liability delta (AC2). */
+export interface FloatVsRevenuePointDto {
+  date: string;
+  walletLiabilityCents: number;
+  segregatedBalanceCents: number;
+  revenueCents: number;
+  priorDayDeltaCents: number;
+}
+
+/** The headline daily snapshot for the most-recent day (AC1). */
+export interface FloatVsRevenueSnapshotDto {
+  date: string;
+  /** Total customer money sitting in wallets (the liability we owe back). */
+  walletLiabilityCents: number;
+  /** The segregated (float/bank) balance backing that liability. */
+  segregatedBalanceCents: number;
+  /** Revenue earned that day. */
+  revenueCents: number;
+  /** Change in wallet liability vs the prior day (today − yesterday). */
+  priorDayDeltaCents: number;
+}
+
+/**
+ * The float-vs-revenue API response (Story 35.4). The daily snapshot (AC1) + the
+ * trailing N-day series for the chart (AC2). Identical shape to `@bm/catalog`'s
+ * `FloatVsRevenue` (all primitives, serialisable).
+ */
+export interface FloatVsRevenueDto {
+  from: string;
+  to: string;
+  snapshot: FloatVsRevenueSnapshotDto;
+  series: FloatVsRevenuePointDto[];
+}
+
+/** Up / down / flat — drives the prior-day-delta arrow + colour on the KPI. */
+export type FloatVsRevenueDeltaDirection = "up" | "down" | "flat";
+
+function floatDeltaDirection(cents: number): FloatVsRevenueDeltaDirection {
+  return cents > 0 ? "up" : cents < 0 ? "down" : "flat";
+}
+
+/** Format a signed delta as a KES amount with an explicit + / − sign. */
+function floatFormatDelta(cents: number): string {
+  if (cents === 0) return "KES 0.00";
+  const sign = cents > 0 ? "+" : "-";
+  return `${sign}${formatSalonRevenue(Math.abs(cents))}`;
+}
+
+/** Render-ready snapshot KPIs (AC1). */
+export interface FloatVsRevenueSnapshotView {
+  date: string;
+  /** Formatted customer-wallet liability, e.g. `KES 620.00`. */
+  walletLiability: string;
+  /** Formatted segregated (float/bank) balance. */
+  segregatedBalance: string;
+  /** Formatted revenue earned that day. */
+  revenue: string;
+  /** Formatted prior-day liability delta, e.g. `+KES 120.00`. */
+  priorDayDelta: string;
+  priorDayDeltaDirection: FloatVsRevenueDeltaDirection;
+}
+
+/** One render-ready chart point: raw cents (axis) + formatted values (AC2). */
+export interface FloatVsRevenueChartPoint {
+  date: string;
+  walletLiabilityCents: number;
+  segregatedBalanceCents: number;
+  revenueCents: number;
+  walletLiability: string;
+  segregatedBalance: string;
+  revenue: string;
+}
+
+/** The float-vs-revenue view-model: the snapshot KPIs + the chart series. */
+export interface FloatVsRevenueViewModel {
+  from: string;
+  to: string;
+  snapshot: FloatVsRevenueSnapshotView;
+  series: FloatVsRevenueChartPoint[];
+}
+
+/**
+ * Shape the report into the snapshot KPIs + the chart series (Story 35.4 AC1/AC2).
+ * Pure + framework-free so it unit-tests without React and the admin page renders
+ * the identical figures. Money is formatted with the shared {@link formatSalonRevenue}
+ * KES formatter; the prior-day delta carries an explicit sign + a direction.
+ */
+export function floatVsRevenueViewModel(report: FloatVsRevenueDto): FloatVsRevenueViewModel {
+  return {
+    from: report.from,
+    to: report.to,
+    snapshot: {
+      date: report.snapshot.date,
+      walletLiability: formatSalonRevenue(report.snapshot.walletLiabilityCents),
+      segregatedBalance: formatSalonRevenue(report.snapshot.segregatedBalanceCents),
+      revenue: formatSalonRevenue(report.snapshot.revenueCents),
+      priorDayDelta: floatFormatDelta(report.snapshot.priorDayDeltaCents),
+      priorDayDeltaDirection: floatDeltaDirection(report.snapshot.priorDayDeltaCents),
+    },
+    series: report.series.map((p) => ({
+      date: p.date,
+      walletLiabilityCents: p.walletLiabilityCents,
+      segregatedBalanceCents: p.segregatedBalanceCents,
+      revenueCents: p.revenueCents,
+      walletLiability: formatSalonRevenue(p.walletLiabilityCents),
+      segregatedBalance: formatSalonRevenue(p.segregatedBalanceCents),
+      revenue: formatSalonRevenue(p.revenueCents),
+    })),
+  };
+}
+
 /* --- Daily dispatch report (P4-E04-S04 / Story 29.4) --------------------- */
 
 /**
