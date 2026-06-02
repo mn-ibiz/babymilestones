@@ -28,6 +28,7 @@ import {
   type SaleLineInput,
 } from "@bm/contracts";
 import { writeReceipt, createMpesaAdapter, createPaystackAdapter } from "@bm/payments";
+import { enqueueStockPush } from "@bm/woocommerce";
 import { balance, post } from "@bm/wallet";
 import { StubSmsSender, type SmsSender } from "@bm/sms";
 import type { PosDeps } from "./index.js";
@@ -108,6 +109,9 @@ async function settleSale(tx: Transaction, sale: PosSaleRow): Promise<string | n
   });
 
   // Guarded decrement: never oversell / go negative. A losing race rolls back.
+  // After the decrement, enqueue a coalesced Woo stock push (Story 29.5 AC1) — a
+  // no-op for an "in-store only" product with no Woo mapping (AC2). It reads the
+  // just-decremented local stock so the queued value is the new on-hand count.
   for (const line of sale.lines) {
     const dec = await tx
       .update(products)
@@ -115,6 +119,7 @@ async function settleSale(tx: Transaction, sale: PosSaleRow): Promise<string | n
       .where(and(eq(products.id, line.productId), sql`${products.stockQty} >= ${line.qty}`))
       .returning({ id: products.id });
     if (dec.length === 0) throw new InsufficientStockError(line.productId);
+    await enqueueStockPush(tx, { productId: line.productId });
   }
 
   await tx.update(posSales).set({ receiptId: receipt.id, updatedAt: new Date() }).where(eq(posSales.id, sale.id));

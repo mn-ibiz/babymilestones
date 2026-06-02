@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@bm/db/testing";
-import { auditOutbox, parents, posSales, products, receipts, smsOutbox, users, wallets } from "@bm/db";
+import { auditOutbox, parents, posSales, products, receipts, smsOutbox, users, wallets, wcOutbox } from "@bm/db";
 import { InMemorySessionStore, staffUserSeed } from "@bm/auth";
 import { createProduct } from "@bm/catalog";
 import { post } from "@bm/wallet";
@@ -149,6 +149,33 @@ describe("POS sales — payment at POS (P2-E04-S04)", () => {
       // audited
       const events = await dbh.db.select().from(auditOutbox);
       expect(events.some((e) => e.action === "pos.sale.paid")).toBe(true);
+    });
+
+    it("enqueues a Woo stock push with the new value for a mapped product (Story 29.5 AC1)", async () => {
+      const mapped = await seedProduct({ sku: "WOO-1", name: "Online toy", priceCents: 1000, stockQty: 5 });
+      await dbh.db.update(products).set({ wooProductId: 7777 }).where(eq(products.id, mapped.id));
+      const creds = await login("+254712000002", "7422");
+      const res = await sale(creds, {
+        method: "cash",
+        lines: [{ productId: mapped.id, qty: 1 }],
+        cashTenderedCents: 1000,
+      });
+      expect(res.statusCode).toBe(200);
+      // local stock decremented 5 → 4
+      const [prod] = await dbh.db.select().from(products).where(eq(products.id, mapped.id));
+      expect(prod!.stockQty).toBe(4);
+      // ONE pending stock_push outbox row carrying the new value + derived status
+      const pushes = await dbh.db.select().from(wcOutbox).where(eq(wcOutbox.kind, "stock_push"));
+      expect(pushes).toHaveLength(1);
+      expect(pushes[0]!.request).toMatchObject({ wooProductId: 7777, stockQuantity: 4, stockStatus: "instock" });
+    });
+
+    it("does NOT enqueue a push for an unmapped (in-store only) product (Story 29.5 AC2)", async () => {
+      const instore = await seedProduct({ sku: "LOCAL-1", name: "Shelf only", priceCents: 1000, stockQty: 5 });
+      const creds = await login("+254712000002", "7422");
+      await sale(creds, { method: "cash", lines: [{ productId: instore.id, qty: 1 }], cashTenderedCents: 1000 });
+      const pushes = await dbh.db.select().from(wcOutbox).where(eq(wcOutbox.kind, "stock_push"));
+      expect(pushes).toHaveLength(0);
     });
 
     it("is idempotent on a replayed create — one charge, one stock decrement (AC7/robustness)", async () => {

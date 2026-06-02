@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { TillHeader } from "../components/TillHeader";
+import { PosTabs } from "../components/PosTabs";
 import { ViewportGuard } from "../components/ViewportGuard";
 import { resolvePrincipal } from "../../lib/session-context";
 import { guardPosAccess, surfaceLabel } from "../../lib/pos-access";
@@ -26,6 +27,7 @@ export default async function PosShellLayout({ children }: { children: ReactNode
   return (
     <div className="pos-shell">
       <TillHeader operatorName={principal?.name ?? ""} surface={surfaceLabel(role)} />
+      <PosTabs />
       <main className="flex-1">
         <ViewportGuard>{children}</ViewportGuard>
       </main>

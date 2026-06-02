@@ -29,6 +29,13 @@ export const products = pgTable("products", {
   /** On-hand stock count. `<= 0` means out of stock (greyed out; sale blocked at Pay). */
   stockQty: integer("stock_qty").notNull().default(0),
   /**
+   * The mapped WooCommerce product id (Story 29.5 / P4-E04-S05). NULLABLE — a
+   * product with no mapping is "in-store only" and a stock push is a no-op (AC2).
+   * The POS is the source of truth: this is only ever WRITTEN by an admin mapping
+   * edit, never read FROM Woo into local stock.
+   */
+  wooProductId: bigint("woo_product_id", { mode: "number" }),
+  /**
    * VAT / tax treatment (P1-E07-S04 semantics). CHECK-constrained in the
    * migration to {`vat_inclusive` | `vat_exclusive` | `vat_exempt` | `zero_rated`};
    * defaults to `vat_exempt` (KRA registration deferred).
