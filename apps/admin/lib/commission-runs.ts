@@ -3,6 +3,7 @@
  * unit-tests without React. The server owns the aggregation + claiming; this
  * shapes the date-range form and the run/preview display.
  */
+import { apiFetch } from "./api.js";
 
 export interface CommissionRunLine {
   staffId: string;
@@ -79,4 +80,23 @@ export function payoutCsvUrl(baseUrl: string, runId: string): string {
  */
 export function canMarkPaid(run: CommissionRun): boolean {
   return run.paidOutAt === null && run.totalCents > 0;
+}
+
+/** A POST-and-parse seam, defaulting to {@link apiFetch}; injectable for tests. */
+type PreviewFetcher = (
+  path: string,
+  opts: { method: string; body: unknown },
+) => Promise<CommissionRunPreview>;
+
+/**
+ * Fetch ad-hoc commission preview totals for a date range (P3-E01-S04 AC1). POSTs
+ * the range to the no-write preview endpoint and returns the typed totals; the
+ * confirm step (S04 AC2) creates the run separately. The `fetcher` seam (defaults
+ * to {@link apiFetch}) keeps this unit-testable without a live network.
+ */
+export async function fetchCommissionRunPreview(
+  range: { periodStart: string; periodEnd: string },
+  fetcher: PreviewFetcher = (path, opts) => apiFetch<CommissionRunPreview>(path, opts),
+): Promise<CommissionRunPreview> {
+  return fetcher("/admin/commission-runs/preview", { method: "POST", body: range });
 }

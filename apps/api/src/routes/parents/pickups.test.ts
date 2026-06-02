@@ -128,8 +128,19 @@ describe("authorised pickup list per child (P2-E03-S01)", () => {
   });
 
   it("lists a child's pickups, newest first (AC1, AC2)", async () => {
-    await create({ name: "First", phone: "0700000001", relationship: "Aunt" });
-    await create({ name: "Second", phone: "0700000002", relationship: "Uncle" });
+    const first = (await create({ name: "First", phone: "0700000001", relationship: "Aunt" })).json().pickup;
+    const second = (await create({ name: "Second", phone: "0700000002", relationship: "Uncle" })).json().pickup;
+    // Pin distinct created_at so "newest-first" is deterministic: the test DB clock
+    // is millisecond-coarse, so two back-to-back inserts can otherwise share a
+    // created_at and the order would depend on physical row order.
+    await dbh.db
+      .update(childPickupAuthorisations)
+      .set({ createdAt: new Date("2026-01-01T00:00:00.000Z") })
+      .where(eq(childPickupAuthorisations.id, first.id));
+    await dbh.db
+      .update(childPickupAuthorisations)
+      .set({ createdAt: new Date("2026-01-02T00:00:00.000Z") })
+      .where(eq(childPickupAuthorisations.id, second.id));
     const res = await app.inject({
       method: "GET",
       url: `/parents/me/children/${childId}/pickups`,

@@ -6,8 +6,10 @@ import {
   auditOutbox,
   bookings,
   children,
+  commissionLedger,
   invoices,
   parents,
+  staff as staffTbl,
   users,
   wallets,
   walletLedger,
@@ -21,6 +23,7 @@ import {
   dayOfWeekIso,
   generateSlotsForSchedule,
   listSlotsWithRemaining,
+  setCommissionRate,
   setServicePrice,
 } from "@bm/catalog";
 import { buildApp } from "../../app.js";
@@ -191,6 +194,59 @@ describe("attendant check-in (P2-E03-S02)", () => {
     const checkin = events.find((e) => e.action === "attendance.checked_in");
     expect(checkin).toBeDefined();
     expect(checkin!.targetTable).toBe("attendances");
+  });
+
+  it("records the staff commission accrual when an attributed booking is checked in (P3-E01-S02)", async () => {
+    const b = await seedBooking({ credit: 5000 });
+    // Attribute the booking to a staff member with a commission rate in force at
+    // booking time, so the check-in settle should accrue their commission line.
+    const [s] = await dbh.db
+      .insert(staffTbl)
+      .values({ displayName: "Asha", role: "stylist" })
+      .returning();
+    await setCommissionRate(dbh.db, {
+      staffId: s!.id,
+      ratePercent: "10.00",
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    await dbh.db
+      .update(bookings)
+      .set({ staffId: s!.id, staffNameSnapshot: "Asha", staffRateSnapshot: 1500 })
+      .where(eq(bookings.id, b.bookingId));
+
+    const staff = await loginStaff("+254712000001", "7421");
+    const res = await app.inject({
+      method: "POST",
+      url: "/reception/attendance/checkin",
+      headers: staffHeaders(staff),
+      payload: { bookingId: b.bookingId },
+    });
+    expect(res.statusCode).toBe(201);
+
+    const accruals = await dbh.db
+      .select()
+      .from(commissionLedger)
+      .where(eq(commissionLedger.bookingId, b.bookingId));
+    expect(accruals).toHaveLength(1);
+    expect(accruals[0]!.amountCents).toBe(150); // 10% of 1500 cents
+    expect(accruals[0]!.staffId).toBe(s!.id);
+    expect(accruals[0]!.source).toBe("booking");
+  });
+
+  it("does not accrue commission for an unattributed booking on check-in (self-skip)", async () => {
+    const b = await seedBooking({ credit: 5000 }); // no staffId attributed
+    const staff = await loginStaff("+254712000001", "7421");
+    await app.inject({
+      method: "POST",
+      url: "/reception/attendance/checkin",
+      headers: staffHeaders(staff),
+      payload: { bookingId: b.bookingId },
+    });
+    const accruals = await dbh.db
+      .select()
+      .from(commissionLedger)
+      .where(eq(commissionLedger.bookingId, b.bookingId));
+    expect(accruals).toHaveLength(0);
   });
 
   it("rejects a second check-in for the same booking (409)", async () => {

@@ -7,6 +7,8 @@ import type {
   WalletOverview,
 } from "@bm/contracts";
 import { WalletBalanceCard } from "./wallet-balance-card.js";
+import { OutstandingBalanceBanner } from "./outstanding-balance-banner.js";
+import { AutoCreditStatus } from "./auto-credit-status.js";
 import { ChildCard } from "./child-card.js";
 import { MpesaPushPrompt } from "./mpesa-push-prompt.js";
 import { ReceiptPreview } from "./receipt-preview-card.js";
@@ -83,6 +85,93 @@ describe("WalletBalanceCard", () => {
 
   it("matches the visual snapshot", () => {
     const { container } = render(<WalletBalanceCard wallet={wallet} />);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+});
+
+describe("OutstandingBalanceBanner (P2-E07-S01)", () => {
+  it("AC1: shows the owed amount and the settle nudge when outstanding > 0", () => {
+    render(<OutstandingBalanceBanner outstandingCents={12000} />);
+    const banner = screen.getByRole("status", { name: /outstanding/i });
+    expect(banner).toHaveTextContent("You owe KES 120.00. Top up to settle.");
+  });
+
+  it("AC2: the CTA links to the top-up flow", () => {
+    render(<OutstandingBalanceBanner outstandingCents={12000} />);
+    expect(screen.getByRole("link", { name: /top up/i })).toHaveAttribute("href", "/top-up");
+  });
+
+  it("AC2: the CTA target is overridable", () => {
+    render(
+      <OutstandingBalanceBanner outstandingCents={12000} topUpHref="/top-up#mpesa-heading" />,
+    );
+    expect(screen.getByRole("link", { name: /top up/i })).toHaveAttribute(
+      "href",
+      "/top-up#mpesa-heading",
+    );
+  });
+
+  it("AC3: renders nothing once the balance is settled (outstanding 0)", () => {
+    const { container } = render(<OutstandingBalanceBanner outstandingCents={0} />);
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("AC3: renders nothing for a non-positive (credit) balance", () => {
+    const { container } = render(<OutstandingBalanceBanner outstandingCents={-5000} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("matches the visual snapshot", () => {
+    const { container } = render(<OutstandingBalanceBanner outstandingCents={12000} />);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+});
+
+describe("AutoCreditStatus (P2-E07-S03: read-only auto-credit visibility)", () => {
+  it("AC1: enabled → 'Auto-credit: Enabled by admin', no helper copy", () => {
+    render(<AutoCreditStatus enabled />);
+    expect(
+      screen.getByText("Auto-credit: Enabled by admin"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Top up before booking to avoid an outstanding balance",
+      ),
+    ).toBeNull();
+  });
+
+  it("AC1: disabled → 'Auto-credit: Not enabled'", () => {
+    render(<AutoCreditStatus enabled={false} />);
+    expect(screen.getByText("Auto-credit: Not enabled")).toBeInTheDocument();
+  });
+
+  it("AC2: disabled → explains exactly how to avoid an outstanding balance", () => {
+    render(<AutoCreditStatus enabled={false} />);
+    expect(
+      screen.getByText(
+        "Top up before booking to avoid an outstanding balance",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("AC3: no edit affordance for the parent in either state", () => {
+    const { rerender } = render(<AutoCreditStatus enabled={false} />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    rerender(<AutoCreditStatus enabled />);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("matches the visual snapshot (disabled, with helper copy)", () => {
+    const { container } = render(<AutoCreditStatus enabled={false} />);
     expect(container.firstChild).toMatchSnapshot();
   });
 });

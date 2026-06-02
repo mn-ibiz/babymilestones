@@ -15,7 +15,7 @@
 # STATUS DEFINITIONS: ready-for-dev | ready-for-dev | in-progress | review | done
 
 generated: 2026-05-24 23:30
-last_updated: 2026-05-30 (EPIC 19 (POS App / in-store mode) dev+review COMPLETE 5/5: POS app scaffold + SSO role-gate + tablet layout; product catalogue read (products table + RBAC `product` resource + scan/search); cart + line/overall discounts + per-line VAT + Pay-step stock check; payment (cash/M-Pesa STK/Paystack/wallet) → receipt + stock decrement + SMS + cart clear; end-of-day cash-up → variance + reason gate + reconciliation-feed write (P1-E06). Each story TDD'd + adversarially code-reviewed (Blind/Edge/Auditor) + findings fixed (28 patches total). Migrations 0055–0058. Shared POS pricing extracted to @bm/contracts. Full suite green 17/17 packages, typecheck+lint 17/17. 19-1..19-5 = done. EPIC 18 prior: 18-1..18-5 done, migrations 0052–0054.)
+last_updated: 2026-06-02 (Story 22-1 (P2-E07-S01) outstanding-balance banner: new `OutstandingBalanceBanner` @bm/ui compound + parent-shell client island (fetch + refetch on nav/focus) rendering on every parent page; copy "You owe KES X. Top up to settle.", CTA → /top-up, hides when settled. TDD: @bm/ui DOM tests + @bm/platform pure gating test. Full suite 17/17 + typecheck green. 22-1 = review.) // Prior: 2026-05-30 (EPIC 19 (POS App / in-store mode) dev+review COMPLETE 5/5: POS app scaffold + SSO role-gate + tablet layout; product catalogue read (products table + RBAC `product` resource + scan/search); cart + line/overall discounts + per-line VAT + Pay-step stock check; payment (cash/M-Pesa STK/Paystack/wallet) → receipt + stock decrement + SMS + cart clear; end-of-day cash-up → variance + reason gate + reconciliation-feed write (P1-E06). Each story TDD'd + adversarially code-reviewed (Blind/Edge/Auditor) + findings fixed (28 patches total). Migrations 0055–0058. Shared POS pricing extracted to @bm/contracts. Full suite green 17/17 packages, typecheck+lint 17/17. 19-1..19-5 = done. EPIC 18 prior: 18-1..18-5 done, migrations 0052–0054.)
 project: Baby Milestones
 project_key: BM
 tracking_system: file-system
@@ -209,9 +209,9 @@ development_status:
 
   # Epic 22 — Auto-credit & Outstanding Surface (parent app)  (P2-E07)
   epic-22: ready-for-dev
-  22-1-outstanding-balance-banner-on-parent-dashboard: ready-for-dev  # P2-E07-S01
-  22-2-sms-stub-nudge-templates-for-outstanding-balances: ready-for-dev  # P2-E07-S02
-  22-3-auto-credit-toggle-visibility-for-parent-read-only: ready-for-dev  # P2-E07-S03
+  22-1-outstanding-balance-banner-on-parent-dashboard: review  # P2-E07-S01
+  22-2-sms-stub-nudge-templates-for-outstanding-balances: review  # P2-E07-S02
+  22-3-auto-credit-toggle-visibility-for-parent-read-only: review  # P2-E07-S03
   epic-22-retrospective: optional
 
   # Epic 23 — Attribution & Commission Ledger  (P3-E01)
@@ -225,17 +225,17 @@ development_status:
 
   # Epic 24 — Stylist Commission Viewer (named, not auth)  (P3-E02)
   epic-24: ready-for-dev
-  24-1-public-but-named-commission-viewer-route: ready-for-dev  # P3-E02-S01
-  24-2-earnings-breakdown-count-of-visits-top-services: ready-for-dev  # P3-E02-S02
+  24-1-public-but-named-commission-viewer-route: review  # P3-E02-S01
+  24-2-earnings-breakdown-count-of-visits-top-services: review  # P3-E02-S02
   epic-24-retrospective: optional
 
   # Epic 25 — Kids-Only Salon Flow  (P3-E03)
   epic-25: ready-for-dev
-  25-1-stylist-availability-and-slot-creation: ready-for-dev  # P3-E03-S01
-  25-2-parent-picks-a-service-then-a-stylist-then-a-slot: ready-for-dev  # P3-E03-S02
-  25-3-salon-counter-check-in-and-service-completion: ready-for-dev  # P3-E03-S03
-  25-4-reassign-a-salon-booking-between-stylists: ready-for-dev  # P3-E03-S04
-  25-5-salon-specific-reporting-tile: ready-for-dev  # P3-E03-S05
+  25-1-stylist-availability-and-slot-creation: review  # P3-E03-S01
+  25-2-parent-picks-a-service-then-a-stylist-then-a-slot: review  # P3-E03-S02
+  25-3-salon-counter-check-in-and-service-completion: review  # P3-E03-S03
+  25-4-reassign-a-salon-booking-between-stylists: review  # P3-E03-S04
+  25-5-salon-specific-reporting-tile: review  # P3-E03-S05
   epic-25-retrospective: optional
 
   # Epic 26 — Loyalty Engine: Clawback + Negative Carry  (P3-E04)
@@ -248,31 +248,31 @@ development_status:
 
   # Epic 27 — Operational Reporting  (P3-E05)
   epic-27: ready-for-dev
-  27-1-daily-operations-dashboard: ready-for-dev  # P3-E05-S01
-  27-2-revenue-by-unit-by-period: ready-for-dev  # P3-E05-S02
-  27-3-top-staff-leaderboard: ready-for-dev  # P3-E05-S03
-  27-4-wallet-aging-report: ready-for-dev  # P3-E05-S04
-  27-5-peak-hours-heatmap: ready-for-dev  # P3-E05-S05
+  27-1-daily-operations-dashboard: review  # P3-E05-S01
+  27-2-revenue-by-unit-by-period: review  # P3-E05-S02
+  27-3-top-staff-leaderboard: review  # P3-E05-S03
+  27-4-wallet-aging-report: review  # P3-E05-S04
+  27-5-peak-hours-heatmap: review  # P3-E05-S05
   epic-27-retrospective: optional
 
   # Epic 28 — Jobs Runner  (P3-E06)
   epic-28: in-progress
   28-1-job-framework-scheduling-observability: done  # P3-E06-S01
   28-2-anonymisation-worker-registered: done  # P3-E06-S02
-  28-3-commission-run-registered: ready-for-dev  # P3-E06-S03
+  28-3-commission-run-registered: review  # P3-E06-S03
   28-4-sms-retry-worker-registered: done  # P3-E06-S04
   28-5-m-pesa-stk-reconciliation-cron-now-under-framework: done  # P3-E06-S05
   epic-28-retrospective: optional
 
   # Epic 29 — POS ↔ WooCommerce Sync  (P4-E04)
   epic-29: ready-for-dev
-  29-1-online-orders-tab-in-pos-pulled-from-woocommerce: ready-for-dev  # P4-E04-S01
-  29-2-order-status-transitions-sync-back-to-woocommerce: ready-for-dev  # P4-E04-S02
-  29-3-print-packing-slip: ready-for-dev  # P4-E04-S03
-  29-4-daily-dispatch-report: ready-for-dev  # P4-E04-S04
+  29-1-online-orders-tab-in-pos-pulled-from-woocommerce: review  # P4-E04-S01
+  29-2-order-status-transitions-sync-back-to-woocommerce: review  # P4-E04-S02
+  29-3-print-packing-slip: review  # P4-E04-S03
+  29-4-daily-dispatch-report: review  # P4-E04-S04
   29-5-stock-push-pos-catalogue-stock-changes-propagate-to: ready-for-dev  # P4-E04-S05
-  29-6-woocommerce-rest-client-credentials-config: ready-for-dev  # P4-E04-S06
-  29-7-sync-scheduler-dead-letter-for-woocommerce-calls: ready-for-dev  # P4-E04-S07
+  29-6-woocommerce-rest-client-credentials-config: review  # P4-E04-S06
+  29-7-sync-scheduler-dead-letter-for-woocommerce-calls: review  # P4-E04-S07
   epic-29-retrospective: optional
 
   # Epic 30 — Events & Recital Ticketing  (P4-E05)

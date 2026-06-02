@@ -103,9 +103,13 @@ export async function updateSmsConfig(
   });
 }
 
-/** List all configs, newest first. */
+/**
+ * List all configs, newest first. `id` is a deterministic tiebreaker so two rows
+ * sharing a `created_at` (the test DB's clock is millisecond-coarse) never fall
+ * back to nondeterministic physical row order — matching the wallet/audit lists.
+ */
 export async function listSmsConfigs(db: ConfigExecutor): Promise<SmsConfigRow[]> {
-  return db.select().from(smsConfig).orderBy(desc(smsConfig.createdAt));
+  return db.select().from(smsConfig).orderBy(desc(smsConfig.createdAt), desc(smsConfig.id));
 }
 
 /** Read one config by id, or null. */

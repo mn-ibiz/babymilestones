@@ -1,5 +1,24 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`AutoCreditStatus (P2-E07-S03: read-only auto-credit visibility) > matches the visual snapshot (disabled, with helper copy) 1`] = `
+<div
+  aria-label="Auto-credit status"
+  class="text-sm text-neutral-700"
+>
+  <p
+    class="font-medium text-neutral-900"
+  >
+    Auto-credit: 
+    Not enabled
+  </p>
+  <p
+    class="mt-1 text-neutral-500"
+  >
+    Top up before booking to avoid an outstanding balance
+  </p>
+</div>
+`;
+
 exports[`ChildCard > matches the visual snapshot 1`] = `
 <div
   class="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
@@ -50,6 +69,29 @@ exports[`MpesaPushPrompt > matches the visual snapshot 1`] = `
     Sent to 
     +254712345678
   </p>
+</div>
+`;
+
+exports[`OutstandingBalanceBanner (P2-E07-S01) > matches the visual snapshot 1`] = `
+<div
+  aria-label="Outstanding balance"
+  aria-live="polite"
+  class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md bg-warn px-4 py-3 text-sm text-neutral-900"
+  role="status"
+>
+  <p
+    class="font-medium"
+  >
+    You owe 
+    KES 120.00
+    . Top up to settle.
+  </p>
+  <a
+    class="shrink-0 rounded-sm font-semibold underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+    href="/top-up"
+  >
+    Top up
+  </a>
 </div>
 `;
 

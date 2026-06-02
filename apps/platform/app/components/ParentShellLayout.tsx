@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ShellNav } from "./ShellNav";
+import { OutstandingBalanceBannerIsland } from "./OutstandingBalanceBannerIsland";
 
 /**
  * `ParentShellLayout` (P1-E11-S05) — the mobile-first chrome for the authed
@@ -27,6 +28,9 @@ export function ParentShellLayout({ children }: { children: ReactNode }) {
       {/* Main content. Left-padded for the sidebar on desktop, bottom-padded for
           the tab bar on mobile so content is never hidden behind the nav. */}
       <main className="mx-auto w-full max-w-2xl px-4 pb-20 pt-4 md:max-w-3xl md:pb-8 md:pl-60">
+        {/* P2-E07-S01: the outstanding-balance nudge sits above page content on
+            every parent page; it renders nothing while the balance is settled. */}
+        <OutstandingBalanceBannerIsland />
         {children}
       </main>
 

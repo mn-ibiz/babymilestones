@@ -100,7 +100,9 @@ export function registerParentPickups(app: FastifyInstance, deps: ParentsDeps): 
         .select()
         .from(childPickupAuthorisations)
         .where(eq(childPickupAuthorisations.childId, childId))
-        .orderBy(desc(childPickupAuthorisations.createdAt));
+        // `id` is a deterministic tiebreaker so two pickups sharing a `created_at`
+        // (the clock is millisecond-coarse) never fall back to physical row order.
+        .orderBy(desc(childPickupAuthorisations.createdAt), desc(childPickupAuthorisations.id));
       return reply.code(200).send({ pickups: rows.map(toPickup) });
     },
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   validateRunRange,
   formatCents,
+  fetchCommissionRunPreview,
   type CommissionRunPreview,
 } from "../../lib/commission-runs";
 
@@ -18,12 +19,16 @@ export function CommissionRunsClient() {
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [preview, setPreview] = useState<CommissionRunPreview | null>(null);
 
-  function onPreview(e: React.FormEvent) {
+  async function onPreview(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateRunRange(periodStart, periodEnd);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    // POST /admin/commission-runs/preview → setPreview(...) in the integration layer.
+    try {
+      setPreview(await fetchCommissionRunPreview({ periodStart, periodEnd }));
+    } catch (err) {
+      setErrors({ form: err instanceof Error ? err.message : "Could not load preview" });
+    }
   }
 
   return (
@@ -45,6 +50,7 @@ export function CommissionRunsClient() {
         />
         {errors.periodEnd && <p role="alert">{errors.periodEnd}</p>}
         <button type="submit">Preview totals</button>
+        {errors.form && <p role="alert">{errors.form}</p>}
       </form>
 
       {preview && (

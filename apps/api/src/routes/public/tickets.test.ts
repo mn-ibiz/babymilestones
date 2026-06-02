@@ -5,7 +5,6 @@ import { createTestDb } from "@bm/db/testing";
 import {
   events,
   eventTicketTiers,
-  ticketOrders,
   tickets,
   smsOutbox,
   auditOutbox,

@@ -19,7 +19,6 @@ import {
 } from "@bm/auth";
 import { buildPayoutCsv, createCommissionRun, previewCommissionRun, type PayoutRow } from "@bm/catalog";
 import { inArray } from "drizzle-orm";
-import type { SessionStore } from "@bm/auth";
 import type { AdminDeps } from "./index.js";
 
 /** Resolve a session userId to its live id+role (for the permission guard). */

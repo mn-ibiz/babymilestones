@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@bm/db/testing";
-import { users, wallets, walletLedger, loyaltyLedger } from "@bm/db";
+import { users, wallets, loyaltyLedger } from "@bm/db";
 import { loyaltyClawbackPoints } from "@bm/contracts";
 import { earnPoints, loyaltyBalance } from "./loyalty.js";
 import { post as ledgerPost } from "./index.js";

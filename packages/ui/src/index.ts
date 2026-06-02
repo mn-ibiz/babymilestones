@@ -65,6 +65,15 @@ export {
   type WalletBalanceCardProps,
 } from "./wallet-balance-card.js";
 export {
+  OutstandingBalanceBanner,
+  type OutstandingBalanceBannerProps,
+} from "./outstanding-balance-banner.js";
+export {
+  AutoCreditStatus,
+  AUTO_CREDIT_DISABLED_HELP,
+  type AutoCreditStatusProps,
+} from "./auto-credit-status.js";
+export {
   ChildCard,
   formatChildAge,
   type ChildCardProps,
@@ -106,3 +115,9 @@ export {
   type ReceiptBusinessDetails,
   type ReceiptFormat,
 } from "./receipt-document.js";
+
+// Packing-slip render (P4-E04-S03 / 29.3) — printable A4 HTML, no price totals.
+export {
+  renderPackingSlipHtml,
+  packingSlipContentType,
+} from "./packing-slip-document.js";

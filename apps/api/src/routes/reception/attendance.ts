@@ -180,6 +180,12 @@ export async function checkInBooking(
     throw err;
   }
 
+  // Commission accrual (P3-E01-S02): the attributed staff member's commission line
+  // for this settled booking. The hook fires on booking settle (wallet debit on
+  // check-in OR subscription consumption); it is idempotent + self-skipping
+  // (unattributed / no-rate), so it is a no-op when no staff is attributed.
+  await recordBookingCommission(db, { bookingId: input.bookingId, postedBy: input.actor });
+
   return {
     bookingId: input.bookingId,
     attendanceId,

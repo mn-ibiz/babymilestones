@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   validateRunRange,
   formatCents,
@@ -6,7 +6,9 @@ import {
   isAwaitingPayout,
   payoutCsvUrl,
   canMarkPaid,
+  fetchCommissionRunPreview,
   type CommissionRun,
+  type CommissionRunPreview,
 } from "./commission-runs";
 
 describe("commission-run date range validation (P3-E01-S04)", () => {
@@ -53,5 +55,26 @@ describe("commission-run display helpers (P3-E01-S04/S05)", () => {
     expect(canMarkPaid(run)).toBe(true);
     expect(canMarkPaid({ ...run, paidOutAt: "2026-06-16T00:00:00.000Z" })).toBe(false);
     expect(canMarkPaid({ ...run, totalCents: 0 })).toBe(false);
+  });
+});
+
+describe("fetchCommissionRunPreview (P3-E01-S04 AC1)", () => {
+  it("POSTs the range to the preview endpoint and returns the typed totals", async () => {
+    const preview: CommissionRunPreview = {
+      periodStart: "2026-06-01T00:00:00.000Z",
+      periodEnd: "2026-07-01T00:00:00.000Z",
+      totalCents: 150000,
+      lines: [{ staffId: "s1", staffNameSnapshot: "Asha", amountCents: 150000 }],
+    };
+    const fetcher = vi.fn(async () => preview);
+    const range = { periodStart: "2026-06-01T00:00", periodEnd: "2026-07-01T00:00" };
+
+    const result = await fetchCommissionRunPreview(range, fetcher);
+
+    expect(result).toEqual(preview);
+    expect(fetcher).toHaveBeenCalledWith("/admin/commission-runs/preview", {
+      method: "POST",
+      body: range,
+    });
   });
 });

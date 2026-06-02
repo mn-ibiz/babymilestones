@@ -4,7 +4,6 @@ import { parents, users, wallets, type Database } from "@bm/db";
 import { validateSession, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   getEffectiveRates,
-  getLoyaltyBalance,
   getLoyaltyHistory,
   getLoyaltyTotals,
   kesForPoints,
