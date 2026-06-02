@@ -1,6 +1,6 @@
 # Story 31.3: Group session booking
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E01-S03 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E01-S03.md
 
