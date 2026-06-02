@@ -154,3 +154,120 @@ export async function reverseBookingCommission(
 
   return "transaction" in db ? db.transaction(run) : run(db);
 }
+
+export interface ReassignBookingCommissionResult {
+  /** True when a settled accrual was actually moved old → new (AC4). */
+  moved: boolean;
+  /** Why no move happened (when `moved` is false). */
+  skipped?: "not_settled" | "no_target_rate";
+  /** True when this call replayed an already-completed move (no-op). */
+  replayed: boolean;
+  /** The signed-opposite reversal posted against the old stylist's accrual. */
+  reversal: CommissionLedgerRow | null;
+  /** The fresh `reassign` line posted to the new (current) stylist. */
+  posted: CommissionLedgerRow | null;
+}
+
+/**
+ * Move a SETTLED salon booking's commission from the old stylist to the booking's
+ * CURRENT (new) stylist after a reassign (Story 25.4 AC4). Assumes the caller has
+ * ALREADY updated `bookings.staffId` to the new stylist (the catalog
+ * `reassignSalonBooking` does this).
+ *
+ *  - If the booking has no `source='booking'` accrual yet, it never settled — this
+ *    is a NO-OP (`skipped:'not_settled'`). Future accrual lands on the new stylist
+ *    via {@link recordBookingCommission} using the now-current attribution.
+ *  - Otherwise: REVERSE the old stylist's accrual with a signed-opposite
+ *    `refund_reversal` row (reusing the exact ledger semantics of
+ *    {@link reverseBookingCommission} — append-only, never mutating the original),
+ *    then POST a fresh positive line to the new stylist as `source='reassign'`
+ *    (outside the `one_accrual_per_booking` partial unique index, so it never
+ *    collides), at the NEW stylist's rate in force at booking time. Net to the old
+ *    stylist becomes zero; the new stylist nets their commission.
+ *
+ * Idempotent: a replay finds the reversal + reassign line already present and is a
+ * no-op (`moved:false, replayed:true`). `fromStaffId` identifies the old accrual
+ * to reverse; the new stylist is read from the (already-updated) booking row.
+ */
+export async function reassignBookingCommission(
+  db: CommissionExecutor,
+  input: { bookingId: string; fromStaffId: string | null; postedBy?: string | null; occurredAt?: Date },
+): Promise<ReassignBookingCommissionResult> {
+  const run = async (tx: CommissionExecutor): Promise<ReassignBookingCommissionResult> => {
+    // The original accrual. No accrual ⇒ not settled ⇒ nothing to move.
+    const [accrual] = await tx
+      .select()
+      .from(commissionLedger)
+      .where(and(eq(commissionLedger.bookingId, input.bookingId), eq(commissionLedger.source, "booking")));
+    if (!accrual) {
+      return { moved: false, skipped: "not_settled", replayed: false, reversal: null, posted: null };
+    }
+
+    const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId));
+    const newStaffId = booking?.staffId ?? null;
+
+    // Idempotency: a prior reassign already posted a 'reassign' line for the new
+    // stylist (and a reversal of the accrual) → no-op.
+    const [priorPost] = await tx
+      .select()
+      .from(commissionLedger)
+      .where(and(eq(commissionLedger.bookingId, input.bookingId), eq(commissionLedger.source, "reassign")));
+    if (priorPost) {
+      const [priorReversal] = await tx
+        .select()
+        .from(commissionLedger)
+        .where(and(eq(commissionLedger.reversesEntryId, accrual.id), eq(commissionLedger.source, "refund_reversal")));
+      return { moved: false, replayed: true, reversal: priorReversal ?? null, posted: priorPost };
+    }
+
+    const occurredAt = input.occurredAt ?? new Date();
+
+    // 1) Reverse the old stylist's accrual (signed-opposite, append-only) — reuse
+    //    the same ledger + audit shape as a refund reversal (AC4).
+    const reversal = await reverseBookingCommission(tx, {
+      bookingId: input.bookingId,
+      postedBy: input.postedBy,
+      occurredAt,
+    });
+
+    // 2) Post the new stylist's commission as a distinct 'reassign' line at THEIR
+    //    rate in force at booking time. No rate ⇒ nothing to post for them.
+    if (!newStaffId || !booking) {
+      return { moved: true, replayed: false, reversal: reversal.entry, posted: null };
+    }
+    const rate = await resolveRateAt(tx, newStaffId, booking.createdAt);
+    if (!rate) {
+      return { moved: true, skipped: "no_target_rate", replayed: false, reversal: reversal.entry, posted: null };
+    }
+    const amountCents = commissionCents(booking.staffRateSnapshot, rate.ratePercent);
+    const [posted] = await tx
+      .insert(commissionLedger)
+      .values({
+        staffId: newStaffId,
+        bookingId: booking.id,
+        amountCents,
+        rateSnapshot: rate.ratePercent,
+        source: "reassign",
+        reversesEntryId: null,
+        occurredAt,
+      })
+      .returning();
+    await audit(tx, {
+      actor: input.postedBy ?? null,
+      action: "commission.ledger.posted",
+      target: { table: "commission_ledger", id: posted!.id },
+      payload: {
+        booking_id: booking.id,
+        staff_id: newStaffId,
+        amount_cents: amountCents,
+        rate_snapshot: rate.ratePercent,
+        source: "reassign",
+        reverses_staff_id: input.fromStaffId,
+      },
+    });
+
+    return { moved: true, replayed: false, reversal: reversal.entry, posted: posted! };
+  };
+
+  return "transaction" in db ? db.transaction(run) : run(db);
+}

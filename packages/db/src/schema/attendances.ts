@@ -1,4 +1,4 @@
-import { pgTable, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { bookings } from "./bookings.js";
 
 /**
@@ -28,6 +28,22 @@ export const attendances = pgTable(
     checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
     /** Acting staff user id who performed the hand-off (S03). */
     checkedOutBy: uuid("checked_out_by"),
+    /**
+     * Salon service completion (P3-E03-S03 / Story 25.3 AC3): when the stylist
+     * marked the salon service complete. Null until completed. Distinct from
+     * {@link checkedOutAt} (the crèche hand-off) — a salon visit completes rather
+     * than being handed over at pickup.
+     */
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Acting staff user id who marked the salon service complete (S03). */
+    completedBy: uuid("completed_by"),
+    /**
+     * Optional reference to the photo captured at completion (P3-E03-S03 AC3).
+     * Only set when the child's `photoConsent` flag is true (consent-gated);
+     * stays null otherwise. The photo-storage engine is out of scope — this just
+     * records the reference the capture surface supplies.
+     */
+    photoRef: text("photo_ref"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
