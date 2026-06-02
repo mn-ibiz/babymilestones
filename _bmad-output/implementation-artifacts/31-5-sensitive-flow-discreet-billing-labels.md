@@ -1,6 +1,6 @@
 # Story 31.5: Sensitive flow: discreet billing labels
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E01-S05 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E01-S05.md
 

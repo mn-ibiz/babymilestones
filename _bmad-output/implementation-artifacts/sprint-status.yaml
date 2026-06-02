@@ -285,12 +285,12 @@ development_status:
   epic-30-retrospective: optional
 
   # Epic 31 — Mom Coaching & Birth Doula  (P5-E01)
-  epic-31: in-progress
+  epic-31: done
   31-1-coaching-catalogue-1-1-group: done  # P5-E01-S01
-  31-2-coach-availability-and-1-1-booking: review  # P5-E01-S02
-  31-3-group-session-booking: review  # P5-E01-S03
-  31-4-coach-session-notes-private: review  # P5-E01-S04
-  31-5-sensitive-flow-discreet-billing-labels: review  # P5-E01-S05
+  31-2-coach-availability-and-1-1-booking: done  # P5-E01-S02
+  31-3-group-session-booking: done  # P5-E01-S03
+  31-4-coach-session-notes-private: done  # P5-E01-S04
+  31-5-sensitive-flow-discreet-billing-labels: done  # P5-E01-S05
   epic-31-retrospective: optional
 
   # Epic 32 — eTIMS Writer Swap  (P5-E02)
@@ -310,8 +310,8 @@ development_status:
   epic-33-retrospective: optional
 
   # Epic 34 — Feedback Engine  (P5-E04)
-  epic-34: ready-for-dev
-  34-1-0-5-rating-after-every-paid-touchpoint: ready-for-dev  # P5-E04-S01
+  epic-34: in-progress
+  34-1-0-5-rating-after-every-paid-touchpoint: review  # P5-E04-S01
   34-2-feedback-dashboard-by-unit-and-by-staff: ready-for-dev  # P5-E04-S02
   34-3-negative-feedback-alert: ready-for-dev  # P5-E04-S03
   34-4-public-review-snippets-optional: ready-for-dev  # P5-E04-S04

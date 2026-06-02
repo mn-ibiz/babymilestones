@@ -1,6 +1,6 @@
 # Story 31.4: Coach session notes (private)
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E01-S04 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E01-S04.md
 
