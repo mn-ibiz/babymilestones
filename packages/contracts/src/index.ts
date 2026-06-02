@@ -5831,3 +5831,170 @@ export function repeatAttendanceUrl(values: { fromDate: string; toDate: string }
   const params = new URLSearchParams({ fromDate: values.fromDate, toDate: values.toDate });
   return `/admin/repeat-attendance?${params.toString()}`;
 }
+
+/* --- Tax-ready exports by period (Story 35.6) ----------------------------- */
+
+/**
+ * Tax-ready export request (Story 35.6 AC1/AC2). An inclusive `[fromDate, toDate]`
+ * range; the report returns the per-period taxable supplies, VAT charged and exempt
+ * supplies (+ a per-month breakdown). Reuses the shared {@link exportDateSchema} and
+ * requires `fromDate <= toDate`.
+ */
+export const taxReportQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type TaxReportQuery = z.infer<typeof taxReportQuerySchema>;
+
+/** The three VAT figures for a window (AC1), plus the total supplies. Integer cents. */
+export interface TaxBucketDto {
+  /** Σ net of VATable lines — the ex-VAT value of standard-rated supplies (AC1). */
+  taxableSuppliesCents: number;
+  /** Σ line tax — the output VAT charged (AC1). */
+  vatChargedCents: number;
+  /** Σ net of non-VATable (exempt / zero-rated) lines (AC1). */
+  exemptSuppliesCents: number;
+  /** taxable + exempt — the total ex-VAT value supplied. */
+  totalSuppliesCents: number;
+}
+
+/** One month's tax bucket within the range (per-period breakdown). */
+export interface TaxMonthRowDto extends TaxBucketDto {
+  /** The `YYYY-MM` this row covers. */
+  month: string;
+}
+
+/** The tax-ready report for one period (AC1). Mirrors `@bm/catalog` TaxReport. */
+export interface TaxReportDto extends TaxBucketDto {
+  /** Inclusive range start (`YYYY-MM-DD`), echoed from the query. */
+  fromDate: string;
+  /** Inclusive range end (`YYYY-MM-DD`), echoed from the query. */
+  toDate: string;
+  /** Per-month breakdown in ascending order (present iff the read model emits one). */
+  byMonth?: TaxMonthRowDto[];
+}
+
+/** Header columns of the tax CSV ("Excel") export, in order (AC2). */
+export const TAX_REPORT_EXPORT_COLUMNS = [
+  "period",
+  "taxable_supplies_kes",
+  "vat_charged_kes",
+  "exempt_supplies_kes",
+  "total_supplies_kes",
+] as const;
+
+/**
+ * Render the tax report as an RFC-4180 CSV (AC2 — the "Excel" export; the repo's
+ * established convention is CSV, which spreadsheets open natively — there is no xlsx
+ * writer dependency in the tree). One row per month (when a breakdown is present),
+ * then a `Total` row. Cents → KES decimals; CRLF-joined with a trailing CRLF.
+ */
+export function taxReportToCsv(report: TaxReportDto): string {
+  const lines: string[] = [TAX_REPORT_EXPORT_COLUMNS.join(",")];
+  const row = (period: string, b: TaxBucketDto): string =>
+    [
+      csvField(period),
+      centsToKes(b.taxableSuppliesCents),
+      centsToKes(b.vatChargedCents),
+      centsToKes(b.exemptSuppliesCents),
+      centsToKes(b.totalSuppliesCents),
+    ].join(",");
+
+  for (const m of report.byMonth ?? []) lines.push(row(m.month, m));
+  lines.push(row("Total", report));
+
+  return lines.join("\r\n") + "\r\n";
+}
+
+/** Minimal HTML escape for text interpolated into the printable tax doc. */
+function taxHtmlEscape(value: string): string {
+  return value
+    .replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;")
+    .replace(/>/gu, "&gt;")
+    .replace(/"/gu, "&quot;");
+}
+
+/**
+ * Render the tax report as a self-contained, printable A4 HTML document (AC2 — the
+ * "PDF" export). Decision 13 in this codebase: printing is the browser's print
+ * dialog, not a native PDF/print server (the receipt engine uses the same
+ * approach), so the API returns deterministic HTML the browser prints to PDF — no
+ * heavy PDF dependency. Inline styles, no external assets, pure string function
+ * (unit-tested without a DOM). Carries the period, the three AC1 figures (taxable
+ * supplies / VAT charged / exempt supplies) + total, and the per-month breakdown.
+ */
+export function taxReportToPrintableHtml(report: TaxReportDto): string {
+  const monthRows = (report.byMonth ?? [])
+    .map((m) => {
+      const cells = [
+        taxHtmlEscape(m.month),
+        centsToKes(m.taxableSuppliesCents),
+        centsToKes(m.vatChargedCents),
+        centsToKes(m.exemptSuppliesCents),
+        centsToKes(m.totalSuppliesCents),
+      ];
+      return `<tr>${cells.map((c, i) => (i === 0 ? `<td>${c}</td>` : `<td class="num">${c}</td>`)).join("")}</tr>`;
+    })
+    .join("");
+
+  const totalRow =
+    `<tr class="total"><td>Total</td><td class="num">${centsToKes(report.taxableSuppliesCents)}</td><td class="num">${centsToKes(report.vatChargedCents)}</td><td class="num">${centsToKes(report.exemptSuppliesCents)}</td><td class="num">${centsToKes(report.totalSuppliesCents)}</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Tax-ready summary ${taxHtmlEscape(report.fromDate)} to ${taxHtmlEscape(report.toDate)}</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #111; margin: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .period { color: #555; margin: 0 0 16px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 700; border-top: 2px solid #111; }
+  .note { color: #666; font-size: 11px; margin-top: 14px; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+<h1>Tax-ready summary</h1>
+<p class="period">Period: ${taxHtmlEscape(report.fromDate)} &ndash; ${taxHtmlEscape(report.toDate)}</p>
+<table>
+<thead>
+<tr><th>Period</th><th class="num">Taxable supplies</th><th class="num">VAT charged</th><th class="num">Exempt supplies</th><th class="num">Total supplies</th></tr>
+</thead>
+<tbody>${monthRows}</tbody>
+<tfoot>${totalRow}</tfoot>
+</table>
+<p class="note">All figures in KES, net of VAT, from settled (non-voided) receipts. Taxable supplies are vatable (standard-rated) lines; exempt supplies include VAT-exempt and zero-rated lines. VAT charged is the output VAT on the taxable supplies.</p>
+</body>
+</html>
+`;
+}
+
+/** Suggested download filename for the tax CSV ("Excel") export (AC2). */
+export function taxReportCsvFilename(report: TaxReportDto): string {
+  return `tax_${report.fromDate}_${report.toDate}.csv`;
+}
+
+/** Suggested download filename for the tax printable-HTML ("PDF") export (AC2). */
+export function taxReportPdfFilename(report: TaxReportDto): string {
+  return `tax_${report.fromDate}_${report.toDate}.html`;
+}
+
+/** The tax export endpoint URL for a format + date range (AC2). */
+export function taxReportExportUrl(values: {
+  format: "csv" | "pdf";
+  fromDate: string;
+  toDate: string;
+}): string {
+  const params = new URLSearchParams({ fromDate: values.fromDate, toDate: values.toDate });
+  return `/admin/tax-report/export.${values.format}?${params.toString()}`;
+}

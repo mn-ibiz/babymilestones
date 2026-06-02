@@ -530,3 +530,18 @@ export {
   type PnlGranularity,
   type LoadPnlReportOpts,
 } from "./pnl-report-db.js";
+
+// Tax-ready exports — per-period taxable supplies / VAT charged / exempt supplies
+// (+ total + monthly breakdown) from settled, non-voided receipts (P6-E07-S06 /
+// Story 35.6).
+export {
+  aggregateTaxReport,
+  monthsInRange,
+  type Month,
+  type TaxLineInput,
+  type TaxBucket,
+  type TaxMonthRow,
+  type TaxReport,
+  type TaxReportInput,
+} from "./tax-report.js";
+export { loadTaxReport, type LoadTaxReportOpts } from "./tax-report-db.js";

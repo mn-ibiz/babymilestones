@@ -133,6 +133,18 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(canAccessRoute("reception", "/pnl")).toBe(false);
   });
 
+  it("the tax-ready summary is visible to the read-report roles (P6-E07-S06 / Story 35.6)", () => {
+    // admin / accountant / treasury / super_admin hold read:report — the same set the
+    // API gates the finance-sensitive tax report to.
+    for (const role of ["admin", "accountant", "treasury", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/tax-report");
+      expect(canAccessRoute(role, "/tax-report")).toBe(true);
+    }
+    // reception/parent never reach it.
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/tax-report");
+    expect(canAccessRoute("reception", "/tax-report")).toBe(false);
+  });
+
   it("the operations dashboard is visible to admin/super_admin/treasury only (P3-E05-S01 AC4)", () => {
     for (const role of ["admin", "super_admin", "treasury"]) {
       expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations");

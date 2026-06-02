@@ -211,6 +211,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Consolidated P&L",
     permission: { action: "read", resource: "report" },
   },
+  // P6-E07-S06 (Story 35.6): tax-ready exports — per-period taxable supplies / VAT
+  // charged / exempt supplies for a VAT return, with CSV + PDF export. Finance-
+  // sensitive, gated on `read report` — admin / accountant / treasury / super_admin
+  // (the same set the API gates to). The server re-enforces it.
+  {
+    href: "/tax-report",
+    label: "Tax-ready summary",
+    permission: { action: "read", resource: "report" },
+  },
   {
     href: "/treasury/float-accounts",
     label: "Float accounts",
