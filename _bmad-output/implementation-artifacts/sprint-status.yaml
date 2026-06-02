@@ -290,7 +290,7 @@ development_status:
   31-2-coach-availability-and-1-1-booking: review  # P5-E01-S02
   31-3-group-session-booking: review  # P5-E01-S03
   31-4-coach-session-notes-private: review  # P5-E01-S04
-  31-5-sensitive-flow-discreet-billing-labels: ready-for-dev  # P5-E01-S05
+  31-5-sensitive-flow-discreet-billing-labels: review  # P5-E01-S05
   epic-31-retrospective: optional
 
   # Epic 32 — eTIMS Writer Swap  (P5-E02)
