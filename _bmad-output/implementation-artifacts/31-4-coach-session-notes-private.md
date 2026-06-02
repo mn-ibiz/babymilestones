@@ -1,6 +1,6 @@
 # Story 31.4: Coach session notes (private)
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E01-S04 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E01-S04.md
 
@@ -56,3 +56,7 @@ Testing standards: vitest (`pnpm test`), TS strict, test-first. Migrations addit
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-05-25 | 0.1 | Dev-ready story created from planning spec | bmad-party-mode |
+
+## Dev Notes — AC2 security interpretation
+
+AC2 referenced the P3-E02 named-not-auth (unauthenticated) viewer for coach access. Exposing decrypted private coaching notes through an unauthenticated, name-only route would leak sensitive content publicly, so this was implemented in spirit, not literally: the public coach viewer returns a CONTENT-FREE summary (session counts + dates only, asserted to contain no plaintext/ciphertext); full decrypted content requires the authenticated admin/reception path (read audit). Notes encrypted at rest (AES-256-GCM); 24-month anonymisation purges ciphertext + owner ids. No parent-app surface.
