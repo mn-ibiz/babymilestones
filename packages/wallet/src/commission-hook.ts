@@ -206,38 +206,76 @@ export async function reassignBookingCommission(
     const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId));
     const newStaffId = booking?.staffId ?? null;
 
-    // Idempotency: a prior reassign already posted a 'reassign' line for the new
-    // stylist (and a reversal of the accrual) → no-op.
-    const [priorPost] = await tx
+    // Idempotency keyed on the SPECIFIC transition, not "any reassign line exists":
+    // compute the booking's CURRENT net commission by staff straight from the
+    // ledger. A move A→B→A or A→B→C is a sequence of distinct transitions — each
+    // must apply exactly once — whereas repeating the SAME final state is a no-op.
+    const ledgerRows = await tx
       .select()
       .from(commissionLedger)
-      .where(and(eq(commissionLedger.bookingId, input.bookingId), eq(commissionLedger.source, "reassign")));
-    if (priorPost) {
-      const [priorReversal] = await tx
-        .select()
-        .from(commissionLedger)
-        .where(and(eq(commissionLedger.reversesEntryId, accrual.id), eq(commissionLedger.source, "refund_reversal")));
-      return { moved: false, replayed: true, reversal: priorReversal ?? null, posted: priorPost };
+      .where(eq(commissionLedger.bookingId, input.bookingId));
+    const netByStaff = new Map<string, number>();
+    // The most recent net-positive-contributing row per staff, to anchor a reversal.
+    const lastPositiveRow = new Map<string, CommissionLedgerRow>();
+    for (const r of ledgerRows) {
+      netByStaff.set(r.staffId, (netByStaff.get(r.staffId) ?? 0) + r.amountCents);
+      if (r.amountCents > 0) lastPositiveRow.set(r.staffId, r);
+    }
+
+    // Staff (other than the current/target) who still hold a net-positive
+    // commission for this booking — these are the prior stylist(s) to reverse.
+    const priorHolders = [...netByStaff.entries()].filter(
+      ([staffId, net]) => net > 0 && staffId !== newStaffId,
+    );
+
+    // True replay: the net is already entirely on the current/target stylist (no
+    // other staff holds a positive net) → nothing to move.
+    if (priorHolders.length === 0) {
+      const priorPost = newStaffId
+        ? ledgerRows.find((r) => r.source === "reassign" && r.staffId === newStaffId) ?? null
+        : null;
+      const priorReversal =
+        ledgerRows.find((r) => r.reversesEntryId === accrual.id && r.source === "refund_reversal") ?? null;
+      return { moved: false, replayed: true, reversal: priorReversal, posted: priorPost };
     }
 
     const occurredAt = input.occurredAt ?? new Date();
 
-    // 1) Reverse the old stylist's accrual (signed-opposite, append-only) — reuse
-    //    the same ledger + audit shape as a refund reversal (AC4).
-    const reversal = await reverseBookingCommission(tx, {
-      bookingId: input.bookingId,
-      postedBy: input.postedBy,
-      occurredAt,
-    });
+    // 1) Reverse each prior stylist's net-positive commission with a signed-opposite,
+    //    append-only `refund_reversal` row anchored to their latest positive line
+    //    (AC4) — net to each prior stylist becomes zero.
+    let lastReversal: CommissionLedgerRow | null = null;
+    for (const [priorStaffId, net] of priorHolders) {
+      const anchor = lastPositiveRow.get(priorStaffId)!;
+      const [reversed] = await tx
+        .insert(commissionLedger)
+        .values({
+          staffId: priorStaffId,
+          bookingId: input.bookingId,
+          amountCents: -net, // zero out the prior stylist's net
+          rateSnapshot: anchor.rateSnapshot,
+          source: "refund_reversal",
+          reversesEntryId: anchor.id,
+          occurredAt,
+        })
+        .returning();
+      await audit(tx, {
+        actor: input.postedBy ?? null,
+        action: "commission.ledger.reversed",
+        target: { table: "commission_ledger", id: reversed!.id },
+        payload: { booking_id: input.bookingId, reverses_entry_id: anchor.id, amount_cents: -net },
+      });
+      lastReversal = reversed!;
+    }
 
-    // 2) Post the new stylist's commission as a distinct 'reassign' line at THEIR
-    //    rate in force at booking time. No rate ⇒ nothing to post for them.
+    // 2) Post the new (now-current) stylist's commission as a distinct 'reassign'
+    //    line at THEIR rate in force at booking time. No rate ⇒ nothing to post.
     if (!newStaffId || !booking) {
-      return { moved: true, replayed: false, reversal: reversal.entry, posted: null };
+      return { moved: true, replayed: false, reversal: lastReversal, posted: null };
     }
     const rate = await resolveRateAt(tx, newStaffId, booking.createdAt);
     if (!rate) {
-      return { moved: true, skipped: "no_target_rate", replayed: false, reversal: reversal.entry, posted: null };
+      return { moved: true, skipped: "no_target_rate", replayed: false, reversal: lastReversal, posted: null };
     }
     const amountCents = commissionCents(booking.staffRateSnapshot, rate.ratePercent);
     const [posted] = await tx
@@ -266,7 +304,7 @@ export async function reassignBookingCommission(
       },
     });
 
-    return { moved: true, replayed: false, reversal: reversal.entry, posted: posted! };
+    return { moved: true, replayed: false, reversal: lastReversal, posted: posted! };
   };
 
   return "transaction" in db ? db.transaction(run) : run(db);

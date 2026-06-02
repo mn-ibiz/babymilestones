@@ -254,4 +254,73 @@ describe("reassign commission move (P3-E03-S04 / Story 25.4)", () => {
     // Exactly: 1 booking accrual + 1 reversal + 1 reassign post = 3 (no duplicates).
     expect(rows).toHaveLength(3);
   });
+
+  /** Net commission by staff, computed straight from the ledger. */
+  async function netByStaff(bookingId: string): Promise<Map<string, number>> {
+    const rows = await dbh.db.select().from(commissionLedger).where(eq(commissionLedger.bookingId, bookingId));
+    const net = new Map<string, number>();
+    for (const r of rows) net.set(r.staffId, (net.get(r.staffId) ?? 0) + r.amountCents);
+    return net;
+  }
+
+  it("A→B→A on a settled booking ends with net commission back on A and zero on B (AC4)", async () => {
+    const { bookingId, oldStaffId: aId, newStaffId: bId } = await seedReassignable({ priceCents: 10000, oldRate: "10.00", newRate: "20.00" });
+    await recordBookingCommission(dbh.db, { bookingId, postedBy: ACTOR });
+
+    // A → B.
+    await dbh.db.update(bookings).set({ staffId: bId, staffNameSnapshot: "Bree" }).where(eq(bookings.id, bookingId));
+    const ab = await reassignBookingCommission(dbh.db, { bookingId, fromStaffId: aId, postedBy: ACTOR });
+    expect(ab.moved).toBe(true);
+
+    // B → A (a SECOND legitimate move — must not be misdetected as a replay).
+    await dbh.db.update(bookings).set({ staffId: aId, staffNameSnapshot: "Asha" }).where(eq(bookings.id, bookingId));
+    const ba = await reassignBookingCommission(dbh.db, { bookingId, fromStaffId: bId, postedBy: ACTOR });
+    expect(ba.moved).toBe(true);
+    expect(ba.replayed).toBe(false);
+
+    const net = await netByStaff(bookingId);
+    expect(net.get(aId)).toBe(1000); // back to A at A's rate (10% of 100.00)
+    expect(net.get(bId) ?? 0).toBe(0); // B nets zero
+  });
+
+  it("A→B→C ends with net only on C (AC4)", async () => {
+    const { bookingId, oldStaffId: aId, newStaffId: bId } = await seedReassignable({ priceCents: 10000, oldRate: "10.00", newRate: "20.00" });
+    // A third stylist C at 30%.
+    const [cStaff] = await dbh.db.insert(staff).values({ displayName: "Cleo", role: "stylist" }).returning();
+    const cId = cStaff!.id;
+    await setCommissionRate(dbh.db, { staffId: cId, ratePercent: "30.00", effectiveFrom: new Date("2026-01-01T00:00:00Z") });
+    await recordBookingCommission(dbh.db, { bookingId, postedBy: ACTOR });
+
+    // A → B.
+    await dbh.db.update(bookings).set({ staffId: bId, staffNameSnapshot: "Bree" }).where(eq(bookings.id, bookingId));
+    expect((await reassignBookingCommission(dbh.db, { bookingId, fromStaffId: aId, postedBy: ACTOR })).moved).toBe(true);
+
+    // B → C.
+    await dbh.db.update(bookings).set({ staffId: cId, staffNameSnapshot: "Cleo" }).where(eq(bookings.id, bookingId));
+    const bc = await reassignBookingCommission(dbh.db, { bookingId, fromStaffId: bId, postedBy: ACTOR });
+    expect(bc.moved).toBe(true);
+    expect(bc.replayed).toBe(false);
+
+    const net = await netByStaff(bookingId);
+    expect(net.get(aId) ?? 0).toBe(0);
+    expect(net.get(bId) ?? 0).toBe(0);
+    expect(net.get(cId)).toBe(3000); // 30% of 100.00, only on C
+  });
+
+  it("calling the same final-state move twice is a no-op — true idempotency on the transition (AC4)", async () => {
+    const { bookingId, oldStaffId: aId, newStaffId: bId } = await seedReassignable({ priceCents: 10000, oldRate: "10.00", newRate: "20.00" });
+    await recordBookingCommission(dbh.db, { bookingId, postedBy: ACTOR });
+
+    // A → B, then replay the SAME final state (booking still on B).
+    await dbh.db.update(bookings).set({ staffId: bId, staffNameSnapshot: "Bree" }).where(eq(bookings.id, bookingId));
+    const first = await reassignBookingCommission(dbh.db, { bookingId, fromStaffId: aId, postedBy: ACTOR });
+    const second = await reassignBookingCommission(dbh.db, { bookingId, fromStaffId: aId, postedBy: ACTOR });
+    expect(first.moved).toBe(true);
+    expect(second.moved).toBe(false);
+    expect(second.replayed).toBe(true);
+
+    const net = await netByStaff(bookingId);
+    expect(net.get(aId) ?? 0).toBe(0);
+    expect(net.get(bId)).toBe(2000); // 20% of 100.00, only on B — not doubled
+  });
 });

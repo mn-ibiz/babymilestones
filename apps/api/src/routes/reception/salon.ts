@@ -205,21 +205,27 @@ export function registerReceptionSalon(app: FastifyInstance, deps: ReceptionSalo
       return reply.code(400).send({ error: first?.message ?? "Invalid input", field: first?.path[0] });
     }
     try {
-      const moved = await reassignSalonBooking(db, {
-        bookingId: parsed.data.bookingId,
-        toStaffId: parsed.data.toStaffId,
-        actor: ctx.userId,
-        ip: req.ip,
-      });
-      // AC4: a settled booking's commission moves to the new stylist (reverse old,
-      // post new). A no-op move (same stylist) or an unsettled booking skips this.
-      if (!moved.unchanged && moved.commissionMoved) {
-        await reassignBookingCommission(db, {
-          bookingId: moved.bookingId,
-          fromStaffId: moved.fromStaffId,
-          postedBy: ctx.userId,
+      // Run the attribution move (catalog) and the commission ledger move (wallet)
+      // in ONE transaction so they commit together — a crash between them must not
+      // leave attribution moved but commission stale (no recovery driver exists).
+      const moved = await db.transaction(async (tx) => {
+        const result = await reassignSalonBooking(tx, {
+          bookingId: parsed.data.bookingId,
+          toStaffId: parsed.data.toStaffId,
+          actor: ctx.userId,
+          ip: req.ip,
         });
-      }
+        // AC4: a settled booking's commission moves to the new stylist (reverse old,
+        // post new). A no-op move (same stylist) or an unsettled booking skips this.
+        if (!result.unchanged && result.commissionMoved) {
+          await reassignBookingCommission(tx, {
+            bookingId: result.bookingId,
+            fromStaffId: result.fromStaffId,
+            postedBy: ctx.userId,
+          });
+        }
+        return result;
+      });
       const out: SalonReassignResult = {
         bookingId: moved.bookingId,
         fromStaffId: moved.fromStaffId,

@@ -933,9 +933,12 @@ export interface ReassignSalonBookingResult {
  * accrual lands on the new stylist via the existing attribution.
  */
 export async function reassignSalonBooking(
-  db: Database,
+  db: Executor,
   input: ReassignSalonBookingInput,
 ): Promise<ReassignSalonBookingResult> {
+  // `Executor` may already be a transaction handle; drizzle's nested `.transaction`
+  // is a savepoint, so the caller can thread its own `tx` to keep the attribution
+  // move and the commission move (in `@bm/wallet`) atomic in ONE transaction.
   return db.transaction(async (tx) => {
     // Lock the booking so a concurrent reassign / completion serialises.
     const [booking] = await tx
