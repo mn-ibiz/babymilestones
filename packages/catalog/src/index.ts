@@ -435,6 +435,20 @@ export {
   type LoadCohortRetentionOpts,
 } from "./cohort-retention-db.js";
 
+// Repeat-attendance metrics for events and classes (P6-E06-S03 / Story 35.3).
+export {
+  aggregateRepeatAttendance,
+  type RepeatAttendanceRecord,
+  type RepeatAttendanceInput,
+  type RepeatAttendanceRow,
+  type RepeatAttendanceSummary,
+  type RepeatAttendanceReport,
+} from "./repeat-attendance.js";
+export {
+  loadRepeatAttendance,
+  type LoadRepeatAttendanceOpts,
+} from "./repeat-attendance-db.js";
+
 // Daily dispatch report — online-order status counts + value + pack/dispatch
 // timings + sync-health (P4-E04-S04 / Story 29.4).
 export {

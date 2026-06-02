@@ -5572,3 +5572,125 @@ export function cohortRetentionViewModel(dto: CohortRetentionDto): CohortRetenti
   });
   return { fromMonth: dto.fromMonth, toMonth: dto.toMonth, offsetHeaders, rows };
 }
+
+/* --- Repeat-attendance metrics for events and classes (P6-E06-S03 / Story 35.3) - */
+
+/**
+ * Repeat-attendance request (Story 35.3 AC2). The admin picks an inclusive date
+ * range (`YYYY-MM-DD`); both bounds are validated calendar dates with
+ * `fromDate <= toDate`. Reuses the shared {@link exportDateSchema}.
+ */
+export const repeatAttendanceQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type RepeatAttendanceQuery = z.infer<typeof repeatAttendanceQuerySchema>;
+
+/** One per-class row of the repeat-attendance table (AC1). */
+export interface RepeatAttendanceRowDto {
+  classId: string;
+  label: string;
+  /** Distinct attendees of this class. */
+  totalAttendees: number;
+  /** Of {@link totalAttendees}, how many also attended ≥1 other class in the window. */
+  repeatAttendees: number;
+  /** `repeatAttendees / totalAttendees` as a percentage, one decimal place. */
+  repeatAttendeePct: number;
+  /** Mean distinct classes (in the window) per attendee of this class, one decimal. */
+  avgClassesAttended: number;
+}
+
+/** The overall summary across every class in the window (AC1). */
+export interface RepeatAttendanceSummaryDto {
+  totalClasses: number;
+  totalAttendees: number;
+  repeatAttendees: number;
+  repeatAttendeePct: number;
+  avgClassesAttended: number;
+}
+
+/**
+ * The repeat-attendance API response (Story 35.3). Identical shape to `@bm/catalog`'s
+ * `RepeatAttendanceReport` (all primitives, serialisable): the per-class rows + the
+ * overall summary over the selected window.
+ */
+export interface RepeatAttendanceDto {
+  from: string;
+  to: string;
+  classes: RepeatAttendanceRowDto[];
+  summary: RepeatAttendanceSummaryDto;
+}
+
+/** A render-ready per-class row: raw figures + formatted percent/average labels. */
+export interface RepeatAttendanceRowView {
+  classId: string;
+  label: string;
+  totalAttendees: number;
+  repeatAttendees: number;
+  /** e.g. `75.0%`. */
+  repeatAttendeePctLabel: string;
+  /** e.g. `1.8`. */
+  avgClassesAttendedLabel: string;
+}
+
+/** A render-ready summary line: raw figures + formatted labels. */
+export interface RepeatAttendanceSummaryView {
+  totalClasses: number;
+  totalAttendees: number;
+  repeatAttendees: number;
+  repeatAttendeePctLabel: string;
+  avgClassesAttendedLabel: string;
+}
+
+/** The repeat-attendance view-model: the labelled per-class table + summary (AC1). */
+export interface RepeatAttendanceViewModel {
+  from: string;
+  to: string;
+  rows: RepeatAttendanceRowView[];
+  summary: RepeatAttendanceSummaryView;
+}
+
+/** Format a one-decimal percentage, e.g. `75` → `75.0%`. */
+function formatRepeatPct(percentage: number): string {
+  return `${percentage.toFixed(1)}%`;
+}
+
+/**
+ * Shape the repeat-attendance report into a labelled per-class table + summary
+ * (Story 35.3 AC1). Pure + framework-free so it unit-tests without React and the
+ * admin page renders the identical figures: each row's repeat-rate is formatted as a
+ * one-decimal percent and its average classes as a one-decimal number.
+ */
+export function repeatAttendanceViewModel(dto: RepeatAttendanceDto): RepeatAttendanceViewModel {
+  const rows: RepeatAttendanceRowView[] = dto.classes.map((c) => ({
+    classId: c.classId,
+    label: c.label,
+    totalAttendees: c.totalAttendees,
+    repeatAttendees: c.repeatAttendees,
+    repeatAttendeePctLabel: formatRepeatPct(c.repeatAttendeePct),
+    avgClassesAttendedLabel: c.avgClassesAttended.toFixed(1),
+  }));
+  return {
+    from: dto.from,
+    to: dto.to,
+    rows,
+    summary: {
+      totalClasses: dto.summary.totalClasses,
+      totalAttendees: dto.summary.totalAttendees,
+      repeatAttendees: dto.summary.repeatAttendees,
+      repeatAttendeePctLabel: formatRepeatPct(dto.summary.repeatAttendeePct),
+      avgClassesAttendedLabel: dto.summary.avgClassesAttended.toFixed(1),
+    },
+  };
+}
+
+/** The repeat-attendance API URL carrying the date range. */
+export function repeatAttendanceUrl(values: { fromDate: string; toDate: string }): string {
+  const params = new URLSearchParams({ fromDate: values.fromDate, toDate: values.toDate });
+  return `/admin/repeat-attendance?${params.toString()}`;
+}

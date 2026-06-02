@@ -139,6 +139,17 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/operations/leaderboard");
   });
 
+  it("the repeat-attendance report is visible + reachable to admin/super_admin/treasury only (P6-E06-S03)", () => {
+    for (const role of ["admin", "super_admin", "treasury"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations/repeat-attendance");
+      expect(canAccessRoute(role, "/operations/repeat-attendance")).toBe(true);
+    }
+    // Narrower than read-report: accountant holds read:report but NOT this view.
+    expect(visibleNavFor("accountant").map((i) => i.href)).not.toContain("/operations/repeat-attendance");
+    expect(canAccessRoute("accountant", "/operations/repeat-attendance")).toBe(false);
+    expect(canAccessRoute("reception", "/operations/repeat-attendance")).toBe(false);
+  });
+
   it("never leaks an item the role lacks permission for", () => {
     for (const role of ["admin", "treasury", "accountant", "super_admin", "parent"]) {
       for (const item of visibleNavFor(role)) {

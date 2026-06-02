@@ -143,6 +143,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: { action: "read", resource: "report" },
     allowRoles: ["admin", "super_admin", "treasury"],
   },
+  // P6-E06-S03 (Story 35.3): repeat-attendance metrics for events + classes —
+  // per-class total attendees, repeat rate, avg classes attended, over a date range.
+  // Same explicit allow-list as the rest of the operations surface (admin /
+  // super_admin / treasury).
+  {
+    href: "/operations/repeat-attendance",
+    label: "Repeat attendance",
+    permission: { action: "read", resource: "report" },
+    allowRoles: ["admin", "super_admin", "treasury"],
+  },
   { href: "/staff", label: "Staff", permission: { action: "manage", resource: "user" } },
   // P1-E10-S02: staff LOGIN users (phone/role/PIN) — distinct from the `/staff`
   // attribution data records (P1-E07-S03). Both gate on `manage user`.

@@ -30,6 +30,7 @@ import { registerAdminStaffLeaderboard } from "./staff-leaderboard.js";
 import { registerAdminWalletAging } from "./wallet-aging.js";
 import { registerAdminPeakHoursHeatmap } from "./peak-hours-heatmap.js";
 import { registerAdminCohortRetention } from "./cohort-retention.js";
+import { registerAdminRepeatAttendance } from "./repeat-attendance.js";
 import { registerAdminFeedbackDashboard } from "./feedback-dashboard.js";
 import { registerAdminReviewSnippets } from "./review-snippets.js";
 import { registerAdminAlerts } from "./alerts.js";
@@ -98,6 +99,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminWalletAging(app, deps); // P3-E05-S04 (Story 27.4)
   registerAdminPeakHoursHeatmap(app, deps); // P3-E05-S05 (Story 27.5)
   registerAdminCohortRetention(app, deps); // Story 35.2
+  registerAdminRepeatAttendance(app, deps); // Story 35.3
   registerAdminFeedbackDashboard(app, deps); // P6-E04-S02 (Story 34.2)
   registerAdminReviewSnippets(app, { db: deps.db, sessions: deps.sessions }); // P6-E04-S04 (Story 34.4)
   registerAdminAlerts(app, deps); // P6-E04-S03 (Story 34.3)
