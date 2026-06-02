@@ -64,6 +64,37 @@ describe("cms-pages contracts (P6-E06-S03 / Story 36.3)", () => {
       const r = cmsPageContentSchema.safeParse({ ...valid, bodySections: "nope" });
       expect(r.success).toBe(false);
     });
+
+    // Stored-XSS guard (security review of 36.3): ctaHref / heroImageUrl are
+    // rendered on the PUBLIC page, so a stored `javascript:`/`data:`/`vbscript:`
+    // or protocol-relative `//evil` URL must be rejected at the schema boundary.
+    const UNSAFE_URLS = [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "  javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+      "//evil.com",
+    ];
+    const SAFE_URLS = ["", "/book", "https://example.com/x", "http://example.com"];
+
+    for (const href of UNSAFE_URLS) {
+      it(`rejects an unsafe ctaHref: ${JSON.stringify(href)}`, () => {
+        expect(cmsPageContentSchema.safeParse({ ...valid, ctaHref: href }).success).toBe(false);
+      });
+      it(`rejects an unsafe heroImageUrl: ${JSON.stringify(href)}`, () => {
+        expect(cmsPageContentSchema.safeParse({ ...valid, heroImageUrl: href }).success).toBe(false);
+      });
+    }
+
+    for (const href of SAFE_URLS) {
+      it(`accepts a safe ctaHref: ${JSON.stringify(href)}`, () => {
+        expect(cmsPageContentSchema.safeParse({ ...valid, ctaHref: href }).success).toBe(true);
+      });
+      it(`accepts a safe heroImageUrl: ${JSON.stringify(href)}`, () => {
+        expect(cmsPageContentSchema.safeParse({ ...valid, heroImageUrl: href }).success).toBe(true);
+      });
+    }
   });
 
   describe("cmsPageSaveSchema", () => {

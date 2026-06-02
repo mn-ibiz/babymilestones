@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchPublishedUnitPage,
   resolveUnitPageView,
+  safeHref,
+  safeImageSrc,
   type PublishedCmsPage,
 } from "./cms-page";
 import { getUnitPage } from "./unit-content";
@@ -56,6 +58,39 @@ describe("cms-page (P6-E06-S03 / Story 36.3)", () => {
       const view = resolveUnitPageView("shop", shopCms);
       expect(view).not.toBeNull();
       expect(view!.source).toBe("cms");
+    });
+  });
+
+  describe("safeHref / safeImageSrc — public-render stored-XSS guard", () => {
+    const UNSAFE = [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "  javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+      "//evil.com",
+    ];
+
+    for (const href of UNSAFE) {
+      it(`safeHref neutralises ${JSON.stringify(href)} → "#"`, () => {
+        expect(safeHref(href)).toBe("#");
+      });
+      it(`safeImageSrc drops ${JSON.stringify(href)} → undefined`, () => {
+        expect(safeImageSrc(href)).toBeUndefined();
+      });
+    }
+
+    it("safeHref passes through safe values unchanged", () => {
+      expect(safeHref("")).toBe("");
+      expect(safeHref("/book")).toBe("/book");
+      expect(safeHref("https://example.com/x")).toBe("https://example.com/x");
+      expect(safeHref("http://example.com")).toBe("http://example.com");
+    });
+
+    it("safeImageSrc passes through safe values; empty → undefined", () => {
+      expect(safeImageSrc("")).toBeUndefined();
+      expect(safeImageSrc("/hero.jpg")).toBe("/hero.jpg");
+      expect(safeImageSrc("https://cdn/hero.jpg")).toBe("https://cdn/hero.jpg");
     });
   });
 

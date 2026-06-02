@@ -3,7 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { UNIT_SLUGS } from "../../../lib/unit-content";
-import { fetchPublishedUnitPage, resolveUnitPageView } from "../../../lib/cms-page";
+import {
+  fetchPublishedUnitPage,
+  resolveUnitPageView,
+  safeHref,
+  safeImageSrc,
+} from "../../../lib/cms-page";
 
 /**
  * Per-unit marketing page (P1-E12-S02) at `/play`, `/talent`, `/salon`,
@@ -50,6 +55,11 @@ export default async function UnitPage(props: {
   const view = resolveUnitPageView(unit, cms);
   if (!view) notFound();
 
+  // Defence-in-depth: sanitise admin-stored URLs before they hit the public DOM,
+  // even if a `javascript:`/`data:`/`//evil` value predates the schema refine.
+  const ctaHref = safeHref(view.cta.href);
+  const heroImageSrc = safeImageSrc(view.heroImageSrc);
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 md:py-16">
       <section className="flex flex-col gap-6 md:flex-row md:items-center md:gap-10">
@@ -59,16 +69,16 @@ export default async function UnitPage(props: {
           </h1>
           <p className="mt-4 max-w-prose text-base text-ink/70">{view.heroCopy}</p>
           <Link
-            href={view.cta.href}
+            href={ctaHref}
             className="mt-6 inline-flex items-center justify-center rounded-lg bg-brand px-6 py-3 text-base font-medium text-surface hover:opacity-90"
           >
             {view.cta.label}
           </Link>
         </div>
-        {view.heroImageSrc && (
+        {heroImageSrc && (
           <div className="flex-1">
             <Image
-              src={view.heroImageSrc}
+              src={heroImageSrc}
               alt={view.heroImageAlt}
               width={960}
               height={720}

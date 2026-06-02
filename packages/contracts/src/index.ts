@@ -6036,6 +6036,29 @@ export const CMS_CTA_LABEL_MAX = 120;
 export const CMS_SECTION_HEADING_MAX = 200;
 export const CMS_SECTION_BODY_MAX = 5000;
 
+/**
+ * Stored-XSS guard for CMS URLs (security review of Story 36.3). `ctaHref` and
+ * `heroImageUrl` are rendered on the PUBLIC unit page, so a stored
+ * `javascript:`/`data:`/`vbscript:` (or protocol-relative `//evil`) value would
+ * become a clickable XSS for every visitor. A URL is SAFE iff it is empty, a
+ * same-origin root-relative path (`/x` but NOT protocol-relative `//x`), or an
+ * explicit http(s) URL. Everything else is rejected. The platform render layer
+ * applies the same predicate as defence-in-depth against content stored before
+ * this refine existed.
+ */
+export const CMS_URL_SAFE_MESSAGE =
+  "URL must be empty, a relative path (e.g. /book), or an http(s):// URL";
+export function isSafeCmsUrl(value: string): boolean {
+  const v = value.trim();
+  if (v === "") return true;
+  // Protocol-relative (`//evil.com`) is an absolute cross-origin URL — reject.
+  if (v.startsWith("//")) return false;
+  // Same-origin root-relative path.
+  if (v.startsWith("/")) return true;
+  // Explicit http(s) only — blocks javascript:, data:, vbscript:, etc.
+  return /^https?:\/\//i.test(v);
+}
+
 /** One ordered body section — a non-empty heading + body text/markdown (AC1). */
 export const cmsBodySectionSchema = z.object({
   heading: z
@@ -6050,9 +6073,15 @@ export type CmsBodySectionInput = z.infer<typeof cmsBodySectionSchema>;
 /** The editable content of a page (hero / image / CTA / ordered body sections). */
 export const cmsPageContentSchema = z.object({
   heroCopy: z.string().max(CMS_HERO_COPY_MAX, `Hero copy must be ${CMS_HERO_COPY_MAX} characters or fewer`),
-  heroImageUrl: z.string().max(CMS_URL_MAX, `Image URL must be ${CMS_URL_MAX} characters or fewer`),
+  heroImageUrl: z
+    .string()
+    .max(CMS_URL_MAX, `Image URL must be ${CMS_URL_MAX} characters or fewer`)
+    .refine(isSafeCmsUrl, CMS_URL_SAFE_MESSAGE),
   ctaLabel: z.string().max(CMS_CTA_LABEL_MAX, `CTA label must be ${CMS_CTA_LABEL_MAX} characters or fewer`),
-  ctaHref: z.string().max(CMS_URL_MAX, `CTA href must be ${CMS_URL_MAX} characters or fewer`),
+  ctaHref: z
+    .string()
+    .max(CMS_URL_MAX, `CTA href must be ${CMS_URL_MAX} characters or fewer`)
+    .refine(isSafeCmsUrl, CMS_URL_SAFE_MESSAGE),
   bodySections: z.array(cmsBodySectionSchema).default([]),
 });
 export type CmsPageContentInput = z.infer<typeof cmsPageContentSchema>;

@@ -1,3 +1,4 @@
+import { isSafeCmsUrl } from "@bm/contracts";
 import { getUnitPage } from "./unit-content";
 
 /**
@@ -98,6 +99,22 @@ export function resolveUnitPageView(slug: string, cms: PublishedCmsPage | null):
 /** Title-case a slug as a last-resort page title (CMS-only slugs, e.g. "shop"). */
 function titleFromSlug(slug: string): string {
   return slug.charAt(0).toUpperCase() + slug.slice(1);
+}
+
+/**
+ * Defence-in-depth stored-XSS guard for the PUBLIC page (security review of 36.3).
+ * The schema {@link isSafeCmsUrl} refine blocks unsafe URLs at write time, but a
+ * `javascript:`/`data:`/`vbscript:`/`//evil` value may already be persisted from
+ * before that refine existed — so the render layer sanitises again. An unsafe
+ * `ctaHref` collapses to "#" (a no-op anchor, CTA text preserved); an unsafe (or
+ * empty) `heroImageSrc` becomes `undefined` so the `<img>` is dropped entirely.
+ */
+export function safeHref(href: string): string {
+  return isSafeCmsUrl(href) ? href : "#";
+}
+
+export function safeImageSrc(src: string): string | undefined {
+  return src !== "" && isSafeCmsUrl(src) ? src : undefined;
 }
 
 /**
