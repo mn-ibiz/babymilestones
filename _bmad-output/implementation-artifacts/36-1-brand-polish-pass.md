@@ -1,6 +1,6 @@
 # Story 36.1: Brand polish pass
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E06-S01 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E06-S01.md
 

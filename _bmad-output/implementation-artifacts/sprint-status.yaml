@@ -329,7 +329,7 @@ development_status:
 
   # Epic 36 — Marketing Site Polish  (P5-E06)
   epic-36: in-progress
-  36-1-brand-polish-pass: ready-for-dev  # P5-E06-S01
+  36-1-brand-polish-pass: review  # P5-E06-S01
   36-2-seo-performance-budget-tightening: review  # P5-E06-S02
   36-3-cms-driven-unit-pages: review  # P5-E06-S03
   36-4-blog-stories-optional: review  # P5-E06-S04
