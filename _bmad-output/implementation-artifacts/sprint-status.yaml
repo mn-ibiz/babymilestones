@@ -331,7 +331,7 @@ development_status:
   epic-36: in-progress
   36-1-brand-polish-pass: ready-for-dev  # P5-E06-S01
   36-2-seo-performance-budget-tightening: ready-for-dev  # P5-E06-S02
-  36-3-cms-driven-unit-pages: ready-for-dev  # P5-E06-S03
+  36-3-cms-driven-unit-pages: review  # P5-E06-S03
   36-4-blog-stories-optional: ready-for-dev  # P5-E06-S04
   36-5-social-proof-testimonials: review  # P5-E06-S05
   epic-36-retrospective: optional

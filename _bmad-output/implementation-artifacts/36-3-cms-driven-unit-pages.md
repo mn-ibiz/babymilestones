@@ -1,6 +1,6 @@
 # Story 36.3: CMS-driven unit pages
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E06-S03 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E06-S03.md
 
