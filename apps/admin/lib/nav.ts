@@ -211,6 +211,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Pages",
     permission: { action: "manage", resource: "config" },
   },
+  // P6-E06-S04 (Story 36.4): Blog / parenting stories — admins write + publish
+  // parenting articles for the public blog (SEO + engagement). Editing the public
+  // blog is a content mutation, so it gates on `manage config` — admin / super_admin
+  // only (same as Pages / review snippets). The server re-enforces the same gate.
+  {
+    href: "/articles",
+    label: "Blog",
+    permission: { action: "manage", resource: "config" },
+  },
   // P6-E05-S01 (Story 35.1): consolidated P&L by period — per-unit revenue /
   // direct costs / expenses / net + MoM/YoY comparison. P&L is the sensitive
   // owners'-books view, gated on `read report` — admin / accountant / treasury /

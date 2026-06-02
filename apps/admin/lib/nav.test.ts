@@ -109,6 +109,19 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(canAccessRoute("treasury", "/review-snippets")).toBe(false);
   });
 
+  it("the blog (articles) editor is visible to manage-config roles only (P6-E06-S04 / Story 36.4)", () => {
+    // admin / super_admin hold manage:config — editing the public blog is a mutation.
+    for (const role of ["admin", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/articles");
+      expect(canAccessRoute(role, "/articles")).toBe(true);
+    }
+    // treasury / accountant / reception may not edit the public blog.
+    expect(visibleNavFor("treasury").map((i) => i.href)).not.toContain("/articles");
+    expect(visibleNavFor("accountant").map((i) => i.href)).not.toContain("/articles");
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/articles");
+    expect(canAccessRoute("treasury", "/articles")).toBe(false);
+  });
+
   it("the expenses module is visible to manage-expense roles (admin/accountant/super_admin) (P6-E05-S05 / Story 35.5)", () => {
     for (const role of ["admin", "accountant", "super_admin"]) {
       expect(visibleNavFor(role).map((i) => i.href)).toContain("/expenses");

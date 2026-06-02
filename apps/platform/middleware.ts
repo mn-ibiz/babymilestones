@@ -30,6 +30,14 @@ const PUBLIC_PATHS = ["/login", "/signup", "/forgot", "/_next", "/favicon.ico"];
 const DEEP_LINK_RE = /^\/book\/[^/]+$/u;
 
 /**
+ * The public parenting-stories blog (P6-E06-S04 / Story 36.4): the index at `/blog`
+ * and one page per article at `/blog/<slug>`. Both must render for first-time,
+ * unauthenticated visitors (SEO). Matched as `/blog` exactly or a single extra
+ * segment — never a deeper authed path.
+ */
+const BLOG_RE = /^\/blog(?:\/[^/]+)?$/u;
+
+/**
  * Exact public marketing routes in the `(public)` route group: the home page
  * (P1-E12-S01) at `/` plus one per-unit page (P1-E12-S02) at `/play`,
  * `/talent`, `/salon`, `/events`, `/coaching`. All must render for first-time,
@@ -53,6 +61,7 @@ const PUBLIC_EXACT_PATHS = new Set([
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
   if (DEEP_LINK_RE.test(pathname)) return true;
+  if (BLOG_RE.test(pathname)) return true;
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 }
 

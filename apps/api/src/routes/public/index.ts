@@ -12,6 +12,7 @@ import {
   ReviewSnippetsRateLimiter,
 } from "./review-snippets.js";
 import { registerPublicCmsPages } from "./cms-pages.js";
+import { registerPublicArticles } from "./articles.js";
 
 export interface PublicRoutesDeps {
   db: Database;
@@ -48,4 +49,7 @@ export function registerPublicRoutes(app: FastifyInstance, deps: PublicRoutesDep
   // platform per-unit public pages to render (falling back to static content on a
   // 404). Drafts are NEVER exposed here.
   registerPublicCmsPages(app, { db: deps.db });
+  // P6-E06-S04 (Story 36.4): the PUBLISHED parenting-articles blog — list + per-slug
+  // detail for the platform blog pages. Drafts are NEVER exposed here.
+  registerPublicArticles(app, { db: deps.db });
 }

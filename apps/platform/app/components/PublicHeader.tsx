@@ -23,9 +23,15 @@ export function PublicHeader() {
 
   return (
     <header className="flex items-center justify-between gap-4 border-b border-ink/10 px-4 py-3">
-      <Link href="/" className="text-base font-semibold text-ink">
-        Baby Milestones
-      </Link>
+      <div className="flex items-center gap-4">
+        <Link href="/" className="text-base font-semibold text-ink">
+          Baby Milestones
+        </Link>
+        {/* P6-E06-S04 (Story 36.4): the parenting-stories blog. */}
+        <Link href="/blog" className="text-sm font-medium text-ink/70 hover:text-ink">
+          Stories
+        </Link>
+      </div>
       <nav aria-label="Account" className="flex items-center gap-2">
         <Link
           href={signInHref(next)}

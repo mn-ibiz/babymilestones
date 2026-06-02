@@ -526,6 +526,25 @@ export {
   type PublishPageInput,
 } from "./cms-pages.js";
 
+// Blog / parenting stories — a DB-backed blog of parenting articles for SEO +
+// engagement (P6-E06-S04 / Story 36.4).
+export {
+  ArticleValidationError,
+  ArticleSlugTakenError,
+  createArticle,
+  updateArticle,
+  publishArticle,
+  unpublishArticle,
+  getArticle,
+  getArticleBySlug,
+  getPublishedArticle,
+  listPublishedArticles,
+  listArticlesForAdmin,
+  type CreateArticleInput,
+  type UpdateArticleInput,
+  type ListPublishedOptions,
+} from "./articles.js";
+
 // Consolidated P&L by period — per-unit revenue / direct costs / expenses / net +
 // consolidated totals, with MoM / YoY comparison (P6-E05-S01 / Story 35.1).
 export {

@@ -6114,3 +6114,128 @@ export interface PublicCmsPageDto {
   ctaHref: string;
   bodySections: CmsBodySectionDto[];
 }
+
+// ---------------------------------------------------------------------------
+// Blog / parenting stories (P6-E06-S04 / Story 36.4). A DB-backed blog of
+// parenting articles for SEO + engagement. An article is a slugged, tagged,
+// authored markdown post (`body_md`) with a draft/published lifecycle (AC1) and
+// admin CRUD gated on `manage config` (AC2). The public list + per-article
+// pages (AC3) render PUBLISHED articles only; drafts are never exposed. Schemas
+// mirror the `@bm/catalog` articles validation + the DB CHECKs.
+// ---------------------------------------------------------------------------
+
+/** An article lifecycle status (AC1). */
+export const ARTICLE_STATUSES = ["draft", "published"] as const;
+export type ArticleStatus = (typeof ARTICLE_STATUSES)[number];
+
+/** True when `value` is one of the known article statuses. */
+export function isArticleStatus(value: unknown): value is ArticleStatus {
+  return typeof value === "string" && (ARTICLE_STATUSES as readonly string[]).includes(value);
+}
+
+export const ARTICLE_TITLE_MAX = 200;
+export const ARTICLE_BODY_MAX = 100_000;
+export const ARTICLE_URL_MAX = 500;
+export const ARTICLE_AUTHOR_MAX = 120;
+export const ARTICLE_TAG_MAX = 40;
+export const ARTICLE_TAGS_MAX = 20;
+export const ARTICLE_SLUG_MAX = 120;
+
+/**
+ * A blog slug (AC1): lowercase kebab-case, `[a-z0-9]` segments joined by single
+ * hyphens — URL-safe, stable, no leading/trailing/double hyphens. The DB also
+ * enforces uniqueness; this only validates the FORMAT.
+ */
+export const articleSlugSchema = z
+  .string()
+  .min(1, "Slug is required")
+  .max(ARTICLE_SLUG_MAX, `Slug must be ${ARTICLE_SLUG_MAX} characters or fewer`)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u, "Slug must be lowercase kebab-case (a-z, 0-9, single hyphens)");
+export type ArticleSlug = z.infer<typeof articleSlugSchema>;
+
+/** True when `value` is a well-formed article slug. */
+export function isArticleSlug(value: unknown): value is ArticleSlug {
+  return articleSlugSchema.safeParse(value).success;
+}
+
+/**
+ * Create/update (save) an article (AC1): slug + title + markdown body + optional
+ * cover image, tags, and author. `tags` are trimmed + blanks dropped; an absent
+ * cover resolves to null. The lifecycle (draft → published) is driven by the
+ * publish endpoint, not this payload.
+ */
+export const articleSaveSchema = z.object({
+  slug: articleSlugSchema,
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(ARTICLE_TITLE_MAX, `Title must be ${ARTICLE_TITLE_MAX} characters or fewer`),
+  bodyMd: z
+    .string()
+    .trim()
+    .min(1, "Body is required")
+    .max(ARTICLE_BODY_MAX, `Body must be ${ARTICLE_BODY_MAX} characters or fewer`),
+  coverImageUrl: z
+    .string()
+    .max(ARTICLE_URL_MAX, `Cover image URL must be ${ARTICLE_URL_MAX} characters or fewer`)
+    .nullish()
+    .transform((v) => (v && v.trim() !== "" ? v.trim() : null)),
+  tags: z
+    .array(z.string())
+    .default([])
+    .transform((tags) =>
+      tags
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+        .slice(0, ARTICLE_TAGS_MAX)
+        .map((t) => t.slice(0, ARTICLE_TAG_MAX)),
+    ),
+  author: z
+    .string()
+    .trim()
+    .min(1, "Author is required")
+    .max(ARTICLE_AUTHOR_MAX, `Author must be ${ARTICLE_AUTHOR_MAX} characters or fewer`),
+});
+export type ArticleSaveInput = z.infer<typeof articleSaveSchema>;
+
+/** Wire DTO for one article (admin view — includes drafts + body). */
+export interface ArticleDto {
+  id: string;
+  slug: string;
+  title: string;
+  bodyMd: string;
+  coverImageUrl: string | null;
+  tags: string[];
+  author: string;
+  status: ArticleStatus;
+  /** ISO timestamp the article was published, or null (never published). */
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Wire DTO for one PUBLISHED article on the public detail page (AC3). Same fields
+ * as the admin DTO minus the lifecycle internals the public never needs; the
+ * surface only ever returns published rows so `status` is implied.
+ */
+export interface PublicArticleDto {
+  slug: string;
+  title: string;
+  bodyMd: string;
+  coverImageUrl: string | null;
+  tags: string[];
+  author: string;
+  publishedAt: string | null;
+}
+
+/** A row in the public article list (AC3) — no body, for a lean index. */
+export interface PublicArticleSummaryDto {
+  slug: string;
+  title: string;
+  coverImageUrl: string | null;
+  tags: string[];
+  author: string;
+  publishedAt: string | null;
+}
