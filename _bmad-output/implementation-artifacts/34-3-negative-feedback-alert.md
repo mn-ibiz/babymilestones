@@ -1,6 +1,6 @@
 # Story 34.3: Negative feedback alert
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E04-S03 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E04-S03.md
 
