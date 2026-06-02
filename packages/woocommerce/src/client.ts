@@ -81,6 +81,8 @@ export interface ListOrdersOptions {
   status?: string[];
   /** 1-based page number. */
   page?: number;
+  /** Page size; sent as Woo's `per_page`. Defaults to {@link WC_ORDERS_PER_PAGE}. */
+  perPage?: number;
 }
 
 export interface ListProductsOptions {
@@ -109,6 +111,16 @@ export interface WooClient {
 
 /** WooCommerce REST API base path under the site URL. */
 const API_BASE = "/wp-json/wc/v3";
+
+/**
+ * Pinned page size for order listing. Sent as an explicit `per_page` on every
+ * `listOrders` request so the pull loop's terminator (`orders.length <
+ * WC_ORDERS_PER_PAGE`) agrees with the real page size. NEVER rely on the Woo
+ * server default here: if that default is ever < 10, a FULL page would look
+ * "short" and the pull loop would stop early, silently dropping every remaining
+ * order from the POS mirror while still recording the run as a success.
+ */
+export const WC_ORDERS_PER_PAGE = 100;
 
 /** Parse a Woo error body best-effort to extract code + message (AC5). */
 function readWooError(body: unknown): { code: string | null; message: string | null } {
@@ -225,6 +237,9 @@ export function createWooClient(opts: CreateWooClientOptions): WooClient {
         modified_after: o.since,
         status: o.status && o.status.length > 0 ? o.status.join(",") : undefined,
         page: o.page !== undefined ? String(o.page) : undefined,
+        // Pin the page size explicitly so a full page is never mistaken for the
+        // tail by the pull loop terminator (see WC_ORDERS_PER_PAGE).
+        per_page: String(o.perPage ?? WC_ORDERS_PER_PAGE),
       });
       return send("GET", url, wooOrderListSchema);
     },

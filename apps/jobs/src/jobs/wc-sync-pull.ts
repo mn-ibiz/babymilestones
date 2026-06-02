@@ -1,5 +1,5 @@
 import { audit, type Database } from "@bm/db";
-import { advanceCheckpoint, getSyncState, upsertWcOrder } from "@bm/woocommerce";
+import { advanceCheckpoint, getSyncState, upsertWcOrder, WC_ORDERS_PER_PAGE } from "@bm/woocommerce";
 import type { WooOrder } from "@bm/contracts";
 import { logger as defaultLogger } from "../logger.js";
 import type { Job } from "../registry.js";
@@ -11,7 +11,7 @@ const MAX_PAGES = 50;
 
 /** The slice of the Woo client the pull needs (injected — no network in tests). */
 export interface WcPullClient {
-  listOrders(opts?: { since?: string; page?: number }): Promise<WooOrder[]>;
+  listOrders(opts?: { since?: string; page?: number; perPage?: number }): Promise<WooOrder[]>;
 }
 
 /** Minimal structured-logger shape the job needs (the shared jobs logger fits). */
@@ -77,7 +77,7 @@ export function createWcSyncPullJob(deps: WcSyncPullJobDeps): Job {
       let pulled = 0;
       let newest: Date | null = null;
       for (let page = 1; page <= MAX_PAGES; page++) {
-        const orders = await deps.client.listOrders({ since, page });
+        const orders = await deps.client.listOrders({ since, page, perPage: WC_ORDERS_PER_PAGE });
         if (orders.length === 0) break;
         for (const o of orders) {
           await upsertWcOrder(db, o);
@@ -85,9 +85,11 @@ export function createWcSyncPullJob(deps: WcSyncPullJobDeps): Job {
           const mod = parseModified(o.date_modified);
           if (mod && (!newest || mod > newest)) newest = mod;
         }
-        // A short page means we have reached the tail — stop paging.
-        if (orders.length < 1) break;
-        if (orders.length < 10) break; // Woo's default per_page is 10; a partial page is the last.
+        // A page shorter than the pinned request size is the tail — stop paging.
+        // The terminator MUST compare against the SAME constant we asked for, so a
+        // full page is never mistaken for a short one (which would silently drop
+        // every remaining order). See WC_ORDERS_PER_PAGE.
+        if (orders.length < WC_ORDERS_PER_PAGE) break;
       }
 
       // Advance the checkpoint (never backwards) and stamp the completion.

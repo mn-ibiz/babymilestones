@@ -11,7 +11,7 @@
  */
 export const PACKAGE = "@bm/woocommerce" as const;
 
-export { createWooClient } from "./client.js";
+export { createWooClient, WC_ORDERS_PER_PAGE } from "./client.js";
 export type {
   WooClient,
   WooConfig,

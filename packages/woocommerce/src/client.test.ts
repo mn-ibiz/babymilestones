@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createWooClient,
+  WC_ORDERS_PER_PAGE,
   WooNotFound,
   WooRateLimited,
   WooAuthFailed,
@@ -71,6 +72,11 @@ describe("WooCommerce REST client (Story 29.6)", () => {
       expect(url.searchParams.get("modified_after")).toBe("2026-01-01T00:00:00Z");
       expect(url.searchParams.get("status")).toBe("processing,completed");
       expect(url.searchParams.get("page")).toBe("2");
+      // The page size MUST be pinned explicitly so the pull loop's terminator
+      // (orders.length < WC_ORDERS_PER_PAGE) agrees with the real page size —
+      // never relying on the Woo server default (which can be < 10 and would
+      // then silently drop a full page of orders).
+      expect(url.searchParams.get("per_page")).toBe(String(WC_ORDERS_PER_PAGE));
 
       const headers = new Headers(calls[0]!.init.headers);
       const expected = "Basic " + Buffer.from("ck_test_key:cs_test_secret").toString("base64");

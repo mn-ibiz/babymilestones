@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, type TestDb } from "@bm/db/testing";
 import { auditOutbox, wcOrders } from "@bm/db";
-import { getSyncState } from "@bm/woocommerce";
+import { getSyncState, WC_ORDERS_PER_PAGE } from "@bm/woocommerce";
 import type { WooOrder } from "@bm/contracts";
 import { createWcSyncPullJob } from "./wc-sync-pull.js";
 
@@ -29,15 +29,18 @@ describe("WooCommerce sync pull job (Story 29.7)", () => {
     return { id, status, number: String(id), date_modified: modified } as WooOrder;
   }
 
-  /** A fake client whose listOrders returns a fixed page set and records the `since` it saw. */
+  /** A fake client whose listOrders returns a fixed page set and records every opts it saw. */
   function fakeClient(pages: WooOrder[][]) {
     const seenSince: (string | undefined)[] = [];
+    const seenOpts: ({ since?: string; page?: number; perPage?: number } | undefined)[] = [];
     let call = 0;
     return {
       seenSince,
+      seenOpts,
       client: {
-        listOrders: async (opts?: { since?: string; page?: number }) => {
+        listOrders: async (opts?: { since?: string; page?: number; perPage?: number }) => {
           seenSince.push(opts?.since);
+          seenOpts.push(opts);
           const page = pages[call] ?? [];
           call += 1;
           return page;
@@ -76,6 +79,51 @@ describe("WooCommerce sync pull job (Story 29.7)", () => {
       .where(eq(auditOutbox.action, "woocommerce.sync.pulled"));
     expect(audits).toHaveLength(1);
     expect((audits[0]!.payload as Record<string, unknown>).count).toBe(2);
+  });
+
+  it("pulls EVERY order across a full first page + a partial second page (no silent drop)", async () => {
+    // A FULL first page (exactly WC_ORDERS_PER_PAGE orders) must NOT terminate the
+    // loop — only a page shorter than the pinned page size is the tail. Regression
+    // guard for the silent-drop bug where a < 10 heuristic mismatched the real
+    // page size and dropped a whole trailing page.
+    const fullPage = Array.from({ length: WC_ORDERS_PER_PAGE }, (_, i) =>
+      order(i + 1, `2026-06-02T11:${String(i % 60).padStart(2, "0")}:00`),
+    );
+    const partialPage = [
+      order(WC_ORDERS_PER_PAGE + 1, "2026-06-02T11:59:00"),
+      order(WC_ORDERS_PER_PAGE + 2, "2026-06-02T11:59:30"),
+    ];
+    const { client, seenOpts } = fakeClient([fullPage, partialPage]);
+    const job = createWcSyncPullJob({ db: dbh.db, client, now: () => NOW, logger: silentLogger });
+    await job.run();
+
+    // ALL orders across BOTH pages are upserted — none dropped.
+    const rows = await dbh.db.select().from(wcOrders);
+    expect(rows).toHaveLength(WC_ORDERS_PER_PAGE + 2);
+    const ids = rows.map((r) => r.wooOrderId).sort((a, b) => a - b);
+    expect(ids[0]).toBe(1);
+    expect(ids[ids.length - 1]).toBe(WC_ORDERS_PER_PAGE + 2);
+
+    // The loop paged exactly twice (full page → continue, partial page → stop).
+    expect(seenOpts).toHaveLength(2);
+    expect(seenOpts[0]?.page).toBe(1);
+    expect(seenOpts[1]?.page).toBe(2);
+    // listOrders is requested with the pinned page size — request size and the
+    // loop terminator agree, so a full page is never mistaken for the tail.
+    expect(seenOpts[0]?.perPage).toBe(WC_ORDERS_PER_PAGE);
+    expect(seenOpts[1]?.perPage).toBe(WC_ORDERS_PER_PAGE);
+
+    // Checkpoint advances to the newest date_modified across BOTH pages.
+    const state = await getSyncState(dbh.db);
+    expect(state.lastSyncAt?.toISOString()).toBe("2026-06-02T11:59:30.000Z");
+
+    // The summary audit counts every pulled order.
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "woocommerce.sync.pulled"));
+    expect(audits).toHaveLength(1);
+    expect((audits[0]!.payload as Record<string, unknown>).count).toBe(WC_ORDERS_PER_PAGE + 2);
   });
 
   it("passes the checkpoint as `since` on the next run (AC1)", async () => {
