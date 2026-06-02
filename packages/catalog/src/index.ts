@@ -226,6 +226,29 @@ export {
   type PendingFeedback,
 } from "./feedback.js";
 
+// Feedback dashboard by unit + by staff (P6-E04-S02 / Story 34.2). Pure
+// aggregation + DB read-model. Staff averages carry a min-sample guardrail; the
+// individual-response read is anonymised by default, de-anonymised on request.
+export {
+  aggregateFeedbackDashboard,
+  feedbackUnitForSourceType,
+  FEEDBACK_MIN_SAMPLE_SIZE,
+  type FeedbackUnit,
+  type FeedbackResponseRow,
+  type FeedbackDashboardInput,
+  type FeedbackUnitStats,
+  type FeedbackStaffStats,
+  type FeedbackDashboard,
+  type AggregateFeedbackDashboardOpts,
+} from "./feedback-dashboard.js";
+export {
+  loadFeedbackDashboard,
+  loadFeedbackResponses,
+  type LoadFeedbackDashboardOpts,
+  type LoadFeedbackResponsesOpts,
+  type FeedbackResponseDetail,
+} from "./feedback-dashboard-db.js";
+
 // Coach availability + 1:1 booking (P5-E01-S02 / Story 31.2). REUSES the generic
 // staff_availability table; bookable coaching_slots are capacity-1.
 export {

@@ -150,6 +150,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Salon report",
     permission: { action: "read", resource: "report" },
   },
+  // P6-E04-S02 (Story 34.2): feedback dashboard by unit + by staff. Gates on
+  // `read report` — admin / accountant / treasury / super_admin. De-anonymising a
+  // response (revealing the parent) is gated to admin/super_admin server-side and
+  // audited; the dashboard READ itself is the broader report-reading posture.
+  {
+    href: "/feedback",
+    label: "Feedback",
+    permission: { action: "read", resource: "report" },
+  },
   {
     href: "/treasury/float-accounts",
     label: "Float accounts",

@@ -29,6 +29,7 @@ import { registerAdminRevenueByPeriod } from "./revenue-by-period.js";
 import { registerAdminStaffLeaderboard } from "./staff-leaderboard.js";
 import { registerAdminWalletAging } from "./wallet-aging.js";
 import { registerAdminPeakHoursHeatmap } from "./peak-hours-heatmap.js";
+import { registerAdminFeedbackDashboard } from "./feedback-dashboard.js";
 import { registerAdminDailyDispatch } from "./daily-dispatch.js";
 import {
   registerAdminWooCommerceConfig,
@@ -91,6 +92,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminDeps): void
   registerAdminStaffLeaderboard(app, deps); // P3-E05-S03 (Story 27.3)
   registerAdminWalletAging(app, deps); // P3-E05-S04 (Story 27.4)
   registerAdminPeakHoursHeatmap(app, deps); // P3-E05-S05 (Story 27.5)
+  registerAdminFeedbackDashboard(app, deps); // P6-E04-S02 (Story 34.2)
   registerAdminDailyDispatch(app, deps); // P4-E04-S04 (Story 29.4)
   registerAdminWooCommerceConfig(app, {
     db: deps.db,

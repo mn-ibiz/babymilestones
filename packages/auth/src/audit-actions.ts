@@ -255,8 +255,12 @@ export const AUDIT_ACTION_CATALOGUE = {
   /** Feedback Engine (Epic 34 / P6-E04) — a 0–5 rating after every paid touchpoint.
    * An invitation is CREATED on a completed touchpoint (salon checkout, attendance
    * pickup, order fulfilled, …); the parent SUBMITS the rating once. Both are state
-   * changes worth a forensic trail; the comment TEXT is never put in the payload. */
-  feedback: ["feedback.invited", "feedback.submitted"],
+   * changes worth a forensic trail; the comment TEXT is never put in the payload.
+   * P6-E04-S02 (Story 34.2): the feedback dashboard shows individual responses
+   * ANONYMISED by default; an admin DE-ANONYMISING one (revealing the parent
+   * behind a rating) is a sensitive identity disclosure worth a forensic line —
+   * `feedback.deanonymised`. The dashboard READ itself is not audited (a read). */
+  feedback: ["feedback.invited", "feedback.submitted", "feedback.deanonymised"],
   /** Events & recital ticketing (Epic 30) — event lifecycle + ticket issuance. */
   event: [
     "event.created",

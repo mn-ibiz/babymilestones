@@ -73,6 +73,16 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/salon-report");
   });
 
+  it("the feedback dashboard is visible to the read-report roles (P6-E04-S02 / Story 34.2)", () => {
+    // admin / accountant / treasury / super_admin hold read:report.
+    for (const role of ["admin", "accountant", "treasury", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/feedback");
+    }
+    // reception/parent never reach the admin console.
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/feedback");
+    expect(visibleNavFor("parent").map((i) => i.href)).not.toContain("/feedback");
+  });
+
   it("the operations dashboard is visible to admin/super_admin/treasury only (P3-E05-S01 AC4)", () => {
     for (const role of ["admin", "super_admin", "treasury"]) {
       expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations");

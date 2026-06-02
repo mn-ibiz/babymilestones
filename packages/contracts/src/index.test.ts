@@ -52,6 +52,13 @@ import {
   salonReportDrillRows,
   operationsDashboardTiles,
   operationsTopStaffRows,
+  feedbackDashboardQuerySchema,
+  feedbackUnitRows,
+  feedbackStaffRows,
+  feedbackResponseRows,
+  feedbackDistributionBars,
+  type FeedbackDashboardDto,
+  type FeedbackResponseDto,
   staffLeaderboardQuerySchema,
   staffLeaderboardRows,
   staffCommissionDrilldownView,
@@ -1027,6 +1034,71 @@ describe("operations dashboard tiles view-model (P3-E05-S01 / Story 27.1)", () =
     expect(byKey.bookings!.value).toBe("0");
     expect(byKey.topStaff!.value).toBe("—");
     expect(operationsTopStaffRows(empty)).toEqual([]);
+  });
+});
+
+describe("feedback dashboard contracts (P6-E04-S02 / Story 34.2)", () => {
+  const dashboard: FeedbackDashboardDto = {
+    from: "2026-06-01",
+    to: "2026-06-30",
+    totalResponses: 6,
+    units: [
+      { unit: "salon", count: 4, average: 4.5, distribution: [0, 0, 0, 0, 2, 2] },
+      { unit: "play", count: 2, average: 3, distribution: [0, 0, 0, 2, 0, 0] },
+    ],
+    staff: [
+      { staffId: "s1", staffName: "Asha", count: 5, average: 4.2, enoughSamples: true },
+      { staffId: "s2", staffName: "Bree", count: 2, average: null, enoughSamples: false },
+    ],
+  };
+
+  it("validates an inclusive date range; rejects fromDate after toDate (AC2)", () => {
+    expect(feedbackDashboardQuerySchema.safeParse({ fromDate: "2026-06-01", toDate: "2026-06-30" }).success).toBe(true);
+    expect(feedbackDashboardQuerySchema.safeParse({ fromDate: "2026-06-30", toDate: "2026-06-01" }).success).toBe(false);
+    expect(feedbackDashboardQuerySchema.safeParse({ fromDate: "nope", toDate: "2026-06-30" }).success).toBe(false);
+  });
+
+  it("shapes per-unit rows: formatted average + a distribution bar (AC1)", () => {
+    const rows = feedbackUnitRows(dashboard);
+    const salon = rows.find((r) => r.unit === "salon")!;
+    expect(salon.label).toBe("Salon");
+    expect(salon.count).toBe(4);
+    expect(salon.average).toBe("4.5");
+    // The distribution renders a 0..5 bar, summing to the unit count.
+    const bars = feedbackDistributionBars(salon.distribution);
+    expect(bars.reduce((a, b) => a + b.count, 0)).toBe(4);
+    expect(bars).toHaveLength(6);
+  });
+
+  it("shapes per-staff rows: surfaces a low-sample badge instead of the average (AC1 guardrail)", () => {
+    const rows = feedbackStaffRows(dashboard);
+    const asha = rows.find((r) => r.staffId === "s1")!;
+    expect(asha.average).toBe("4.2");
+    expect(asha.lowSample).toBe(false);
+    const bree = rows.find((r) => r.staffId === "s2")!;
+    // Below threshold → no average surfaced, low-sample badge instead.
+    expect(bree.average).toBe("—");
+    expect(bree.lowSample).toBe(true);
+    expect(bree.sampleBadge).toMatch(/\b2\b/);
+  });
+
+  it("shapes anonymised individual responses WITHOUT parent identity (AC3)", () => {
+    const responses: FeedbackResponseDto[] = [
+      { id: "f1", unit: "salon", staffId: "s1", staffName: "Asha", rating: 5, comment: "Lovely", submittedAt: "2026-06-12T10:00:00.000Z" },
+    ];
+    const rows = feedbackResponseRows(responses);
+    expect(rows[0]).toMatchObject({ id: "f1", unitLabel: "Salon", staffName: "Asha", rating: 5, comment: "Lovely" });
+    // No parent identity leaks into the view-model unless the DTO carries it.
+    expect(rows[0]!.parentName).toBeUndefined();
+    expect(JSON.stringify(rows[0])).not.toContain("parentName");
+  });
+
+  it("surfaces parent identity only when the de-anonymised DTO carries it (AC3)", () => {
+    const responses: FeedbackResponseDto[] = [
+      { id: "f1", unit: "salon", staffId: "s1", staffName: "Asha", rating: 5, comment: null, submittedAt: "2026-06-12T10:00:00.000Z", parentId: "p1", parentName: "Pat Doe" },
+    ];
+    const rows = feedbackResponseRows(responses);
+    expect(rows[0]!.parentName).toBe("Pat Doe");
   });
 });
 

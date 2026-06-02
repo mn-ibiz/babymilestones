@@ -3005,6 +3005,234 @@ export function operationsTopStaffRows(dto: OperationsDashboardDto): OperationsT
   }));
 }
 
+/* --- Feedback dashboard by unit + by staff (P6-E04-S02 / Story 34.2) ------ */
+
+/**
+ * Feedback-dashboard request (Story 34.2 AC2). The admin picks an inclusive date
+ * range (`YYYY-MM-DD`); the dashboard returns the per-unit + per-staff aggregates
+ * over `[fromDate, toDate]`. Both bounds are validated calendar dates and
+ * `fromDate <= toDate`. Reuses the shared {@link exportDateSchema}.
+ */
+export const feedbackDashboardQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type FeedbackDashboardQuery = z.infer<typeof feedbackDashboardQuerySchema>;
+
+/**
+ * Individual-response request (Story 34.2 AC3). Drills into one unit / staff over
+ * the same inclusive range; `reveal` opts into the DE-ANONYMISED variant (the API
+ * gates it on a strong permission + writes the audit row). Default is anonymised.
+ */
+export const feedbackResponsesQuerySchema = z
+  .object({
+    fromDate: exportDateSchema,
+    toDate: exportDateSchema,
+    unit: z.string().min(1).optional(),
+    staffId: z.string().uuid().optional(),
+    reveal: z
+      .union([z.literal("true"), z.literal("false"), z.boolean()])
+      .optional()
+      .transform((v) => v === true || v === "true"),
+  })
+  .refine((v) => v.fromDate <= v.toDate, {
+    message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  });
+export type FeedbackResponsesQuery = z.infer<typeof feedbackResponsesQuerySchema>;
+
+/** The dashboard unit a feedback touchpoint rolls up to (mirror of @bm/catalog). */
+export type FeedbackUnit = "salon" | "play" | "talent" | "coaching" | "order" | "event" | "other";
+
+/** Human label for a feedback unit, used by the dashboard tables. */
+export function feedbackUnitLabel(unit: FeedbackUnit): string {
+  switch (unit) {
+    case "salon":
+      return "Salon";
+    case "play":
+      return "Play";
+    case "talent":
+      return "Talent";
+    case "coaching":
+      return "Coaching";
+    case "order":
+      return "Online orders";
+    case "event":
+      return "Events";
+    case "other":
+      return "Other";
+  }
+}
+
+/** Per-unit aggregate on the wire (AC1). */
+export interface FeedbackUnitStatsDto {
+  unit: FeedbackUnit;
+  count: number;
+  average: number;
+  /** Histogram indexed 0..5 (`distribution[r]` = number of `r`-star responses). */
+  distribution: number[];
+}
+
+/** Per-staff aggregate on the wire — average suppressed below the guardrail (AC1). */
+export interface FeedbackStaffStatsDto {
+  staffId: string;
+  staffName: string;
+  count: number;
+  /** Mean rating, or `null` until the sample reaches the min-sample threshold. */
+  average: number | null;
+  enoughSamples: boolean;
+}
+
+/**
+ * The feedback-dashboard API response (Story 34.2). Identical shape to
+ * `@bm/catalog`'s `FeedbackDashboard` (all primitives, serialisable).
+ */
+export interface FeedbackDashboardDto {
+  from: string;
+  to: string;
+  totalResponses: number;
+  units: FeedbackUnitStatsDto[];
+  staff: FeedbackStaffStatsDto[];
+}
+
+/**
+ * An individual feedback response on the wire (Story 34.2 AC3). ANONYMISED by
+ * default — rating / comment / date / unit / staff but NO parent identity. The
+ * de-anonymised variant ADDS `parentId` + `parentName` (the only place a parent's
+ * identity ever appears on this surface).
+ */
+export interface FeedbackResponseDto {
+  id: string;
+  unit: FeedbackUnit;
+  staffId: string | null;
+  staffName: string | null;
+  rating: number;
+  comment: string | null;
+  /** ISO timestamp the parent submitted. */
+  submittedAt: string;
+  /** Present ONLY on a de-anonymised (revealed) response (AC3). */
+  parentId?: string;
+  /** Present ONLY on a de-anonymised (revealed) response (AC3). */
+  parentName?: string;
+}
+
+/** Format a 0..5 average to one decimal place, e.g. `4.5`. */
+export function formatFeedbackAverage(average: number): string {
+  return average.toFixed(1);
+}
+
+/** One bar of the 0..5 rating distribution (AC1). */
+export interface FeedbackDistributionBar {
+  rating: number;
+  count: number;
+}
+
+/** Shape a 0..5 distribution histogram into render-ready bars (AC1). */
+export function feedbackDistributionBars(distribution: readonly number[]): FeedbackDistributionBar[] {
+  return Array.from({ length: 6 }, (_, rating) => ({ rating, count: distribution[rating] ?? 0 }));
+}
+
+/** A render-ready per-unit row (AC1). */
+export interface FeedbackUnitRow {
+  unit: FeedbackUnit;
+  label: string;
+  count: number;
+  /** Formatted average (one decimal), or `—` when the unit has no responses. */
+  average: string;
+  distribution: number[];
+  /** Drill-down to this unit's individual responses (AC3). */
+  href: string;
+}
+
+/** Shape the per-unit aggregates into render-ready rows (AC1). */
+export function feedbackUnitRows(dto: FeedbackDashboardDto): FeedbackUnitRow[] {
+  return dto.units.map((u) => ({
+    unit: u.unit,
+    label: feedbackUnitLabel(u.unit),
+    count: u.count,
+    average: u.count > 0 ? formatFeedbackAverage(u.average) : "—",
+    distribution: u.distribution,
+    href: `/feedback/responses?unit=${u.unit}`,
+  }));
+}
+
+/** A render-ready per-staff row with the min-sample guardrail surfaced (AC1). */
+export interface FeedbackStaffRow {
+  staffId: string;
+  staffName: string;
+  count: number;
+  /** Formatted average, or `—` when the sample is below the guardrail. */
+  average: string;
+  /** True when the average is suppressed for too few samples (AC1). */
+  lowSample: boolean;
+  /** A short badge explaining the suppression, e.g. `2 ratings (need more)`. */
+  sampleBadge: string;
+  /** Drill-down to this staff member's individual responses (AC3). */
+  href: string;
+}
+
+/**
+ * Shape the per-staff aggregates into render-ready rows (AC1). When the average is
+ * suppressed (the min-sample guardrail), the row surfaces `—` plus a low-sample
+ * badge instead of a misleading one-star-surprise average.
+ */
+export function feedbackStaffRows(dto: FeedbackDashboardDto): FeedbackStaffRow[] {
+  return dto.staff.map((s) => {
+    const lowSample = !s.enoughSamples || s.average === null;
+    return {
+      staffId: s.staffId,
+      staffName: s.staffName,
+      count: s.count,
+      average: lowSample || s.average === null ? "—" : formatFeedbackAverage(s.average),
+      lowSample,
+      sampleBadge: lowSample
+        ? `${s.count.toLocaleString("en-KE")} ratings (need more)`
+        : `${s.count.toLocaleString("en-KE")} ratings`,
+      href: `/feedback/responses?staffId=${s.staffId}`,
+    };
+  });
+}
+
+/** A render-ready individual-response row (AC3). */
+export interface FeedbackResponseRowView {
+  id: string;
+  unitLabel: string;
+  staffName: string;
+  rating: number;
+  comment: string;
+  /** Formatted date (`YYYY-MM-DD`) the response was submitted. */
+  date: string;
+  /** Present ONLY on a de-anonymised (revealed) response (AC3). */
+  parentName?: string;
+}
+
+/**
+ * Shape the individual responses into render-ready rows (AC3). ANONYMISED by
+ * default — `parentName` is set ONLY when the DTO carries it (the de-anonymised
+ * variant). Never invents a parent identity from an anonymised payload.
+ */
+export function feedbackResponseRows(responses: readonly FeedbackResponseDto[]): FeedbackResponseRowView[] {
+  return responses.map((r) => {
+    const row: FeedbackResponseRowView = {
+      id: r.id,
+      unitLabel: feedbackUnitLabel(r.unit),
+      staffName: r.staffName ?? "Unattributed",
+      rating: r.rating,
+      comment: r.comment ?? "",
+      date: r.submittedAt.slice(0, 10),
+    };
+    if (r.parentName !== undefined || r.parentId !== undefined) {
+      row.parentName = r.parentName ?? r.parentId;
+    }
+    return row;
+  });
+}
+
 /* --- Revenue by unit, by period (P3-E05-S02 / Story 27.2) ----------------- */
 
 /**
