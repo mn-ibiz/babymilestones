@@ -7,6 +7,8 @@ import {
   renderArticleMarkdown,
   shareLinks,
 } from "../../../../lib/blog";
+import { articleJsonLd, buildMetadata } from "../../../../lib/seo";
+import { JsonLd } from "../../../components/JsonLd";
 
 /**
  * Public per-article page (P6-E06-S04 / Story 36.4) at `/blog/[slug]`.
@@ -31,11 +33,15 @@ export async function generateMetadata(props: {
   if (!article) return {};
   // A short, plain-text description from the start of the body (markup stripped).
   const description = article.bodyMd.replace(/[#*_>\-`[\]()]/gu, "").trim().slice(0, 160);
-  return {
+  // Story 36.2 AC2: full canonical + OG (type=article) + Twitter, using the
+  // article cover as the share image when present.
+  return buildMetadata({
     title: `${article.title} — Baby Milestones`,
     description,
-    openGraph: article.coverImageUrl ? { images: [{ url: article.coverImageUrl }] } : undefined,
-  };
+    path: `/blog/${slug}`,
+    type: "article",
+    ...(article.coverImageUrl ? { image: article.coverImageUrl } : {}),
+  });
 }
 
 export default async function ArticleDetailPage(props: {
@@ -50,6 +56,8 @@ export default async function ArticleDetailPage(props: {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 md:py-16">
+      {/* Story 36.2 AC2: per-article Article structured data (LocalBusiness is in the layout). */}
+      <JsonLd data={articleJsonLd(article)} />
       <p className="text-sm text-ink/60">
         <Link href="/blog" className="text-brand hover:underline">
           ← All stories

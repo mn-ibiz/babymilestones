@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { fetchPublishedArticles } from "../../../lib/blog";
+import { buildMetadata } from "../../../lib/seo";
 
 /**
  * Public Blog index (P6-E06-S04 / Story 36.4) at `/blog`.
@@ -13,10 +14,17 @@ import { fetchPublishedArticles } from "../../../lib/blog";
  * renders an empty state rather than crashing).
  */
 
+// Story 36.2 AC2: canonical + OG + Twitter for the blog index. The branded title
+// is set absolute so the `<title>`, OG and Twitter cards all read consistently
+// (the root template would otherwise only brand the document title, not OG).
 export const metadata: Metadata = {
-  title: "Parenting stories & tips — Baby Milestones",
-  description:
-    "Practical parenting articles on play, development, nutrition, sleep and more from the Baby Milestones team.",
+  ...buildMetadata({
+    title: "Parenting stories & tips — Baby Milestones",
+    description:
+      "Practical parenting articles on play, development, nutrition, sleep and more from the Baby Milestones team.",
+    path: "/blog",
+  }),
+  title: { absolute: "Parenting stories & tips — Baby Milestones" },
 };
 
 type BlogParams = { searchParams: Promise<{ tag?: string }> };

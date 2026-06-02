@@ -9,6 +9,7 @@ import {
   safeHref,
   safeImageSrc,
 } from "../../../lib/cms-page";
+import { buildMetadata } from "../../../lib/seo";
 
 /**
  * Per-unit marketing page (P1-E12-S02) at `/play`, `/talent`, `/salon`,
@@ -40,10 +41,17 @@ export async function generateMetadata(props: {
   const cms = await fetchPublishedUnitPage(unit);
   const view = resolveUnitPageView(unit, cms);
   if (!view) return {};
-  return {
-    title: `${view.title} — Baby Milestones`,
+  // Story 36.2 AC2: per-unit canonical + OG + Twitter. Use the unit's own hero
+  // image as the OG image when it is an absolute (off-app) URL — relative app
+  // paths resolve against metadataBase, but the CDN cover is preferred.
+  const ogImage = /^https?:\/\//u.test(view.heroImageSrc) ? view.heroImageSrc : undefined;
+  const brandedTitle = `${view.title} — Baby Milestones`;
+  return buildMetadata({
+    title: brandedTitle,
     description: view.heroCopy,
-  };
+    path: `/${unit}`,
+    ...(ogImage ? { image: ogImage } : {}),
+  });
 }
 
 export default async function UnitPage(props: {

@@ -8,6 +8,7 @@ import {
   fetchHomeTestimonials,
   unitLinkAttrs,
 } from "../../lib/home-content";
+import { buildMetadata } from "../../lib/seo";
 
 /**
  * Public marketing home page (P1-E12-S01) at `/`.
@@ -20,10 +21,17 @@ import {
  * eagerly to meet the sub-2s-on-3G budget (AC4).
  */
 
+// Story 36.2 AC2: full meta + canonical + OG + Twitter for the home page. The
+// title is absolute (overrides the root template) to keep the keyword-rich
+// landing title; the site-wide LocalBusiness JSON-LD is injected by the layout.
 export const metadata: Metadata = {
-  title: "Baby Milestones — Play, Talent, Salon & Toy Shop",
-  description:
-    "Play, talent, salon and toy shop for your little one — one wallet, one tap. Top up and book in seconds.",
+  ...buildMetadata({
+    title: "Baby Milestones — Play, Talent, Salon & Toy Shop",
+    description:
+      "Play, talent, salon and toy shop for your little one — one wallet, one tap. Top up and book in seconds.",
+    path: "/",
+  }),
+  title: { absolute: "Baby Milestones — Play, Talent, Salon & Toy Shop" },
 };
 
 export default async function MarketingHomePage() {

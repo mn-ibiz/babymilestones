@@ -73,9 +73,9 @@ describe("unitLinkAttrs", () => {
   });
 });
 
-describe("LCP budget (AC4)", () => {
-  it("targets sub-2s LCP on 3G", () => {
-    expect(LCP_BUDGET_MS).toBe(2000);
+describe("LCP budget (Story 36.2 AC3)", () => {
+  it("targets sub-1.5s LCP on 3G fast (tightened from 2000 → 1500)", () => {
+    expect(LCP_BUDGET_MS).toBe(1500);
   });
 
   it("accepts at/under budget and rejects slower", () => {

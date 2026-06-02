@@ -18,8 +18,17 @@ export const SIGN_UP_HREF = "/signup";
 /** The standalone WooCommerce toy shop — an external system, opened off-site. */
 export const TOY_SHOP_URL = "https://shop.babymilestones.co.ke";
 
-/** LCP budget for the hero on a 3G connection, in milliseconds (AC4). */
-export const LCP_BUDGET_MS = 2000;
+/**
+ * LCP budget for the hero on a 3G-fast connection, in milliseconds.
+ *
+ * Tightened from 2000 → 1500 for Story 36.2 AC3 ("LCP < 1.5s on 3G fast"). This
+ * is the controllable budget *constant*; the actual sub-1.5s measurement is a
+ * CI/manual Lighthouse gate (not a vitest assertion). The page-side perf wins
+ * that keep us under it: the hero uses `next/image` with `priority` + explicit
+ * width/height (eager fetch, no CLS), and the public pages avoid heavy client
+ * imports so the marketing surface stays SSR-light.
+ */
+export const LCP_BUDGET_MS = 1500;
 
 /** A single unit in the four-icon strip below the hero (AC2). */
 export interface HomeUnit {
