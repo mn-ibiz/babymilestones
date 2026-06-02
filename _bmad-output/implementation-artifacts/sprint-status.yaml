@@ -324,7 +324,7 @@ development_status:
   35-3-repeat-attendance-metrics-for-events-and-classes: review  # P5-E05-S03
   35-4-wallet-float-vs-revenue-snapshot: review  # P5-E05-S04
   35-5-expenses-module: review  # P5-E05-S05
-  35-6-tax-ready-exports: ready-for-dev  # P5-E05-S06
+  35-6-tax-ready-exports: review  # P5-E05-S06
   epic-35-retrospective: optional
 
   # Epic 36 — Marketing Site Polish  (P5-E06)
