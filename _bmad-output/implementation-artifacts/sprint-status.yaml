@@ -318,20 +318,20 @@ development_status:
   epic-34-retrospective: optional
 
   # Epic 35 — Advanced Reporting / Cohort Analytics  (P5-E05)
-  epic-35: in-progress
-  35-1-consolidated-p-l-by-period: review  # P5-E05-S01
-  35-2-cohort-retention-by-signup-month: review  # P5-E05-S02
-  35-3-repeat-attendance-metrics-for-events-and-classes: review  # P5-E05-S03
-  35-4-wallet-float-vs-revenue-snapshot: review  # P5-E05-S04
-  35-5-expenses-module: review  # P5-E05-S05
-  35-6-tax-ready-exports: review  # P5-E05-S06
+  epic-35: done
+  35-1-consolidated-p-l-by-period: done  # P5-E05-S01
+  35-2-cohort-retention-by-signup-month: done  # P5-E05-S02
+  35-3-repeat-attendance-metrics-for-events-and-classes: done  # P5-E05-S03
+  35-4-wallet-float-vs-revenue-snapshot: done  # P5-E05-S04
+  35-5-expenses-module: done  # P5-E05-S05
+  35-6-tax-ready-exports: done  # P5-E05-S06
   epic-35-retrospective: optional
 
   # Epic 36 — Marketing Site Polish  (P5-E06)
-  epic-36: ready-for-dev
+  epic-36: in-progress
   36-1-brand-polish-pass: ready-for-dev  # P5-E06-S01
   36-2-seo-performance-budget-tightening: ready-for-dev  # P5-E06-S02
   36-3-cms-driven-unit-pages: ready-for-dev  # P5-E06-S03
   36-4-blog-stories-optional: ready-for-dev  # P5-E06-S04
-  36-5-social-proof-testimonials: ready-for-dev  # P5-E06-S05
+  36-5-social-proof-testimonials: review  # P5-E06-S05
   epic-36-retrospective: optional

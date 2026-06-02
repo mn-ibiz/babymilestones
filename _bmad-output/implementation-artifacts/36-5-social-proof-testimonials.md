@@ -1,6 +1,6 @@
 # Story 36.5: Social proof + testimonials
 
-Status: backlog
+Status: review
 
 > Canonical ID: P5-E06-S05 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E06-S05.md
 

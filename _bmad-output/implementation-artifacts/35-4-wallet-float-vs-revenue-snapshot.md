@@ -1,6 +1,6 @@
 # Story 35.4: Wallet float vs revenue snapshot
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E05-S04 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E05-S04.md
 

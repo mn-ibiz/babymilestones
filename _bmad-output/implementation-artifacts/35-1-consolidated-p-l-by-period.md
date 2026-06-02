@@ -1,6 +1,6 @@
 # Story 35.1: Consolidated P&L by period
 
-Status: review
+Status: done
 
 > Canonical ID: P5-E05-S01 · Phase: P5 · Source: _bmad-output/planning-artifacts/stories/p5/P5-E05-S01.md
 
