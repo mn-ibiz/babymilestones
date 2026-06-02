@@ -1,6 +1,6 @@
 # Story 22.1: Outstanding-balance banner on parent dashboard
 
-Status: review
+Status: done
 
 > Canonical ID: P2-E07-S01 · Phase: P2 · Source: _bmad-output/planning-artifacts/stories/p2/P2-E07-S01.md
 
