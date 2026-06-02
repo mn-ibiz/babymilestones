@@ -72,6 +72,9 @@ export default function OperationsDashboardPage() {
       <p>
         <a href="/operations/heatmap">Peak hours heatmap &rarr;</a>
       </p>
+      <p>
+        <a href="/operations/cohort-retention">Cohort retention by signup month &rarr;</a>
+      </p>
 
       {error && <p role="alert">{error}</p>}
 

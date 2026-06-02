@@ -5452,3 +5452,123 @@ export function pnlReportExportUrl(values: {
   const params = new URLSearchParams({ anchor: values.anchor, granularity: values.granularity });
   return `/admin/pnl-report/export.${values.format}?${params.toString()}`;
 }
+
+/* --- Cohort retention by signup month (Story 35.2) ------------------------ */
+
+/** A calendar month, `YYYY-MM` (validated to a real 01–12 month). */
+const cohortMonthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/u, "Month must be YYYY-MM");
+
+/**
+ * The set of selectable "active" / paid-touchpoint definitions (AC2). `wallet_debit`
+ * (the default) treats any wallet `debit` ledger entry — money actually spent on a
+ * service — as a paid touchpoint. The enum is the named, overridable parameter the
+ * report keys its retention off; new signals (e.g. completed bookings) extend it.
+ */
+export const COHORT_ACTIVE_DEFINITIONS = ["wallet_debit"] as const;
+export type CohortActiveDefinition = (typeof COHORT_ACTIVE_DEFINITIONS)[number];
+
+/**
+ * Cohort-retention request (Story 35.2 AC1/AC2). The owner picks an inclusive
+ * signup-MONTH range (`YYYY-MM`); the report returns the retention matrix for those
+ * cohorts. `activeDefinition` is the OPTIONAL override for what counts as "active" —
+ * absent means the default (`wallet_debit`). Bounds must be real months with
+ * `fromMonth <= toMonth`.
+ */
+export const cohortRetentionQuerySchema = z
+  .object({
+    fromMonth: cohortMonthSchema,
+    toMonth: cohortMonthSchema,
+    activeDefinition: z.enum(COHORT_ACTIVE_DEFINITIONS).optional(),
+  })
+  .refine((v) => v.fromMonth <= v.toMonth, {
+    message: "fromMonth must be on or before toMonth",
+    path: ["toMonth"],
+  });
+export type CohortRetentionQuery = z.infer<typeof cohortRetentionQuerySchema>;
+
+/** One cell of the matrix: a cohort's retention at a given month offset. */
+export interface CohortCellDto {
+  offset: number;
+  retained: number;
+  /** `retained / cohortSize` as a percentage, one decimal place. */
+  percentage: number;
+}
+
+/** One cohort row: a signup month + its size + the per-offset retention cells. */
+export interface CohortRowDto {
+  signupMonth: string;
+  cohortSize: number;
+  cells: CohortCellDto[];
+}
+
+/**
+ * The cohort-retention API response (Story 35.2). Identical shape to `@bm/catalog`'s
+ * `CohortRetentionMatrix` (all primitives, serialisable): the cohorts (one per signup
+ * month, ascending) with their per-offset cells, plus the widest offset so the grid
+ * can render a stable header.
+ */
+export interface CohortRetentionDto {
+  fromMonth: string;
+  toMonth: string;
+  asOfMonth: string;
+  cohorts: CohortRowDto[];
+  maxOffset: number;
+}
+
+/** One rendered grid cell: a formatted percentage, or a blank past the cohort's reach. */
+export interface CohortGridCell {
+  offset: number;
+  /** Formatted percentage (e.g. `75.0%`), or `""` when the cohort has no such offset. */
+  value: string;
+  /** Raw percentage (0 when absent) — for the heat shading on the page. */
+  percentage: number;
+  /** False when this offset is beyond the cohort's last observable month (a blank). */
+  present: boolean;
+}
+
+/** One rendered grid row: a cohort, padded to the full offset width. */
+export interface CohortGridRow {
+  signupMonth: string;
+  cohortSize: number;
+  /** One cell per offset 0..maxOffset; trailing offsets the cohort can't reach are blanks. */
+  cells: CohortGridCell[];
+}
+
+/** The cohort-retention view-model: a triangular grid (header + padded rows) (AC1). */
+export interface CohortRetentionViewModel {
+  fromMonth: string;
+  toMonth: string;
+  /** Column headers: offsets `0..maxOffset` (always at least `[0]`). */
+  offsetHeaders: number[];
+  rows: CohortGridRow[];
+}
+
+/** Format a one-decimal percentage, e.g. `75` → `75.0%`. */
+function formatCohortPct(percentage: number): string {
+  return `${percentage.toFixed(1)}%`;
+}
+
+/**
+ * Shape the cohort matrix into a triangular grid (Story 35.2 AC1). Pure +
+ * framework-free so it unit-tests without React and the admin page renders the
+ * identical figures. The header spans offsets `0..maxOffset`; each cohort row is
+ * padded to that width — offsets the cohort hasn't reached yet (its current partial
+ * month + beyond) render as BLANK cells, never as a misleading 0%, so the current
+ * partial month is not over-counted on screen either.
+ */
+export function cohortRetentionViewModel(dto: CohortRetentionDto): CohortRetentionViewModel {
+  const offsetHeaders = Array.from({ length: dto.maxOffset + 1 }, (_, i) => i);
+  const rows: CohortGridRow[] = dto.cohorts.map((cohort) => {
+    const byOffset = new Map(cohort.cells.map((c) => [c.offset, c]));
+    const cells: CohortGridCell[] = offsetHeaders.map((offset) => {
+      const cell = byOffset.get(offset);
+      return cell
+        ? { offset, value: formatCohortPct(cell.percentage), percentage: cell.percentage, present: true }
+        : { offset, value: "", percentage: 0, present: false };
+    });
+    return { signupMonth: cohort.signupMonth, cohortSize: cohort.cohortSize, cells };
+  });
+  return { fromMonth: dto.fromMonth, toMonth: dto.toMonth, offsetHeaders, rows };
+}

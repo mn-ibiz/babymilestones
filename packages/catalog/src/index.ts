@@ -419,6 +419,22 @@ export {
   type LoadWalletAgingOpts,
 } from "./wallet-aging-db.js";
 
+// Cohort retention by signup month — triangular retention matrix (Story 35.2).
+export {
+  aggregateCohortRetention,
+  ACTIVE_WINDOW_DAYS,
+  type CohortParentRow,
+  type CohortRetentionInput,
+  type CohortCell,
+  type CohortRow,
+  type CohortRetentionMatrix,
+} from "./cohort-retention.js";
+export {
+  loadCohortRetention,
+  loadWalletDebitActiveMonths,
+  type LoadCohortRetentionOpts,
+} from "./cohort-retention-db.js";
+
 // Daily dispatch report — online-order status counts + value + pack/dispatch
 // timings + sync-health (P4-E04-S04 / Story 29.4).
 export {
