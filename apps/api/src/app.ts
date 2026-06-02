@@ -37,6 +37,7 @@ import { registerReceptionRoutes } from "./routes/reception/index.js";
 import { registerPosRoutes } from "./routes/pos/index.js";
 import { registerPublicRoutes } from "./routes/public/index.js";
 import type { StaffEarningsRateLimiter } from "./routes/public/staff-earnings.js";
+import type { ReviewSnippetsRateLimiter } from "./routes/public/review-snippets.js";
 import { registerTreasuryRoutes } from "./routes/treasury/index.js";
 import { registerReceiptRoutes } from "./routes/receipts/index.js";
 import { registerHealthRoutes, type ReadinessCheck } from "./routes/health.js";
@@ -54,6 +55,8 @@ export interface AppDeps {
   consumedTokens?: ConsumedTokenStore;
   /** Anti-scrape limiter for the public staff-earnings viewer (P3-E02-S01 AC5). */
   staffEarningsRateLimiter?: StaffEarningsRateLimiter;
+  /** Anti-scrape limiter for the public review-snippets endpoint (P6-E04-S04). */
+  reviewSnippetsRateLimiter?: ReviewSnippetsRateLimiter;
   /** HMAC secret for reset tokens. Defaults to a per-process random secret. */
   resetTokenSecret?: string;
   /** Clock injection for deterministic TTL/expiry tests. Defaults to `Date.now`. */
@@ -318,6 +321,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       db,
       now: deps.now ? () => new Date(deps.now!()) : undefined,
       staffEarningsRateLimiter: deps.staffEarningsRateLimiter,
+      reviewSnippetsRateLimiter: deps.reviewSnippetsRateLimiter,
     });
 
     // Resolve provider wiring once (explicit deps in tests, env in production) so

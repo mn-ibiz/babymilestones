@@ -159,6 +159,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Feedback",
     permission: { action: "read", resource: "report" },
   },
+  // P6-E04-S04 (Story 34.4): curate which 5-star comments to publish as ANONYMISED
+  // testimonials on the marketing home page. Curation/publication is a content
+  // mutation, so it gates on `manage config` — admin / super_admin only (narrower
+  // than the report-reading feedback dashboard). The server re-enforces the same gate.
+  {
+    href: "/review-snippets",
+    label: "Review snippets",
+    permission: { action: "manage", resource: "config" },
+  },
   {
     href: "/treasury/float-accounts",
     label: "Float accounts",

@@ -83,6 +83,20 @@ describe("visibleNavFor (AC1 — server-side nav filtered by permission set)", (
     expect(visibleNavFor("parent").map((i) => i.href)).not.toContain("/feedback");
   });
 
+  it("review-snippets curation is visible to manage-config roles only (P6-E04-S04 / Story 34.4)", () => {
+    // admin / super_admin hold manage:config — content curation is a mutation.
+    for (const role of ["admin", "super_admin"]) {
+      expect(visibleNavFor(role).map((i) => i.href)).toContain("/review-snippets");
+    }
+    // treasury / accountant may read reports but cannot curate the public home page.
+    expect(visibleNavFor("treasury").map((i) => i.href)).not.toContain("/review-snippets");
+    expect(visibleNavFor("accountant").map((i) => i.href)).not.toContain("/review-snippets");
+    expect(visibleNavFor("reception").map((i) => i.href)).not.toContain("/review-snippets");
+    // The route guard agrees with the rendered nav.
+    expect(canAccessRoute("admin", "/review-snippets")).toBe(true);
+    expect(canAccessRoute("treasury", "/review-snippets")).toBe(false);
+  });
+
   it("the operations dashboard is visible to admin/super_admin/treasury only (P3-E05-S01 AC4)", () => {
     for (const role of ["admin", "super_admin", "treasury"]) {
       expect(visibleNavFor(role).map((i) => i.href)).toContain("/operations");

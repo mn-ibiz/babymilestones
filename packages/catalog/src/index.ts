@@ -251,6 +251,38 @@ export {
 // P6-E04-S03 (Story 34.3): admin in-app alert read model (the bell / alerts list).
 export { listUnreadAdminAlerts, dismissAdminAlert } from "./admin-alerts.js";
 
+// Public review snippets (P6-E04-S04 / Story 34.4): the admin curates which 5-star
+// comments to publish as ANONYMISED testimonials on the marketing home page (AC1);
+// publication is audited (AC3); the public list exposes ONLY quote + attribution (AC2).
+export {
+  curateReviewSnippet,
+  publishReviewSnippet,
+  unpublishReviewSnippet,
+  updateSnippetAttribution,
+  reorderReviewSnippets,
+  listPublishedSnippets,
+  listSnippetsForAdmin,
+  listFiveStarCandidates,
+  generateDefaultAttribution,
+  buildAttributionLabel,
+  childrenCountWord,
+  REVIEW_QUOTE_MAX,
+  REVIEW_ATTRIBUTION_MAX,
+  PUBLISHED_SNIPPETS_LIMIT,
+  ReviewSnippetNotFiveStarError,
+  ReviewSnippetNoCommentError,
+  ReviewSnippetNotFoundError,
+  type CurateReviewSnippetInput,
+  type UpdateSnippetAttributionInput,
+  type ReorderReviewSnippetsInput,
+  type PublishReviewSnippetInput,
+  type UnpublishReviewSnippetInput,
+  type ListPublishedSnippetsOpts,
+  type PublicReviewSnippet,
+  type FiveStarCandidate,
+  type AdminReviewSnippet,
+} from "./review-snippets.js";
+
 // Coach availability + 1:1 booking (P5-E01-S02 / Story 31.2). REUSES the generic
 // staff_availability table; bookable coaching_slots are capacity-1.
 export {

@@ -269,6 +269,13 @@ export const AUDIT_ACTION_CATALOGUE = {
     "feedback.deanonymised",
     "feedback.negative_alert",
   ],
+  /** Public review snippets (Epic 34 / P6-E04-S04 / Story 34.4) — the admin curates
+   * which 5-star comments to publish as anonymised testimonials on the marketing
+   * home page. PUBLISHING a snippet (making it publicly visible) and UNPUBLISHING it
+   * are deliberate admin acts worth a forensic trail (AC3). The audit payload carries
+   * the snippet/feedback ids + the already-anonymised attribution label — NEVER the
+   * parent's real name and never the quote text. Curation + reorder are not audited. */
+  reviewSnippet: ["review_snippet.published", "review_snippet.unpublished"],
   /** In-app admin alerts (Epic 34 / P6-E04-S03) — the bell / alerts list. An admin
    * acknowledging (read) or DISMISSING an alert is a state change worth a trail. */
   alert: ["alert.dismissed"],

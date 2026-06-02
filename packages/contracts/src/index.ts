@@ -4883,3 +4883,130 @@ export function peakHoursHeatmapUrl(values: { fromDate: string; toDate: string; 
   if (values.unit) params.set("unit", values.unit);
   return `/admin/peak-hours-heatmap?${params.toString()}`;
 }
+
+/* --- Public review snippets (P6-E04-S04 / Story 34.4) --------------------- */
+
+/** Quote cap — matches the feedback comment cap (Story 34.1 AC2). */
+export const REVIEW_QUOTE_MAX = 200;
+/** Attribution-label cap (matches the column CHECK). */
+export const REVIEW_ATTRIBUTION_MAX = 120;
+
+/**
+ * The PUBLIC testimonial DTO (Story 34.4 AC2): the curated quote + the ANONYMISED
+ * attribution label, plus a public id (the snippet's own id). Carries NO parent
+ * identity and NO feedback id — the only fields the public home page ever sees.
+ */
+export interface PublicReviewSnippetDto {
+  id: string;
+  quote: string;
+  attributionLabel: string;
+}
+
+/** The public testimonials response (the published quotes, ordered). */
+export interface PublicReviewSnippetsResponse {
+  snippets: PublicReviewSnippetDto[];
+}
+
+/**
+ * A 5-star feedback comment offered to the admin to curate (Story 34.4 AC1). The
+ * comment + a SUGGESTED anonymised attribution built from real data; the admin may
+ * override the attribution before publishing. NO parent name is carried.
+ */
+export interface ReviewSnippetCandidateDto {
+  feedbackId: string;
+  comment: string;
+  rating: number;
+  /** ISO timestamp the parent submitted. */
+  submittedAt: string;
+  /** Suggested "Parent of <n>, <place>" label — editable by the admin (AC1). */
+  suggestedAttribution: string;
+}
+
+/**
+ * A curated snippet as the admin curation screen sees it (Story 34.4). Includes the
+ * publish state + the underlying feedback id (admin-side only — never public).
+ */
+export interface AdminReviewSnippetDto {
+  id: string;
+  feedbackId: string;
+  quote: string;
+  attributionLabel: string;
+  published: boolean;
+  /** ISO timestamp when published, or null. */
+  publishedAt: string | null;
+  displayOrder: number | null;
+  /** ISO timestamp the snippet was curated. */
+  createdAt: string;
+}
+
+/** The admin curation-screen response: pending candidates + curated snippets. */
+export interface AdminReviewSnippetsResponse {
+  candidates: ReviewSnippetCandidateDto[];
+  snippets: AdminReviewSnippetDto[];
+}
+
+/**
+ * Curate a 5-star feedback comment into a review snippet (Story 34.4 AC1). The quote
+ * defaults to the feedback comment; the attribution defaults to the generated
+ * anonymised label. Both are overridable — the attribution override is the admin's
+ * privacy guarantee. `feedbackId` is the only required field.
+ */
+export const curateReviewSnippetSchema = z.object({
+  feedbackId: z.string().uuid("feedbackId must be a UUID"),
+  quote: z
+    .string()
+    .trim()
+    .min(1, "Quote cannot be empty")
+    .max(REVIEW_QUOTE_MAX, `Quote must be ${REVIEW_QUOTE_MAX} characters or fewer`)
+    .optional(),
+  attributionLabel: z
+    .string()
+    .trim()
+    .min(1, "Attribution cannot be empty")
+    .max(REVIEW_ATTRIBUTION_MAX, `Attribution must be ${REVIEW_ATTRIBUTION_MAX} characters or fewer`)
+    .optional(),
+});
+export type CurateReviewSnippetInput = z.infer<typeof curateReviewSnippetSchema>;
+
+/** Edit a curated snippet's anonymised attribution label (Story 34.4 AC1). */
+export const updateReviewAttributionSchema = z.object({
+  attributionLabel: z
+    .string()
+    .trim()
+    .min(1, "Attribution cannot be empty")
+    .max(REVIEW_ATTRIBUTION_MAX, `Attribution must be ${REVIEW_ATTRIBUTION_MAX} characters or fewer`),
+});
+export type UpdateReviewAttributionInput = z.infer<typeof updateReviewAttributionSchema>;
+
+/** Reorder the published snippets on the home page (Story 34.4). */
+export const reorderReviewSnippetsSchema = z.object({
+  orderedIds: z.array(z.string().uuid("each id must be a UUID")).min(1, "At least one snippet is required"),
+});
+export type ReorderReviewSnippetsInput = z.infer<typeof reorderReviewSnippetsSchema>;
+
+/**
+ * A render-ready testimonial card for the marketing home page (Story 34.4 AC2). A
+ * thin shaping of the public DTO: the quote wrapped in display quotes + the
+ * attribution. Pure so the home-page server component stays a thin render and the
+ * shaping is unit-tested in isolation.
+ */
+export interface ReviewSnippetCardView {
+  id: string;
+  /** The quote, as-is (the renderer adds visual quote marks). */
+  quote: string;
+  /** The anonymised attribution (e.g. "Parent of two, Nairobi"). */
+  attribution: string;
+}
+
+/**
+ * Shape the public snippets into render-ready testimonial cards for the home page
+ * (AC2). Drops any snippet with an empty quote/attribution defensively. Carries only
+ * the public fields — never a parent identity (the DTO never had one).
+ */
+export function reviewSnippetCards(
+  snippets: readonly PublicReviewSnippetDto[],
+): ReviewSnippetCardView[] {
+  return snippets
+    .filter((s) => s.quote.trim().length > 0 && s.attributionLabel.trim().length > 0)
+    .map((s) => ({ id: s.id, quote: s.quote.trim(), attribution: s.attributionLabel.trim() }));
+}

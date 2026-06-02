@@ -4,6 +4,8 @@ import Link from "next/link";
 import {
   HOME_HERO,
   HOME_UNITS,
+  TESTIMONIALS_HEADING,
+  fetchHomeTestimonials,
   unitLinkAttrs,
 } from "../../lib/home-content";
 
@@ -24,8 +26,12 @@ export const metadata: Metadata = {
     "Play, talent, salon and toy shop for your little one — one wallet, one tap. Top up and book in seconds.",
 };
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
   const { headline, subhead, cta, image } = HOME_HERO;
+  // P6-E04-S04 (Story 34.4 AC2): the CURATED, published testimonials. Sourced from
+  // the public review-snippets endpoint, which strips ALL parent PII; an outage
+  // resolves to an empty list so the home page never breaks on it.
+  const testimonials = await fetchHomeTestimonials();
   return (
     <main>
       {/* Hero (AC1) */}
@@ -85,6 +91,28 @@ export default function MarketingHomePage() {
           })}
         </ul>
       </section>
+
+      {/* Testimonials (P6-E04-S04 / Story 34.4 AC2). Curated, anonymised 5-star
+          quotes — never a real parent name. Hidden entirely when none are published. */}
+      {testimonials.length > 0 && (
+        <section
+          aria-label={TESTIMONIALS_HEADING}
+          className="mx-auto max-w-5xl px-4 pb-16 md:pb-24"
+        >
+          <h2 className="text-2xl font-semibold text-ink md:text-3xl">{TESTIMONIALS_HEADING}</h2>
+          <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {testimonials.map((t) => (
+              <li
+                key={t.id}
+                className="flex h-full flex-col justify-between rounded-xl border border-ink/10 bg-surface p-5"
+              >
+                <blockquote className="text-base text-ink/80">&ldquo;{t.quote}&rdquo;</blockquote>
+                <p className="mt-4 text-sm font-medium text-ink/60">— {t.attribution}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

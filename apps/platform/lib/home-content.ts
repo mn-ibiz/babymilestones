@@ -92,3 +92,65 @@ export function unitLinkAttrs(unit: HomeUnit): {
 export function withinLcpBudget(lcpMs: number): boolean {
   return lcpMs <= LCP_BUDGET_MS;
 }
+
+/* ----------------------------------------- testimonials (P6-E04-S04 / 34.4) */
+
+/**
+ * A render-ready testimonial card on the home page (Story 34.4 AC2). A curated
+ * 5-star quote shown under an ANONYMISED attribution (e.g. "Parent of two,
+ * Nairobi") — NEVER a real parent name. Sourced from the public review-snippets
+ * endpoint, which already strips all PII; this is purely the home-page shape.
+ */
+export interface HomeTestimonial {
+  /** The snippet's public id (a stable React key — not a parent/feedback id). */
+  readonly id: string;
+  /** The curated quote. */
+  readonly quote: string;
+  /** The anonymised attribution. */
+  readonly attribution: string;
+}
+
+/** The public review-snippet shape returned by `/public/review-snippets`. */
+export interface PublicReviewSnippet {
+  id: string;
+  quote: string;
+  attributionLabel: string;
+}
+
+/** Section heading shown above the testimonials strip. */
+export const TESTIMONIALS_HEADING = "What parents say";
+
+/**
+ * Shape the public snippets into home-page testimonial cards (AC2). Drops any
+ * snippet missing a quote or attribution defensively, and trims whitespace. Pure so
+ * the home-page server component stays a thin render and this is unit-tested in
+ * isolation. Carries ONLY the public fields — never a parent identity.
+ */
+export function homeTestimonials(snippets: readonly PublicReviewSnippet[]): HomeTestimonial[] {
+  return snippets
+    .filter((s) => s.quote.trim().length > 0 && s.attributionLabel.trim().length > 0)
+    .map((s) => ({ id: s.id, quote: s.quote.trim(), attribution: s.attributionLabel.trim() }));
+}
+
+/**
+ * Fetch the published testimonials for the home page (AC2). Server-side fetch
+ * against the public, cached review-snippets endpoint. Resolves to an EMPTY list on
+ * any failure (network/parse/non-2xx) so a marketing home page never crashes just
+ * because the testimonials feed is unavailable. `fetchImpl` + `apiBaseUrl` are
+ * injectable for deterministic tests.
+ */
+export async function fetchHomeTestimonials(opts: {
+  apiBaseUrl?: string;
+  fetchImpl?: typeof fetch;
+} = {}): Promise<HomeTestimonial[]> {
+  const base = opts.apiBaseUrl ?? process.env.API_BASE_URL ?? "http://127.0.0.1:8080";
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  try {
+    const res = await fetchImpl(`${base}/public/review-snippets`);
+    if (!res.ok) return [];
+    const json = (await res.json()) as { snippets?: PublicReviewSnippet[] };
+    return homeTestimonials(json.snippets ?? []);
+  } catch {
+    return [];
+  }
+}

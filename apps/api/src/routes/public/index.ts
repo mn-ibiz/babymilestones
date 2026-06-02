@@ -7,12 +7,18 @@ import {
   StaffEarningsRateLimiter,
 } from "./staff-earnings.js";
 import { registerPublicCoachingNotesSummary } from "./coaching-notes-summary.js";
+import {
+  registerPublicReviewSnippets,
+  ReviewSnippetsRateLimiter,
+} from "./review-snippets.js";
 
 export interface PublicRoutesDeps {
   db: Database;
   now?: () => Date;
   /** Anti-scrape limiter for the public staff-earnings viewer (P3-E02-S01 AC5). */
   staffEarningsRateLimiter?: StaffEarningsRateLimiter;
+  /** Anti-scrape limiter for the public review-snippets endpoint (P6-E04-S04). */
+  reviewSnippetsRateLimiter?: ReviewSnippetsRateLimiter;
 }
 
 /** Public, unauthenticated API surface (P4-E05-S02 onward). */
@@ -30,5 +36,11 @@ export function registerPublicRoutes(app: FastifyInstance, deps: PublicRoutesDep
   registerPublicCoachingNotesSummary(app, {
     db: deps.db,
     rateLimiter: deps.staffEarningsRateLimiter,
+  });
+  // P6-E04-S04 (Story 34.4, AC2): the CURATED, published 5-star testimonials for the
+  // marketing home page — quote + ANONYMISED attribution only, no parent PII.
+  registerPublicReviewSnippets(app, {
+    db: deps.db,
+    rateLimiter: deps.reviewSnippetsRateLimiter,
   });
 }
