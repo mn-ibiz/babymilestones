@@ -204,12 +204,20 @@ export function registerParentCoaching(app: FastifyInstance, deps: CoachingRoute
     const service = await getService(db, result.serviceId);
     if (user?.phone) {
       try {
+        // P5-E01-S05 (Story 31.5 AC2): a discreet (sensitive) coaching service
+        // confirms under its NEUTRAL label so the SMS carries no sensitive
+        // service detail. Non-discreet services keep their real name unchanged.
+        const discreetLabel = (service?.discreetBillingLabel ?? "").trim();
+        const serviceName =
+          service?.discreetBillingEnabled && discreetLabel !== ""
+            ? discreetLabel
+            : (service?.name ?? "Coaching session");
         await sender.send({
           to: user.phone,
           template: "booking.confirmed",
           data: {
             childName: child.firstName,
-            serviceName: service?.name ?? "Coaching session",
+            serviceName,
             date: result.slotDate,
             time: result.startTime,
           },

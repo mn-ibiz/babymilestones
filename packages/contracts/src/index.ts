@@ -1711,6 +1711,26 @@ function ageStageTagsField(presentDefault: null | undefined) {
     });
 }
 
+/**
+ * Discreet-billing label (P5-E01-S05 / Story 31.5 AC1). A neutral display label
+ * shown on receipts / SMS in place of a sensitive service name, e.g. "BM Coaching
+ * Session". Optional + trimmed; a present-but-empty value clears to null, and a
+ * present string is trimmed + length-bounded. `presentDefault` is what an ABSENT
+ * field resolves to: `null` on create (a stray label without the toggle collapses
+ * to null), `undefined` on update (absent = untouched, so a name-only patch never
+ * clears a stored label). The "enabled ⇒ a non-empty label" rule is enforced by
+ * the object-level refine on each schema (so the message targets the label field).
+ */
+function discreetBillingLabelField(presentDefault: null | undefined) {
+  return z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? presentDefault : (v ?? "").trim() === "" ? null : (v as string).trim()))
+    .refine((v) => v == null || v.length <= SERVICE_NAME_MAX, {
+      message: `discreetBillingLabel must be ${SERVICE_NAME_MAX} characters or fewer`,
+    });
+}
+
 /** True when a child of `ageMonths` fits a service's `[min, max]` month range (null bounds = open). */
 export function slotFitsAge(
   ageMonths: number,
@@ -1740,12 +1760,25 @@ export const serviceCreateSchema = z
     coachingDurationMinutes: coachingDurationField,
     coachingCapacity: coachingCapacityField,
     ageStageTags: ageStageTagsField(null),
+    // Discreet billing (P5-E01-S05): default OFF; label collapses to null unless
+    // explicitly enabled (so a stray label without the toggle is ignored).
+    discreetBillingEnabled: z.boolean().optional().default(false),
+    discreetBillingLabel: discreetBillingLabelField(null),
   })
+  .transform((v) => ({
+    ...v,
+    // The label only travels with the toggle — drop it when discreet billing is off.
+    discreetBillingLabel: v.discreetBillingEnabled ? v.discreetBillingLabel : null,
+  }))
   .refine(
     (v) =>
       v.ageMinMonths == null || v.ageMaxMonths == null || v.ageMinMonths <= v.ageMaxMonths,
     { message: "ageMinMonths must be ≤ ageMaxMonths", path: ["ageMaxMonths"] },
-  );
+  )
+  .refine((v) => !v.discreetBillingEnabled || v.discreetBillingLabel !== null, {
+    message: "discreetBillingLabel is required when discreet billing is enabled",
+    path: ["discreetBillingLabel"],
+  });
 export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
 
 /**
@@ -1775,6 +1808,9 @@ export const serviceUpdateSchema = z
     coachingDurationMinutes: coachingDurationField,
     coachingCapacity: coachingCapacityField,
     ageStageTags: ageStageTagsField(undefined),
+    // Discreet billing toggle + label (P5-E01-S05). Absent = untouched.
+    discreetBillingEnabled: z.boolean().optional(),
+    discreetBillingLabel: discreetBillingLabelField(undefined),
   })
   .refine(
     (v) =>
@@ -1790,14 +1826,23 @@ export const serviceUpdateSchema = z
       v.format !== undefined ||
       v.coachingDurationMinutes !== undefined ||
       v.coachingCapacity !== undefined ||
-      v.ageStageTags !== undefined,
+      v.ageStageTags !== undefined ||
+      v.discreetBillingEnabled !== undefined ||
+      v.discreetBillingLabel !== undefined,
     "at least one field is required",
   )
   .refine(
     (v) =>
       v.ageMinMonths == null || v.ageMaxMonths == null || v.ageMinMonths <= v.ageMaxMonths,
     { message: "ageMinMonths must be ≤ ageMaxMonths", path: ["ageMaxMonths"] },
-  );
+  )
+  // Enabling discreet billing in a patch requires a non-empty label in the SAME
+  // patch (so the receipt never falls back to the real name). Turning it off does
+  // not require a label. An absent (untouched) label does NOT satisfy "enabled".
+  .refine((v) => v.discreetBillingEnabled !== true || typeof v.discreetBillingLabel === "string", {
+    message: "discreetBillingLabel is required when discreet billing is enabled",
+    path: ["discreetBillingLabel"],
+  });
 export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;
 
 /** A YYYY-MM-DD calendar date for a price's effective-from (validated as real). */

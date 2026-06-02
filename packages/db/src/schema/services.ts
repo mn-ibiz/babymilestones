@@ -123,6 +123,22 @@ export const services = pgTable("services", {
    * set rather than an enum so admin can coin new stages without a migration.
    */
   ageStageTags: text("age_stage_tags").array().$type<string[]>(),
+  /**
+   * Discreet-billing toggle (P5-E01-S05 / Story 31.5 AC3). When true, the receipt
+   * engine renders {@link discreetBillingLabel} as the line description instead of
+   * the real `name`, and coaching confirmations use neutral language. Non-null,
+   * defaults false (CHECK in migration 0100) so existing rows are unaffected.
+   * Display-only: the stored ledger / invoice / receipt line keep the real
+   * `serviceId`; only what the parent SEES changes.
+   */
+  discreetBillingEnabled: boolean("discreet_billing_enabled").notNull().default(false),
+  /**
+   * Neutral display label shown on receipts / SMS when {@link discreetBillingEnabled}
+   * is true, e.g. "BM Coaching Session" (P5-E01-S05 AC1). Nullable; required +
+   * non-blank when enabled (CHECK in migration 0100, re-enforced at the contract
+   * layer). Null when discreet billing is off.
+   */
+  discreetBillingLabel: text("discreet_billing_label"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

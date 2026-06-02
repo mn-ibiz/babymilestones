@@ -12,6 +12,7 @@ import { validateSession, requirePermission } from "@bm/auth";
 import { formatReceiptNumber } from "@bm/payments";
 import {
   receiptContentType,
+  receiptLineDescription,
   renderReceipt,
   toReceiptDocument,
   type ReceiptDocumentLine,
@@ -78,6 +79,9 @@ async function loadReceipt(db: Database, receiptId: string): Promise<LoadedRecei
     .select({
       serviceId: receiptLines.serviceId,
       serviceName: services.name,
+      // P5-E01-S05: the discreet-billing facts drive the display label (AC1).
+      discreetBillingEnabled: services.discreetBillingEnabled,
+      discreetBillingLabel: services.discreetBillingLabel,
       quantity: receiptLines.quantity,
       unitPrice: receiptLines.unitPrice,
       lineTax: receiptLines.lineTax,
@@ -88,7 +92,14 @@ async function loadReceipt(db: Database, receiptId: string): Promise<LoadedRecei
     .where(eq(receiptLines.receiptId, header.id));
 
   const lines: ReceiptDocumentLine[] = lineRows.map((l) => ({
-    description: l.serviceName ?? (l.serviceId ? "Service" : "Item"),
+    // Discreet coaching services render a neutral label instead of the real,
+    // sensitive name (P5-E01-S05 AC1) — amounts are unchanged.
+    description: receiptLineDescription({
+      serviceId: l.serviceId,
+      serviceName: l.serviceName,
+      discreetBillingEnabled: l.discreetBillingEnabled ?? false,
+      discreetBillingLabel: l.discreetBillingLabel ?? null,
+    }),
     quantity: l.quantity,
     unitPrice: Number(l.unitPrice),
     lineTax: Number(l.lineTax),

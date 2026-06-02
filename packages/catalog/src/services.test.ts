@@ -494,3 +494,71 @@ describe("coaching catalogue (P5-E01-S01)", () => {
     expect(play[0]!.name).toBe("Soft Play");
   });
 });
+
+/**
+ * P5-E01-S05 (Story 31.5) — Discreet billing labels. A sensitive coaching
+ * offering can carry a NEUTRAL display label used on receipts + SMS in place of
+ * the real, sensitive service name. The toggle + label live on `services`; the
+ * substitution itself is a display concern (the stored line keeps the real
+ * service_id). Admin toggles it per service (AC3).
+ */
+describe("discreet billing labels (P5-E01-S05)", () => {
+  let dbh: Awaited<ReturnType<typeof createTestDb>>;
+
+  beforeEach(async () => {
+    dbh = await createTestDb();
+  });
+  afterEach(async () => {
+    await dbh.close();
+  });
+
+  it("defaults discreet billing OFF with a null label (AC3)", async () => {
+    const svc = await createService(dbh.db, { name: "Sleep coaching", unit: "coaching" });
+    expect(svc.discreetBillingEnabled).toBe(false);
+    expect(svc.discreetBillingLabel).toBeNull();
+  });
+
+  it("round-trips an enabled toggle + neutral label (AC1/AC3)", async () => {
+    const svc = await createService(dbh.db, {
+      name: "Postnatal depression coaching",
+      unit: "coaching",
+      format: "one_to_one",
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    expect(svc.discreetBillingEnabled).toBe(true);
+    expect(svc.discreetBillingLabel).toBe("BM Coaching Session");
+
+    const read = await getService(dbh.db, svc.id);
+    expect(read?.discreetBillingEnabled).toBe(true);
+    expect(read?.discreetBillingLabel).toBe("BM Coaching Session");
+  });
+
+  it("toggles discreet billing on then off via update (AC3)", async () => {
+    const svc = await createService(dbh.db, { name: "Coaching", unit: "coaching" });
+    const on = await updateService(dbh.db, svc.id, {
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    expect(on?.discreetBillingEnabled).toBe(true);
+    expect(on?.discreetBillingLabel).toBe("BM Coaching Session");
+
+    const off = await updateService(dbh.db, svc.id, {
+      discreetBillingEnabled: false,
+      discreetBillingLabel: null,
+    });
+    expect(off?.discreetBillingEnabled).toBe(false);
+    expect(off?.discreetBillingLabel).toBeNull();
+  });
+
+  it("DB CHECK rejects an enabled row with a blank label (AC1)", async () => {
+    await expect(
+      createService(dbh.db, {
+        name: "Bad discreet",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "   ",
+      }),
+    ).rejects.toThrow();
+  });
+});

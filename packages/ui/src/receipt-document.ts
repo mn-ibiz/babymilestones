@@ -69,6 +69,39 @@ export interface ReceiptDocumentLine {
 }
 
 /**
+ * The catalogue facts a receipt line needs to compute its display description
+ * (P5-E01-S05 / Story 31.5). The real line keeps its `serviceId`; only the
+ * rendered description changes when discreet billing is enabled.
+ */
+export interface ReceiptLineServiceInfo {
+  /** The line's service id (null for a product line). */
+  serviceId: string | null;
+  /** The real catalogue service name (null when no service / unnamed). */
+  serviceName: string | null;
+  /** Discreet-billing toggle on the service (P5-E01-S05 AC3). */
+  discreetBillingEnabled: boolean;
+  /** Neutral display label to show when discreet billing is enabled (AC1). */
+  discreetBillingLabel: string | null;
+}
+
+/**
+ * The SINGLE chokepoint that turns a receipt line's catalogue facts into the
+ * description shown on the receipt (P5-E01-S05 AC1). When discreet billing is
+ * enabled AND a non-blank label is set, the NEUTRAL label is rendered instead of
+ * the real, sensitive service name — every amount/VAT stays identical (this only
+ * changes the text). Otherwise it preserves the existing behaviour: the real
+ * service name, or the generic `Service` / `Item` fallbacks for an unnamed
+ * service / a product line. Pure + display-only — the stored line is untouched.
+ */
+export function receiptLineDescription(info: ReceiptLineServiceInfo): string {
+  if (info.discreetBillingEnabled) {
+    const label = (info.discreetBillingLabel ?? "").trim();
+    if (label !== "") return label;
+  }
+  return info.serviceName ?? (info.serviceId ? "Service" : "Item");
+}
+
+/**
  * The receipt render model — everything a template needs, already shaped and
  * phone-masked. Built from a persisted receipt record by {@link toReceiptDocument}.
  */

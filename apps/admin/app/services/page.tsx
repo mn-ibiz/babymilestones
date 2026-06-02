@@ -36,6 +36,8 @@ interface Service {
   coachingDurationMinutes: number | null;
   coachingCapacity: number | null;
   ageStageTags: string[] | null;
+  discreetBillingEnabled: boolean;
+  discreetBillingLabel: string | null;
 }
 
 interface Price {
@@ -61,6 +63,8 @@ const EMPTY_SERVICE = {
   coachingDurationMinutes: "",
   coachingCapacity: "",
   ageStageTags: "",
+  discreetBillingEnabled: false,
+  discreetBillingLabel: "",
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -77,6 +81,8 @@ export default function ServicesPage() {
         format: form.format,
         coachingDurationMinutes: form.coachingDurationMinutes === "" ? null : Number(form.coachingDurationMinutes),
         coachingCapacity: form.coachingCapacity === "" ? null : Number(form.coachingCapacity),
+        discreetBillingEnabled: form.discreetBillingEnabled,
+        discreetBillingLabel: form.discreetBillingLabel,
       }),
     [form],
   );
@@ -131,6 +137,12 @@ export default function ServicesPage() {
                 coachingCapacity:
                   form.coachingCapacity === "" ? null : Number(form.coachingCapacity),
                 ageStageTags: parseAgeStageTags(form.ageStageTags),
+                // Discreet billing (P5-E01-S05 / Story 31.5). The label only
+                // travels with the toggle; the server collapses a stray label.
+                discreetBillingEnabled: form.discreetBillingEnabled,
+                discreetBillingLabel: form.discreetBillingEnabled
+                  ? form.discreetBillingLabel.trim() || null
+                  : null,
               }
             : {}),
         }),
@@ -335,6 +347,33 @@ export default function ServicesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, ageStageTags: e.target.value }))}
               />
             </label>
+            {/* Discreet billing (P5-E01-S05 / Story 31.5): bill a sensitive
+                offering under a neutral label on receipts + SMS. */}
+            <label>
+              <input
+                name="discreetBillingEnabled"
+                type="checkbox"
+                checked={form.discreetBillingEnabled}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, discreetBillingEnabled: e.target.checked }))
+                }
+              />
+              Discreet billing (neutral label on receipts & SMS)
+            </label>
+            {form.discreetBillingEnabled && (
+              <label>
+                Discreet billing label
+                <input
+                  name="discreetBillingLabel"
+                  placeholder="BM Coaching Session"
+                  value={form.discreetBillingLabel}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, discreetBillingLabel: e.target.value }))
+                  }
+                  aria-invalid={Boolean(serviceErrors.discreetBillingLabel)}
+                />
+              </label>
+            )}
           </fieldset>
         )}
         <label>

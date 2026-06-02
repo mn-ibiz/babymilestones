@@ -453,4 +453,85 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     expect(patched.statusCode).toBe(200);
     expect(patched.json().coachingCapacity).toBe(10);
   });
+
+  /* --- Discreet billing labels (P5-E01-S05 / Story 31.5) ------------------ */
+
+  it("creates a coaching offering with discreet billing on, round-trips on read (AC1/AC3)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Postnatal depression coaching",
+      unit: "coaching",
+      format: "one_to_one",
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().discreetBillingEnabled).toBe(true);
+    expect(res.json().discreetBillingLabel).toBe("BM Coaching Session");
+
+    const read = await req("GET", `/admin/services/${res.json().id}`, creds);
+    expect(read.json().discreetBillingEnabled).toBe(true);
+    expect(read.json().discreetBillingLabel).toBe("BM Coaching Session");
+  });
+
+  it("defaults discreet billing off with a null label (AC3)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, { name: "Coaching", unit: "coaching" });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().discreetBillingEnabled).toBe(false);
+    expect(res.json().discreetBillingLabel).toBeNull();
+  });
+
+  it("rejects enabling discreet billing without a label (AC1 validation 400)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const res = await req("POST", "/admin/services", creds, {
+      name: "Coaching",
+      unit: "coaching",
+      discreetBillingEnabled: true,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("discreetBillingLabel");
+  });
+
+  it("toggles discreet billing on then off via PATCH, audited (AC3)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (
+      await req("POST", "/admin/services", creds, { name: "Coaching", unit: "coaching" })
+    ).json();
+
+    const on = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    expect(on.statusCode).toBe(200);
+    expect(on.json().discreetBillingEnabled).toBe(true);
+    expect(on.json().discreetBillingLabel).toBe("BM Coaching Session");
+
+    const off = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      discreetBillingEnabled: false,
+      discreetBillingLabel: null,
+    });
+    expect(off.statusCode).toBe(200);
+    expect(off.json().discreetBillingEnabled).toBe(false);
+    expect(off.json().discreetBillingLabel).toBeNull();
+
+    // The toggle reuses the existing catalog.service.update audit action.
+    const audits = await dbh.db
+      .select()
+      .from(auditOutbox)
+      .where(eq(auditOutbox.action, "catalog.service.update"));
+    expect(audits.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("rejects enabling discreet billing via PATCH without a label (AC1 validation 400)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (
+      await req("POST", "/admin/services", creds, { name: "Coaching", unit: "coaching" })
+    ).json();
+    const res = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      discreetBillingEnabled: true,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("discreetBillingLabel");
+  });
 });

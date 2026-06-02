@@ -52,6 +52,9 @@ function serializeService(row: Awaited<ReturnType<typeof getService>>) {
     coachingDurationMinutes: row.coachingDurationMinutes,
     coachingCapacity: row.coachingCapacity,
     ageStageTags: row.ageStageTags,
+    // Discreet billing toggle + neutral label (P5-E01-S05 / Story 31.5).
+    discreetBillingEnabled: row.discreetBillingEnabled,
+    discreetBillingLabel: row.discreetBillingLabel,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

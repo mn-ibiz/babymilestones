@@ -153,4 +153,45 @@ describe("Receipt render (P1-E08-S03)", () => {
     const res = await app.inject({ method: "GET", url: `/receipts/${id}?format=a4` });
     expect(res.statusCode).toBe(401);
   });
+
+  /**
+   * P5-E01-S05 (Story 31.5 AC1) — a discreet coaching line renders its neutral
+   * label instead of the real, sensitive service name. Amounts are unchanged.
+   */
+  async function seedDiscreetReceipt(): Promise<string> {
+    const [svc] = await dbh.db
+      .insert(services)
+      .values({
+        name: "Postnatal depression coaching",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "BM Coaching Session",
+      })
+      .returning();
+    const receipt = await writeReceipt(dbh.db, {
+      series: "BM-2026",
+      paymentMethod: "wallet",
+      postedBy: "system",
+      lines: [{ serviceId: svc!.id, quantity: 1, unitPrice: 80_000, lineTax: 0, lineTotal: 80_000 }],
+    });
+    return receipt.id;
+  }
+
+  it("renders the discreet label, not the real name, with amounts unchanged (AC1)", async () => {
+    const id = await seedDiscreetReceipt();
+    const session = await loginStaff("0712000001", "7421");
+    for (const format of ["a4", "thermal"] as const) {
+      const res = await app.inject({
+        method: "GET",
+        url: `/receipts/${id}?format=${format}`,
+        headers: { cookie: session },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain("BM Coaching Session");
+      expect(res.body).not.toContain("Postnatal depression coaching");
+      expect(res.body).not.toMatch(/depression/iu);
+      // Amounts are unchanged by the label substitution.
+      expect(res.body).toContain("KES 800.00");
+    }
+  });
 });

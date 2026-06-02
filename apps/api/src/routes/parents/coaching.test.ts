@@ -170,6 +170,47 @@ describe("parent coaching booking (P5-E01-S02)", () => {
     expect(audits).toHaveLength(1);
   });
 
+  it("a NON-discreet booking confirmation names the real service (AC2 baseline)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    const svc = await seedCoachingOffering("Sleep Coaching", 2500);
+    const asha = await seedCoach(svc.id, "Asha");
+    const slot = (await availability(parent, svc.id, asha.id)).json().slots[0];
+
+    const res = await confirm(parent, { coachingSlotId: slot.id, childId, staffId: asha.id });
+    expect(res.statusCode).toBe(201);
+
+    const sms = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "booking.confirmed"));
+    expect(sms).toHaveLength(1);
+    // Unchanged behaviour: the real service name appears.
+    expect(sms[0]!.body).toContain("Sleep Coaching");
+  });
+
+  it("a DISCREET coaching confirmation uses the neutral label, never the real name (AC2)", async () => {
+    const parent = await makeParent("+254712345678", "0712345678");
+    const childId = await addChild(parent.parentId);
+    // A sensitive offering with discreet billing enabled + a neutral label.
+    const svc = await seedCoachingOffering("Postnatal Depression Coaching", 2500);
+    await updateService(dbh.db, svc.id, {
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    const asha = await seedCoach(svc.id, "Asha");
+    const slot = (await availability(parent, svc.id, asha.id)).json().slots[0];
+
+    const res = await confirm(parent, { coachingSlotId: slot.id, childId, staffId: asha.id });
+    expect(res.statusCode).toBe(201);
+
+    const sms = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "booking.confirmed"));
+    expect(sms).toHaveLength(1);
+    // No sensitive service detail leaks; the neutral label is used instead.
+    expect(sms[0]!.body).not.toContain("Postnatal Depression Coaching");
+    expect(sms[0]!.body).not.toMatch(/depression/iu);
+    expect(sms[0]!.body).toContain("BM Coaching Session");
+    // The child name is still personalised (it is the parent's own confirmation).
+    expect(sms[0]!.body).toContain("Zola");
+  });
+
   it("409s a double-book of the same coaching slot — capacity 1 (AC3)", async () => {
     const a = await makeParent("+254712345678", "0712345678");
     const childA = await addChild(a.parentId);

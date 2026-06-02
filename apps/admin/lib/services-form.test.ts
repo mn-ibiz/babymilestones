@@ -177,3 +177,37 @@ describe("coaching catalogue form logic (P5-E01-S01 / Story 31.1)", () => {
     expect(validateServiceForm({ name: "S", unit: "coaching", format: "one_to_one", coachingCapacity: 1 })).toEqual({});
   });
 });
+
+describe("discreet billing form logic (P5-E01-S05 / Story 31.5)", () => {
+  it("requires a non-empty label when discreet billing is enabled (AC1/AC3)", () => {
+    expect(
+      validateServiceForm({
+        name: "C",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "BM Coaching Session",
+      }),
+    ).toEqual({});
+    expect(
+      validateServiceForm({ name: "C", unit: "coaching", discreetBillingEnabled: true })
+        .discreetBillingLabel,
+    ).toBeDefined();
+    expect(
+      validateServiceForm({
+        name: "C",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "   ",
+      }).discreetBillingLabel,
+    ).toBeDefined();
+  });
+
+  it("does not require a label when discreet billing is off (AC3)", () => {
+    expect(validateServiceForm({ name: "C", unit: "coaching", discreetBillingEnabled: false })).toEqual({});
+    expect(validateServiceForm({ name: "C", unit: "coaching" })).toEqual({});
+    // A stray label without the toggle is harmless (ignored).
+    expect(
+      validateServiceForm({ name: "C", unit: "coaching", discreetBillingLabel: "BM Coaching Session" }),
+    ).toEqual({});
+  });
+});

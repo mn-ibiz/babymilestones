@@ -158,6 +158,7 @@ export interface ServiceFormErrors {
   format?: string;
   coachingDurationMinutes?: string;
   coachingCapacity?: string;
+  discreetBillingLabel?: string;
 }
 
 /**
@@ -173,6 +174,8 @@ export function validateServiceForm(input: {
   format?: string;
   coachingDurationMinutes?: number | null;
   coachingCapacity?: number | null;
+  discreetBillingEnabled?: boolean;
+  discreetBillingLabel?: string;
 }): ServiceFormErrors {
   const errors: ServiceFormErrors = {};
   if (input.name.trim().length === 0) errors.name = "Name is required";
@@ -207,6 +210,12 @@ export function validateServiceForm(input: {
     errors.coachingCapacity = "Capacity must be a whole number of seats (at least 1)";
   } else if (capacity != null && capacity === 1 && format === "group") {
     errors.coachingCapacity = "A group session needs more than one seat";
+  }
+  // Discreet billing (P5-E01-S05 AC1/AC3): when the toggle is on, a non-empty
+  // neutral label is required (it replaces the sensitive name on receipts + SMS).
+  // The server re-validates. A stray label without the toggle is ignored.
+  if (input.discreetBillingEnabled && (input.discreetBillingLabel ?? "").trim() === "") {
+    errors.discreetBillingLabel = "A neutral billing label is required when discreet billing is on";
   }
   return errors;
 }

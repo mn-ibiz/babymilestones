@@ -35,6 +35,7 @@ import {
   RECONCILIATION_EXPORT_MAX_DAYS,
   serviceCreateSchema,
   serviceUpdateSchema,
+  SERVICE_NAME_MAX,
   ATTRIBUTION_ROLES,
   isAttributionRole,
   TAX_TREATMENTS,
@@ -655,6 +656,82 @@ describe("coaching catalogue contracts (P5-E01-S01)", () => {
     // Invalid values rejected.
     expect(serviceUpdateSchema.safeParse({ format: "webinar" }).success).toBe(false);
     expect(serviceUpdateSchema.safeParse({ coachingDurationMinutes: -5 }).success).toBe(false);
+  });
+});
+
+describe("discreet billing labels (P5-E01-S05)", () => {
+  it("serviceCreateSchema defaults discreet billing OFF with a null label (AC1/AC3)", () => {
+    const bare = serviceCreateSchema.parse({ name: "Sleep coaching", unit: "coaching" });
+    expect(bare.discreetBillingEnabled).toBe(false);
+    expect(bare.discreetBillingLabel).toBeNull();
+  });
+
+  it("serviceCreateSchema accepts an enabled toggle with a trimmed label (AC1/AC3)", () => {
+    const parsed = serviceCreateSchema.parse({
+      name: "Postnatal depression coaching",
+      unit: "coaching",
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "  BM Coaching Session  ",
+    });
+    expect(parsed.discreetBillingEnabled).toBe(true);
+    expect(parsed.discreetBillingLabel).toBe("BM Coaching Session");
+  });
+
+  it("serviceCreateSchema requires a non-empty label when enabled (AC1/AC3)", () => {
+    expect(
+      serviceCreateSchema.safeParse({ name: "C", unit: "coaching", discreetBillingEnabled: true })
+        .success,
+    ).toBe(false);
+    expect(
+      serviceCreateSchema.safeParse({
+        name: "C",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "   ",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("serviceCreateSchema rejects an over-long label", () => {
+    expect(
+      serviceCreateSchema.safeParse({
+        name: "C",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "x".repeat(SERVICE_NAME_MAX + 1),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("serviceCreateSchema collapses a label to null when the toggle is off", () => {
+    // A label supplied without the toggle is ignored (collapses to null) — the
+    // receipt only substitutes when enabled.
+    const parsed = serviceCreateSchema.parse({
+      name: "C",
+      unit: "coaching",
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    expect(parsed.discreetBillingEnabled).toBe(false);
+    expect(parsed.discreetBillingLabel).toBeNull();
+  });
+
+  it("serviceUpdateSchema only changes discreet fields when present + validates them (AC3)", () => {
+    expect(
+      serviceUpdateSchema.parse({
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "BM Coaching Session",
+      }).discreetBillingLabel,
+    ).toBe("BM Coaching Session");
+    // Untouched on a name-only patch: both stay undefined (absent = untouched),
+    // so a name-only edit never clears a stored label.
+    expect(serviceUpdateSchema.safeParse({ name: "C" }).data?.discreetBillingEnabled).toBeUndefined();
+    expect(serviceUpdateSchema.safeParse({ name: "C" }).data?.discreetBillingLabel).toBeUndefined();
+    // Enabling without a label is rejected.
+    expect(serviceUpdateSchema.safeParse({ discreetBillingEnabled: true }).success).toBe(false);
+    // Disabling can clear the label to null.
+    const off = serviceUpdateSchema.parse({ discreetBillingEnabled: false, discreetBillingLabel: null });
+    expect(off.discreetBillingEnabled).toBe(false);
+    expect(off.discreetBillingLabel).toBeNull();
   });
 });
 

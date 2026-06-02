@@ -123,6 +123,18 @@ export interface CreateServiceInput {
    * as an empty set (distinct from null).
    */
   ageStageTags?: string[] | null;
+  /**
+   * Discreet-billing toggle (P5-E01-S05 / Story 31.5 AC3). Default false. When
+   * true, receipts + coaching SMS use {@link discreetBillingLabel} in place of the
+   * real, sensitive service name. Display-only — never changes the stored line.
+   */
+  discreetBillingEnabled?: boolean;
+  /**
+   * Neutral display label shown when discreet billing is enabled (P5-E01-S05 AC1),
+   * e.g. "BM Coaching Session". Null/omitted when off; required + non-blank when
+   * enabled (DB CHECK + contract). The contract collapses a stray label to null.
+   */
+  discreetBillingLabel?: string | null;
 }
 
 /** Create a service (AC1). Always created active. Returns the new row. */
@@ -142,6 +154,9 @@ export async function createService(db: Executor, input: CreateServiceInput) {
       coachingCapacity: input.coachingCapacity ?? null,
       // An explicit (possibly empty) array is preserved; absent → null (no tags).
       ageStageTags: input.ageStageTags ?? null,
+      // Discreet billing (P5-E01-S05): default off, label null unless enabled.
+      discreetBillingEnabled: input.discreetBillingEnabled ?? false,
+      discreetBillingLabel: input.discreetBillingLabel ?? null,
       ...(input.rescheduleCutoffHours !== undefined
         ? { rescheduleCutoffHours: input.rescheduleCutoffHours }
         : {}),
@@ -181,6 +196,10 @@ export interface UpdateServiceInput {
   coachingCapacity?: number | null;
   /** Free-set age-stage tags (P5-E01-S01 AC2); null clears them, [] = empty set. */
   ageStageTags?: string[] | null;
+  /** Discreet-billing toggle (P5-E01-S05 AC3); only changed when present. */
+  discreetBillingEnabled?: boolean;
+  /** Neutral discreet-billing label (P5-E01-S05 AC1); null clears it. */
+  discreetBillingLabel?: string | null;
 }
 
 /**
@@ -207,6 +226,10 @@ export async function updateService(db: Executor, id: string, patch: UpdateServi
     set.coachingDurationMinutes = patch.coachingDurationMinutes;
   if (patch.coachingCapacity !== undefined) set.coachingCapacity = patch.coachingCapacity;
   if (patch.ageStageTags !== undefined) set.ageStageTags = patch.ageStageTags;
+  if (patch.discreetBillingEnabled !== undefined)
+    set.discreetBillingEnabled = patch.discreetBillingEnabled;
+  if (patch.discreetBillingLabel !== undefined)
+    set.discreetBillingLabel = patch.discreetBillingLabel;
   const [row] = await db.update(services).set(set).where(eq(services.id, id)).returning();
   return row ?? null;
 }

@@ -4,6 +4,7 @@ import {
   DEFAULT_BUSINESS_DETAILS,
   maskPhoneLast4,
   receiptContentType,
+  receiptLineDescription,
   renderReceipt,
   renderReceiptA4,
   renderReceiptThermal,
@@ -154,5 +155,80 @@ describe("renderReceipt + receiptContentType (P1-E08-S03)", () => {
   it("maps formats to content types", () => {
     expect(receiptContentType("a4")).toBe("text/html; charset=utf-8");
     expect(receiptContentType("thermal")).toBe("text/plain; charset=utf-8");
+  });
+});
+
+describe("receiptLineDescription (P5-E01-S05 — discreet billing labels)", () => {
+  it("renders the neutral label instead of the real name when discreet billing is on (AC1)", () => {
+    expect(
+      receiptLineDescription({
+        serviceId: "svc-1",
+        serviceName: "Postnatal depression coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "BM Coaching Session",
+      }),
+    ).toBe("BM Coaching Session");
+  });
+
+  it("renders the real service name when discreet billing is off (AC1)", () => {
+    expect(
+      receiptLineDescription({
+        serviceId: "svc-1",
+        serviceName: "Postnatal depression coaching",
+        discreetBillingEnabled: false,
+        discreetBillingLabel: null,
+      }),
+    ).toBe("Postnatal depression coaching");
+  });
+
+  it("falls back to the real name if the toggle is on but the label is blank (defensive)", () => {
+    expect(
+      receiptLineDescription({
+        serviceId: "svc-1",
+        serviceName: "Sensitive service",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "   ",
+      }),
+    ).toBe("Sensitive service");
+  });
+
+  it("keeps the existing generic fallbacks for an unnamed service / a product line", () => {
+    expect(
+      receiptLineDescription({
+        serviceId: "svc-1",
+        serviceName: null,
+        discreetBillingEnabled: false,
+        discreetBillingLabel: null,
+      }),
+    ).toBe("Service");
+    expect(
+      receiptLineDescription({
+        serviceId: null,
+        serviceName: null,
+        discreetBillingEnabled: false,
+        discreetBillingLabel: null,
+      }),
+    ).toBe("Item");
+  });
+
+  it("substitutes the label in the FULL render with amounts unchanged (AC1)", () => {
+    const realName = "Postnatal depression coaching";
+    const lineDesc = receiptLineDescription({
+      serviceId: "svc-1",
+      serviceName: realName,
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    const d = doc({
+      lines: [{ description: lineDesc, quantity: 1, unitPrice: 80_000, lineTax: 0, lineTotal: 80_000 }],
+      total: 80_000,
+      taxTotal: 0,
+    });
+    for (const out of [renderReceiptA4(d), renderReceiptThermal(d)]) {
+      expect(out).toContain("BM Coaching Session");
+      expect(out).not.toContain(realName);
+      // Amounts are unchanged by the label substitution.
+      expect(out).toContain("KES 800.00");
+    }
   });
 });

@@ -71,6 +71,9 @@ export function createCoachingRemindersJob(deps: CoachingRemindersJobDeps): Job 
           parentId: bookings.parentId,
           childName: children.firstName,
           offeringName: services.name,
+          // P5-E01-S05: discreet-billing facts neutralise the offering name.
+          discreetBillingEnabled: services.discreetBillingEnabled,
+          discreetBillingLabel: services.discreetBillingLabel,
           coachName: staff.displayName,
           coachNameSnapshot: bookings.staffNameSnapshot,
           slotDate: coachingSlots.slotDate,
@@ -104,12 +107,20 @@ export function createCoachingRemindersJob(deps: CoachingRemindersJobDeps): Job 
           );
         if (prior.length > 0) continue;
 
+        // P5-E01-S05 (AC2): a discreet (sensitive) offering reminds under its
+        // NEUTRAL label so the SMS carries no sensitive service detail. Non-discreet
+        // offerings keep their real name unchanged.
+        const discreetLabel = (row.discreetBillingLabel ?? "").trim();
+        const offeringName =
+          row.discreetBillingEnabled && discreetLabel !== ""
+            ? discreetLabel
+            : (row.offeringName ?? "coaching session");
         await sender.send({
           to: row.phone,
           template: "coaching.reminder",
           data: {
             childName: row.childName,
-            offeringName: row.offeringName ?? "coaching session",
+            offeringName,
             coachName: row.coachName ?? row.coachNameSnapshot,
             date: row.slotDate,
             time: row.startTime,

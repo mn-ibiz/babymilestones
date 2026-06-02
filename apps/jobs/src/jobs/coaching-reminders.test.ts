@@ -11,6 +11,7 @@ import {
   generateCoachingSlotsForAvailability,
   listAvailableCoachingSlots,
   setServicePrice,
+  updateService,
 } from "@bm/catalog";
 import { createCoachingRemindersJob } from "./coaching-reminders.js";
 
@@ -88,6 +89,27 @@ describe("coaching day-before reminder cron (P5-E01-S02 AC5)", () => {
     expect(rows[0]!.phone).toBe("+254712000001");
     expect(rows[0]!.body).toContain("tomorrow");
     expect(rows[0]!.body).toContain("Sleep coaching");
+  });
+
+  it("a DISCREET coaching reminder uses the neutral label, never the real name (P5-E01-S05 AC2)", async () => {
+    const { coach, svc } = await seedOfferingCoach();
+    // Rename to a sensitive name + enable discreet billing with a neutral label.
+    await updateService(dbh.db, svc.id, {
+      name: "Postnatal Depression Coaching",
+      discreetBillingEnabled: true,
+      discreetBillingLabel: "BM Coaching Session",
+    });
+    const fam = await seedParentChild("+254712000009");
+    const [slot] = await listAvailableCoachingSlots(dbh.db, { serviceId: svc.id, fromDate: TOMORROW, toDate: TOMORROW });
+    await bookCoachingSlot(dbh.db, { coachingSlotId: slot!.id, parentId: fam.parentId, childId: fam.childId, staffId: coach.id });
+
+    await createCoachingRemindersJob({ db: dbh.db, now }).run();
+
+    const rows = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "coaching.reminder"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.body).not.toContain("Postnatal Depression Coaching");
+    expect(rows[0]!.body).not.toMatch(/depression/iu);
+    expect(rows[0]!.body).toContain("BM Coaching Session");
   });
 
   it("is idempotent — a second run the same day does not double-send (AC5)", async () => {

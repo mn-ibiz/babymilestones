@@ -105,11 +105,13 @@ export {
   renderReceiptA4,
   renderReceiptThermal,
   receiptContentType,
+  receiptLineDescription,
   maskPhoneLast4,
   // formatReceiptCents already re-exported from receipt-preview (same impl).
   DEFAULT_BUSINESS_DETAILS,
   type ReceiptDocument,
   type ReceiptDocumentLine,
+  type ReceiptLineServiceInfo,
   type ReceiptRecordInput,
   type ReceiptRenderContext,
   type ReceiptBusinessDetails,
