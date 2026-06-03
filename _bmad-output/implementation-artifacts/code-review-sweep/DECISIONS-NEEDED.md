@@ -3,6 +3,37 @@
 These are real findings where the correct fix requires a human/product decision (ambiguous intent).
 They are NOT auto-fixed. Review and tell me how to resolve each.
 
+## Epic 36 — Marketing Site Polish  (stored-XSS surfaces verified SAFE)
+
+104. **[HIGH · functional · P5-E06-S03] CMS external hero image breaks at render.** The CMS schema
+    accepts absolute `http(s)` hero image URLs (the documented primary use case), but the public
+    `[unit]/page.tsx` renders via `next/image` and `next.config.mjs` configures NO `images.remotePatterns`
+    — so Next 400s any remote host and the admin gets a broken hero on the published page. NOT a security
+    issue (the URL scheme guard still blocks XSS). Decide: allowlist the approved CDN host(s) in
+    `next.config.mjs`, restrict hero URLs to root-relative local paths, or render external absolute URLs
+    with a plain `<img>` / `unoptimized`.
+
+105. **[MED · P5-E06-S02] AC1 (Lighthouse 95+ Perf/SEO/A11y) and AC3 (LCP < 1.5s on 3G) are not enforced
+    or tested** — no lhci gate in CI; `LCP_BUDGET_MS`/`withinLcpBudget()` are referenced only by their own
+    unit test (nothing measures a real LCP). Both perf/quality ACs are aspirational and can silently
+    regress. Add a Lighthouse-CI budget gate, or explicitly waive the "every AC has a test" DoD for these
+    two. **[LOW]** no `sitemap.ts`/`robots.ts` shipped with the SEO pass.
+
+106. **[LOW · P5-E06-S04] Public article/blog cache (`max-age=300`) serves an unpublished article for up
+    to 5 min after takedown** (DB unpublish is immediate). Fine for SEO; for a legal/defamatory takedown
+    the body stays cache-retrievable. Accept + document the SLA, lower max-age, or `no-store` the detail
+    route. **[LOW]** AC1 says the body is "MDX" but the implementation is a safe markdown SUBSET — a
+    deliberate, correct anti-XSS tradeoff; update the AC wording, do NOT add real MDX. (Same cache-
+    takedown class as the testimonial snippet decision #95.)
+
+(Patched directly this review: the CMS slug is now `encodeURIComponent`-encoded into the fetch URL.
+**Security note:** all stored-XSS surfaces in this epic were adversarially verified SAFE — the CMS
+CTA-href/hero-image scheme guard and the article cover-image guard are robust allowlists at all layers,
+the blog body is an escape-first markdown subset (~13 attack vectors probed, no bypass), the JSON-LD
+serializer escapes `<` (no `</script>` breakout), and testimonials render as escaped JSX. Stories 36-1
+and 36-5 reviewed CLEAN. One PRE-EXISTING middleware issue — `/health/*` probes redirect to `/login` —
+is tracked as a non-story-scoped follow-up.)
+
 ## Epic 35 — Advanced Reporting / Cohorts
 
 99. **[BLOCKER · money · P5-E05-S01] Consolidated P&L omits shop (in-store retail) REVENUE.** `loadPeriod`

@@ -1,0 +1,6 @@
+{"id":"P5-E06-S04","verdict":"issues","patches_applied":0,"decisions":2,"deferred":1,"dismissed":6,
+ "findings":[
+  {"severity":"low","category":"decision-needed","title":"Unpublish/takedown served stale up to 5min via public max-age=300 cache","location":"apps/api/src/routes/public/articles.ts:26"},
+  {"severity":"low","category":"decision-needed","title":"AC1 says MDX but impl is a safe markdown subset (correct security tradeoff) — update AC wording","location":"apps/platform/lib/blog.ts:93"},
+  {"severity":"medium","category":"defer","title":"PRE-EXISTING: middleware redirects /health/live + /health/ready probes to /login","location":"apps/platform/middleware.ts:84"}
+ ]}

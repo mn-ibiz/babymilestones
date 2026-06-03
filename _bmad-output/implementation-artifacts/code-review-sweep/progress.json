@@ -82,7 +82,7 @@
     "33": "done",
     "34": "done",
     "35": "done",
-    "36": "todo"
+    "36": "done"
   },
   "stories": [
     {
@@ -2952,7 +2952,7 @@
         "05e7b38d6da4d4138574dd867b0dd067efe3be49"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "36-2-seo-performance-budget-tightening",
@@ -2970,7 +2970,7 @@
         "8a7aaef441f865f95cdbc330105b9e132a29c5a5"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "36-3-cms-driven-unit-pages",
@@ -2989,7 +2989,7 @@
         "90d981516741aefc0a9dd77cde637976103a6a86"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "36-4-blog-stories-optional",
@@ -3008,7 +3008,7 @@
         "2272e0e6c330d38620b4f60124a6a7b86c2245ec"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "36-5-social-proof-testimonials",
@@ -3025,7 +3025,7 @@
         "3e811fb6ad46ef3ab47240bc21b7cd6936eb3cba"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     }
   ],
   "epic_results": {
@@ -3300,8 +3300,16 @@
       "decisions_needed": 8,
       "dismissed": 22,
       "commit": ""
+    },
+    "36": {
+      "stories_reviewed": 5,
+      "patches": 1,
+      "deferred": 4,
+      "decisions_needed": 4,
+      "dismissed": 19,
+      "commit": ""
     }
   },
-  "epics_done": 34,
+  "epics_done": 35,
   "epics_total": 35
 }

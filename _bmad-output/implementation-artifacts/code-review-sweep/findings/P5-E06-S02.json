@@ -1,0 +1,5 @@
+{"id":"P5-E06-S02","verdict":"issues","patches_applied":0,"decisions":1,"deferred":1,"dismissed":3,
+ "findings":[
+  {"severity":"medium","category":"decision-needed","title":"AC1 Lighthouse 95+ / AC3 LCP<1.5s not enforced — aspirational (LCP_BUDGET_MS unused)","location":"apps/platform/lib/home-content.ts:21-31"},
+  {"severity":"low","category":"defer","title":"No sitemap.ts / robots.ts shipped with the SEO pass","location":"apps/platform/app"}
+ ]}

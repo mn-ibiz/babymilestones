@@ -42,7 +42,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 33 | 4 | ✅ | 1 (admin go-live toggle credentials:include) | 5 | 13 (incl. switch-dead-code + cap-not-enforced + deferred-lost BLOCKERs) | 11 |
 | 34 | 4 | ✅ | 6 (feedback-invite discreet leak, staff attribution, dashboard 366d cap, alert claim-then-act, submitted guard, index parity) | 4 | 6 | 15 |
 | 35 | 6 | ✅ | 5 (tax-report month-breakdown bug, recurring-expense double-post, repeat+tax 366d caps, P&L audit tag) | 6 | 8 (incl. P&L shop-revenue BLOCKER, expense hard-delete) | 22 |
-| 36 | 5 | ⬜ | | | | |
+| 36 | 5 | ✅ | 1 (CMS slug encodeURIComponent) — all stored-XSS surfaces verified SAFE; 36-1/36-5 clean | 4 | 4 (CMS hero remote-image, Lighthouse gate, cache-takedown) | 19 |
 
 ## Notes / observations
 - Repo advanced mid-session (HEAD `19d412b` → `35272a5`); a concurrent process completed Epics 35–36. Reviewing by pinned SHA isolates us from further movement.

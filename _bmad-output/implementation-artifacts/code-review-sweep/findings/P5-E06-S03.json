@@ -1,0 +1,7 @@
+{"id":"P5-E06-S03","verdict":"issues","patches_applied":1,"decisions":1,"deferred":2,"dismissed":6,
+ "findings":[
+  {"severity":"low","category":"patch","title":"fetchPublishedUnitPage now encodeURIComponents the slug (defense-in-depth)","location":"apps/platform/lib/cms-page.ts:133","status":"FIXED"},
+  {"severity":"high","category":"decision-needed","title":"CMS external hero image breaks at render — next/image with no remotePatterns configured","location":"apps/platform/app/(public)/[unit]/page.tsx:88-96"},
+  {"severity":"low","category":"defer","title":"getPublishedPage revision tiebreak uses random UUID not a monotonic sequence","location":"packages/catalog/src/cms-pages.ts:229-241"},
+  {"severity":"low","category":"defer","title":"(resolved) slug interpolated into fetch URL — patched","location":"apps/platform/lib/cms-page.ts:133"}
+ ]}

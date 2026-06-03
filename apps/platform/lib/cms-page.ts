@@ -130,7 +130,9 @@ export async function fetchPublishedUnitPage(
   const base = opts.apiBaseUrl ?? process.env.API_BASE_URL ?? "http://127.0.0.1:8080";
   const fetchImpl = opts.fetchImpl ?? fetch;
   try {
-    const res = await fetchImpl(`${base}/public/cms-pages/${slug}`);
+    // Encode the slug into the path (defense-in-depth — the [unit] route can't
+    // carry a '/', but never interpolate a route param into a URL raw).
+    const res = await fetchImpl(`${base}/public/cms-pages/${encodeURIComponent(slug)}`);
     if (!res.ok) return null;
     const json = (await res.json()) as { page?: PublishedCmsPage };
     return json.page ?? null;
