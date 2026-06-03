@@ -1,0 +1,6 @@
+{"id":"P5-E05-S05","verdict":"issues","patches_applied":1,"decisions":1,"deferred":1,"dismissed":4,
+ "findings":[
+  {"severity":"high","category":"patch","title":"Recurring materialise non-atomic — could double-post; reworked to claim-then-insert","location":"packages/catalog/src/expenses.ts:318-357","status":"FIXED"},
+  {"severity":"high","category":"decision-needed","title":"Expenses hard-deleted (history destroyed); delete/update audit carries no value snapshot","location":"packages/catalog/src/expenses.ts:163-166"},
+  {"severity":"low","category":"defer","title":"cron '0 1 * * *' decorative + UTC day matching — pre-existing platform pattern","location":"apps/jobs/src/jobs/recurring-expenses.ts:42-62"}
+ ]}

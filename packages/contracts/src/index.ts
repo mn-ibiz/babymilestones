@@ -5768,6 +5768,8 @@ export function cohortRetentionViewModel(dto: CohortRetentionDto): CohortRetenti
  * range (`YYYY-MM-DD`); both bounds are validated calendar dates with
  * `fromDate <= toDate`. Reuses the shared {@link exportDateSchema}.
  */
+/** Max span for the repeat-attendance report — matches the other date reports. */
+export const REPEAT_ATTENDANCE_MAX_DAYS = 366;
 export const repeatAttendanceQuerySchema = z
   .object({
     fromDate: exportDateSchema,
@@ -5775,6 +5777,12 @@ export const repeatAttendanceQuerySchema = z
   })
   .refine((v) => v.fromDate <= v.toDate, {
     message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  })
+  // Cap the span so an unbounded range can't trigger a full scan of attendances +
+  // tickets (mirrors revenue-by-period / feedback-dashboard / peak-hours).
+  .refine((v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= REPEAT_ATTENDANCE_MAX_DAYS, {
+    message: `Date range may not exceed ${REPEAT_ATTENDANCE_MAX_DAYS} days`,
     path: ["toDate"],
   });
 export type RepeatAttendanceQuery = z.infer<typeof repeatAttendanceQuerySchema>;
@@ -5891,6 +5899,8 @@ export function repeatAttendanceUrl(values: { fromDate: string; toDate: string }
  * supplies (+ a per-month breakdown). Reuses the shared {@link exportDateSchema} and
  * requires `fromDate <= toDate`.
  */
+/** Max span for the tax report — matches the other date reports. */
+export const TAX_REPORT_MAX_DAYS = 366;
 export const taxReportQuerySchema = z
   .object({
     fromDate: exportDateSchema,
@@ -5898,6 +5908,12 @@ export const taxReportQuerySchema = z
   })
   .refine((v) => v.fromDate <= v.toDate, {
     message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  })
+  // Cap the span so an unbounded range can't trigger a full scan of receipts +
+  // receipt_lines (mirrors revenue-by-period / reconciliation export).
+  .refine((v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= TAX_REPORT_MAX_DAYS, {
+    message: `Date range may not exceed ${TAX_REPORT_MAX_DAYS} days`,
     path: ["toDate"],
   });
 export type TaxReportQuery = z.infer<typeof taxReportQuerySchema>;

@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lt, ne, or } from "drizzle-orm";
 import {
   expenses,
   expenseRecurringTemplates,
@@ -309,8 +309,16 @@ export interface MaterialiseResult {
  * (`lastRunMonth != YYYY-MM`). IDEMPOTENT: a second run the same month re-finds
  * `lastRunMonth` set and skips. Each materialised expense carries
  * `recurringTemplateId` back to its template and uses `asOfDate` as its
- * `expense_date`. Runs in a transaction per template so the insert + the
- * `last_run_month` stamp are atomic.
+ * `expense_date`.
+ *
+ * IDEMPOTENCY is enforced by a CLAIM-then-insert: the `last_run_month` stamp is
+ * written FIRST via a conditional UPDATE (`WHERE last_run_month IS DISTINCT FROM
+ * :month`) and the concrete expense is inserted ONLY when that claim wins (a row
+ * is returned). Two concurrent ticks — or a replay after a crash — can never both
+ * claim the same template/month, so a recurring expense can never be double-posted
+ * (which would silently corrupt the P&L). The residual failure mode (claim commits
+ * but the insert throws) skips one expense rather than duplicating one — the safe
+ * direction for money.
  *
  * `asOfDate` is the YYYY-MM-DD the daily cron passes (today). Returns the count
  * created so the job can log a per-run summary.
@@ -333,8 +341,27 @@ export async function materialiseDueRecurringExpenses(
 
   let created = 0;
   for (const tpl of due) {
-    // Idempotency guard: already materialised this calendar month → skip.
+    // Cheap pre-skip (already materialised this month) to avoid a needless write.
     if (tpl.lastRunMonth === month) continue;
+
+    // CLAIM the template for this month atomically: only the writer whose UPDATE
+    // matches `last_run_month IS DISTINCT FROM :month` wins. A 0-row result means a
+    // concurrent tick (or a replay) already claimed it — skip the insert so the
+    // expense is posted at-most-once per template per month.
+    const claimed = await db
+      .update(expenseRecurringTemplates)
+      .set({ lastRunMonth: month, updatedAt: new Date() })
+      .where(
+        and(
+          eq(expenseRecurringTemplates.id, tpl.id),
+          or(
+            isNull(expenseRecurringTemplates.lastRunMonth),
+            ne(expenseRecurringTemplates.lastRunMonth, month),
+          ),
+        ),
+      )
+      .returning({ id: expenseRecurringTemplates.id });
+    if (claimed.length === 0) continue;
 
     await db.insert(expenses).values({
       expenseDate: asOfDate,
@@ -346,10 +373,6 @@ export async function materialiseDueRecurringExpenses(
       recurringTemplateId: tpl.id,
       createdBy: tpl.createdBy,
     });
-    await db
-      .update(expenseRecurringTemplates)
-      .set({ lastRunMonth: month, updatedAt: new Date() })
-      .where(eq(expenseRecurringTemplates.id, tpl.id));
     created += 1;
   }
 

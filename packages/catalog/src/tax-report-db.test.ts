@@ -171,6 +171,33 @@ describe("loadTaxReport (Story 35.6)", () => {
     expect(out.vatChargedCents).toBe(16_00);
   });
 
+  it("includes the final month in the breakdown when toDate is mid-month (Σ months === total)", async () => {
+    const vatable = await seedService("vat_inclusive");
+    const exempt = await seedService("vat_exempt");
+    await seedReceipt({ createdAt: new Date("2026-04-15T10:00:00Z"), lines: [{ serviceId: vatable, lineTax: 16_00, lineTotal: 116_00 }] });
+    // June 1-10 line: must appear in the June row, not just the period total.
+    await seedReceipt({ createdAt: new Date("2026-06-05T10:00:00Z"), lines: [{ serviceId: exempt, lineTax: 0, lineTotal: 50_00 }] });
+
+    // toDate is MID-month (the 10th), like the default first-of-month..today range.
+    const out = await loadTaxReport(dbh.db, { fromDate: "2026-04-10", toDate: "2026-06-10" });
+    expect(out.byMonth!.map((m) => m.month)).toEqual(["2026-04", "2026-05", "2026-06"]);
+    const jun = out.byMonth!.find((m) => m.month === "2026-06")!;
+    expect(jun.exemptSuppliesCents).toBe(50_00);
+    // Σ(month rows) reconciles with the period totals.
+    const sumExempt = out.byMonth!.reduce((s, m) => s + m.exemptSuppliesCents, 0);
+    const sumTaxable = out.byMonth!.reduce((s, m) => s + m.taxableSuppliesCents, 0);
+    expect(sumExempt).toBe(out.exemptSuppliesCents);
+    expect(sumTaxable).toBe(out.taxableSuppliesCents);
+  });
+
+  it("includes the only month when the whole range is within one month, ending mid-month", async () => {
+    const vatable = await seedService("vat_inclusive");
+    await seedReceipt({ createdAt: new Date("2026-05-08T10:00:00Z"), lines: [{ serviceId: vatable, lineTax: 16_00, lineTotal: 116_00 }] });
+    const out = await loadTaxReport(dbh.db, { fromDate: "2026-05-01", toDate: "2026-05-15" });
+    expect(out.byMonth!.map((m) => m.month)).toEqual(["2026-05"]);
+    expect(out.byMonth![0]!.vatChargedCents).toBe(16_00);
+  });
+
   it("treats zero-rated lines as exempt-of-VAT supplies (no VAT)", async () => {
     const zeroRated = await seedService("zero_rated");
     await seedReceipt({ createdAt: new Date("2026-05-10T10:00:00Z"), lines: [{ serviceId: zeroRated, lineTax: 0, lineTotal: 40_00 }] });

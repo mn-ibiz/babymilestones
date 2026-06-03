@@ -81,7 +81,7 @@
     "32": "done",
     "33": "done",
     "34": "done",
-    "35": "todo",
+    "35": "done",
     "36": "todo"
   },
   "stories": [
@@ -2845,7 +2845,7 @@
         "c189bd3a594e1fb141ab814f07bae3baa39ba547"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "35-2-cohort-retention-by-signup-month",
@@ -2863,7 +2863,7 @@
         "3fda28368317ad95c3325e78310bd85bfddde49c"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "35-3-repeat-attendance-metrics-for-events-and-classes",
@@ -2881,7 +2881,7 @@
         "ca8cf6f7f7ad47ae653125444ff2b42ba1dbb3da"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "35-4-wallet-float-vs-revenue-snapshot",
@@ -2899,7 +2899,7 @@
         "a63328cb3187d771a90b67ab51f9ac1d5063a4a0"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "35-5-expenses-module",
@@ -2916,7 +2916,7 @@
         "b310ec5b146e4ad93a281d417c4e9596048353b9"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "35-6-tax-ready-exports",
@@ -2934,7 +2934,7 @@
         "73e9f06241ad0e3839580e3a6bfdc07c42e44dcf"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "36-1-brand-polish-pass",
@@ -3292,8 +3292,16 @@
       "decisions_needed": 6,
       "dismissed": 15,
       "commit": ""
+    },
+    "35": {
+      "stories_reviewed": 6,
+      "patches": 5,
+      "deferred": 6,
+      "decisions_needed": 8,
+      "dismissed": 22,
+      "commit": ""
     }
   },
-  "epics_done": 33,
+  "epics_done": 34,
   "epics_total": 35
 }

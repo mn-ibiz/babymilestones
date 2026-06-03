@@ -92,7 +92,16 @@ export async function loadTaxReport(db: Executor, opts: LoadTaxReportOpts): Prom
       ),
     );
 
-  const months = monthsInRange(opts.fromDate, nextDayStart(opts.toDate).toISOString().slice(0, 10));
+  // monthsInRange is half-open on FIRST-OF-MONTH ([from, to)), so to include the
+  // month CONTAINING toDate the exclusive bound must be the first day of the NEXT
+  // month — not nextDayStart(toDate), which only crosses the boundary when toDate
+  // is month-end. Otherwise a mid-month toDate (incl. the default first-of-month..
+  // today range) drops the final month from the breakdown while still counting its
+  // lines in the totals, breaking Σ(months) === total reconciliation.
+  const [ty, tm] = opts.toDate.split("-").map(Number) as [number, number];
+  const firstOfMonthAfterTo =
+    tm === 12 ? `${ty + 1}-01-01` : `${ty}-${String(tm + 1).padStart(2, "0")}-01`;
+  const months = monthsInRange(opts.fromDate, firstOfMonthAfterTo);
 
   const lines: TaxLineInput[] = rows
     .filter((r) => !voidedSet.has(r.receiptId))

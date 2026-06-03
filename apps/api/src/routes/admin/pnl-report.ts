@@ -111,7 +111,9 @@ export function registerAdminPnlReport(app: FastifyInstance, deps: AdminDeps): v
     await audit(db, {
       actor: user.id,
       action: auditAction("report.pnl.export"),
-      target: { table: "expenses", id: null },
+      // The P&L is a composed report, not an expenses mutation — tag the audit
+      // target as the report so it doesn't pollute expenses-table audit queries.
+      target: { table: "pnl_report", id: null },
       payload: {
         anchor: query.anchor,
         granularity: query.granularity,

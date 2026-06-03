@@ -1,0 +1,6 @@
+{"id":"P5-E05-S03","verdict":"issues","patches_applied":1,"decisions":2,"deferred":0,"dismissed":2,
+ "findings":[
+  {"severity":"high","category":"patch","title":"No 366-day cap — unbounded scan of attendances+tickets; added cap","location":"packages/contracts/src/index.ts:5771","status":"FIXED"},
+  {"severity":"medium","category":"decision-needed","title":"Soft-deleted events still counted (no isNull(events.deletedAt) filter)","location":"packages/catalog/src/repeat-attendance-db.ts:110"},
+  {"severity":"low","category":"decision-needed","title":"Un-normalised phone identity — class users.phone vs guest tickets.buyerPhone won't unify","location":"packages/catalog/src/repeat-attendance-db.ts:122"}
+ ]}

@@ -1,0 +1,6 @@
+{"id":"P5-E05-S01","verdict":"issues","patches_applied":1,"decisions":1,"deferred":1,"dismissed":4,
+ "findings":[
+  {"severity":"low","category":"patch","title":"P&L export audit target.table was 'expenses' for a report event — changed to 'pnl_report'","location":"apps/api/src/routes/admin/pnl-report.ts:114","status":"FIXED"},
+  {"severity":"blocker","category":"decision-needed","title":"Shop (in-store retail) revenue never composed into P&L — net understated by the POS top-line","location":"packages/catalog/src/pnl-report-db.ts:81-100"},
+  {"severity":"low","category":"defer","title":"AC3 PDF/Excel delivered as printable-HTML + CSV (Decision 13 convention)","location":"apps/api/src/routes/admin/pnl-report.ts:46-52"}
+ ]}

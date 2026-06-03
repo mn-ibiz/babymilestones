@@ -3,6 +3,48 @@
 These are real findings where the correct fix requires a human/product decision (ambiguous intent).
 They are NOT auto-fixed. Review and tell me how to resolve each.
 
+## Epic 35 — Advanced Reporting / Cohorts
+
+99. **[BLOCKER · money · P5-E05-S01] Consolidated P&L omits shop (in-store retail) REVENUE.** `loadPeriod`
+    sources revenue only from the service-unit read model, never from `pos_sales`, yet the `shop` unit
+    still carries its expenses — so the shop net is structurally negative and the consolidated net is
+    understated by the entire POS top-line. The COGS=0 gap is documented; this revenue=0 gap is not, and
+    a test bakes in `shop.revenueCents === 0`. Compose a `pos_sales` revenue read model (decide gross vs
+    net + the paid-sale filter — a finance-policy call), or document the limitation explicitly like COGS.
+
+100. **[HIGH · audit/accounting · P5-E05-S05] Expenses are HARD-deleted and edits aren't value-audited.**
+    `deleteExpense` issues a physical DELETE (templates are soft-deleted), and the audit rows carry no
+    value snapshot (delete logs only `{ip}`; update logs only changed field NAMES). An admin can silently
+    edit a past expense's amount and alter a closed period's P&L with no recoverable prior figure. Decide:
+    soft-delete expenses (mirror templates + the ledger philosophy), snapshot old→new in the audit, and
+    whether editing a reported-period expense should be blocked / require a reversing entry.
+    (The double-post idempotency bug in the recurring poster was PATCHED directly this review.)
+
+101. **[MED · P5-E05-S06] Zero-rated and VAT-exempt supplies are merged into one "exempt" bucket** —
+    different KRA VAT-3 return boxes (zero-rated = taxable at 0%; exempt = not taxable). `receipt_lines`
+    stores only `line_tax` (no `tax_treatment`), so the report can't separate them today. AC1 only names
+    "exempt" (spec-compliant), but flag for the accountant: accept + document, or persist `tax_treatment`
+    on receipt_lines (additive migration) to split them. (Same root cause: a standard line whose VAT
+    rounds to 0 cents is also mis-bucketed as exempt — sub-3-cent, negligible.)
+
+102. **[MED · P5-E05-S02] Cohort "active" metric: AC2 says "≥1 paid touchpoint in the last 30 days" but
+    the code uses calendar-month membership; the `ACTIVE_WINDOW_DAYS=30` constant and the
+    `activeDefinition` param are dead/no-op.** A defensible metric, but not the literal AC. Accept
+    calendar-month (delete the misleading knob + update AC wording), or implement the rolling 30-day
+    window. **[also MED · perf, deferred]** the active-signal query is an unbounded full scan of
+    `wallet_ledger` (no date/parent bound, no index) — bound it to before `monthAfter(asOf)` + the
+    in-range parents (result-preserving); tracked as a perf fix.
+
+103. **[MED · P5-E05-S03] Repeat-attendance counts soft-deleted events** (no `isNull(events.deletedAt)`,
+    unlike every other event read) and **[LOW]** unifies attendee identity by exact phone-string equality
+    (canonical `users.phone` vs free-text guest `tickets.buyerPhone`), so a parent who buys a ticket with
+    a differently-formatted number is double-counted / cross-surface repeats under-counted. Decide whether
+    to hide deleted events and whether to normalise phones before keying.
+
+(Patched directly this review, no decision needed: tax-report mid-month breakdown bug, the
+repeat-attendance + tax-report 366-day caps, the recurring-expense claim-then-insert idempotency,
+and the P&L export audit-target tag. Story 35-4 wallet float vs revenue reviewed CLEAN — no findings.)
+
 ## Epic 34 — Feedback Engine
 
 95. **[MED · P5-E04-S04] Retracted public review snippet keeps serving from CDN/browser cache for up to

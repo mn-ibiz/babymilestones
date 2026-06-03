@@ -1,0 +1,8 @@
+{"id":"P5-E05-S06","verdict":"issues","patches_applied":2,"decisions":2,"deferred":1,"dismissed":3,
+ "findings":[
+  {"severity":"high","category":"patch","title":"Per-month breakdown dropped final month for mid-month toDate (incl. default load) — fixed bound","location":"packages/catalog/src/tax-report-db.ts:95","status":"FIXED"},
+  {"severity":"medium","category":"patch","title":"No 366-day cap on tax report — added cap","location":"packages/contracts/src/index.ts:5894","status":"FIXED"},
+  {"severity":"medium","category":"decision-needed","title":"Zero-rated and exempt merged into one bucket (different KRA VAT-3 boxes); needs persisted tax_treatment","location":"packages/catalog/src/tax-report-db.ts:99-106"},
+  {"severity":"low","category":"decision-needed","title":"Standard line whose VAT rounds to 0 mis-bucketed as exempt (classifies on line_tax!=0)","location":"packages/catalog/src/tax-report-db.ts:104"},
+  {"severity":"low","category":"defer","title":"UTC vs EAT period boundaries — codebase-wide convention","location":"packages/catalog/src/tax-report-db.ts:48-56"}
+ ]}
