@@ -221,13 +221,14 @@ export class ConsentAwareSmsSender {
   }
 
   /**
-   * Send a reception receipt copy (P1-E05-S06 AC3). Gated on the parent's SMS
-   * consent flag (P1-E02-S04): a parent who has not opted in does not get an
-   * unsolicited receipt text — the copy is dropped (the print path is
-   * unaffected). Returns the queued result, or null when dropped.
+   * Send a reception receipt copy (P1-E05-S06 AC3). A receipt is a TRANSACTIONAL
+   * message — proof of a payment the parent just made and explicitly requested at
+   * the counter — so it is ALWAYS sent and is NOT gated on the marketing opt-in
+   * (P1-E02-S04 AC3: transactional SMS are always delivered; the marketing flag
+   * governs only marketing sends). `parentId` is retained for callsite/signature
+   * compatibility. Returns the queued result.
    */
-  async sendReceipt(parentId: string, payload: SmsPayload): Promise<SmsResult | null> {
-    if (!(await isMarketingOptedIn(this.db, parentId))) return null;
+  async sendReceipt(_parentId: string, payload: SmsPayload): Promise<SmsResult | null> {
     return this.sender.send(payload);
   }
 }

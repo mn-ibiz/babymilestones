@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { audit, parents, users, walletLedger, wallets, type Database } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   receiptLineDescription,
   type ReceiptPayload,
@@ -58,7 +58,10 @@ async function loadReceipt(db: Database, transactionId: string): Promise<Receipt
     .where(eq(walletLedger.id, transactionId));
   if (!row) return null;
 
-  const amountCents = Number(row.amount);
+  // wallet_ledger.amount is signed (credits positive, debits negative). A receipt
+  // is a proof-of-transaction document, so present the magnitude — otherwise a
+  // reprint of a debit/refund entry (AC4) would render a negative line + total.
+  const amountCents = Math.abs(Number(row.amount));
   const payload: ReceiptPayload = {
     transactionId: row.entryId,
     parentName: `${row.firstName} ${row.lastName}`.trim(),
@@ -114,6 +117,13 @@ export function registerReceipt(app: FastifyInstance, deps: ReceptionDeps): void
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    // Reception-only. Parents also hold `read wallet` / `create payment`, so the
+    // permission guard alone would let any authenticated parent read another
+    // parent's receipt (by ledger id) and fire a receipt SMS to them. Gate on staff.
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return null;
     }
     const perm = guard(auth.user);

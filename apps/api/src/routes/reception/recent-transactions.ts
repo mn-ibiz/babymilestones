@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { users, type Database } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import { recentTransactions, RECENT_TRANSACTIONS_LIMIT } from "@bm/wallet";
 import type { RecentTransaction, RecentTransactionsResponse } from "@bm/contracts";
 import { loadParentRecord } from "./parent-profile.js";
@@ -46,6 +46,13 @@ export function registerRecentTransactions(
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return false;
+    }
+    // Parents also hold `read wallet` (over their OWN wallet only). This by-:userId
+    // route is staff-only — without this gate a parent could read another parent's
+    // recent ledger postings by guessing a userId (mirrors statement.ts).
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return false;
     }
     const perm = guard(auth.user);

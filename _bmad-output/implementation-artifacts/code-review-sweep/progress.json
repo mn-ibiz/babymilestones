@@ -52,7 +52,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "todo",
+    "5": "done",
     "6": "todo",
     "7": "todo",
     "8": "todo",
@@ -559,7 +559,7 @@
         "70fef02c117430f10a3109084eeed34becba7fb7"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "5-3-reception-top-up-cash-m-pesa-paystack",
@@ -627,7 +627,7 @@
         "5578cc87be55598152628cbcf9713eb9c21aacc5"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "6-1-configure-float-accounts-per-till-per-bank",
@@ -3060,8 +3060,16 @@
       "decisions_needed": 2,
       "dismissed": 10,
       "commit": ""
+    },
+    "5": {
+      "stories_reviewed": 2,
+      "patches": 5,
+      "deferred": 1,
+      "decisions_needed": 3,
+      "dismissed": 5,
+      "commit": ""
     }
   },
-  "epics_done": 4,
+  "epics_done": 5,
   "epics_total": 35
 }

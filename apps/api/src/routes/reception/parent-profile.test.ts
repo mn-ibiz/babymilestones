@@ -153,6 +153,17 @@ describe("Reception parent profile header (P1-E05-S02)", () => {
     expect((await getProfile(p.userId, packer)).statusCode).toBe(403);
   });
 
+  it("a logged-in parent cannot read ANOTHER parent's profile/open-invoices → 403 (IDOR guard, review fix)", async () => {
+    const victim = await seedParent({ first: "Vic", last: "Tim" });
+    const attacker = await seedParent({ first: "Att", last: "Acker" });
+    // Parents hold `read wallet` (for their own /me view) and share the session
+    // store with staff — mint the attacker a real parent session directly.
+    const token = await sessions.create(attacker.userId);
+    const creds = { session: `bm_session=${token}` };
+    expect((await getProfile(victim.userId, creds)).statusCode).toBe(403);
+    expect((await getInvoices(victim.userId, creds)).statusCode).toBe(403);
+  });
+
   it("unauthenticated request → 401", async () => {
     const p = await seedParent({ first: "Eve", last: "Njeri" });
     const recep = await loginStaff("0712000001", "7421");

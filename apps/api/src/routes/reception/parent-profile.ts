@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { invoices, parents, users, wallets, type Database } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import { balance } from "@bm/wallet";
 import type {
   ParentProfileSummary,
@@ -141,6 +141,14 @@ export function registerParentProfile(app: FastifyInstance, { db, sessions }: Re
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return false;
+    }
+    // Parents also hold `read wallet`, but only over their OWN wallet (the /me
+    // route). These by-:userId routes are staff-only — without this gate any
+    // authenticated parent could read another parent's financial header by
+    // guessing a userId (mirrors apps/api/src/routes/parents/statement.ts).
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return false;
     }
     const perm = guard(auth.user);

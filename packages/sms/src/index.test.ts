@@ -166,20 +166,22 @@ it("gates marketing sends by opt-in but always sends transactional (AC3)", async
   }
 });
 
-it("gates the receipt copy on SMS consent (P1-E05-S06 AC3)", async () => {
+it("always sends the receipt copy regardless of marketing consent — transactional (P1-E05-S06 AC3)", async () => {
   const { db, close } = await createTestDb();
   try {
     const optedOut = await makeParent(db, "+254712345678", false);
     const optedIn = await makeParent(db, "+254799999999", true);
     const sender = new ConsentAwareSmsSender(db, new StubSmsSender(db));
 
+    // A receipt is transactional (proof of a payment the parent requested), so it
+    // sends even for a parent who has NOT opted in to marketing.
     expect(
       await sender.sendReceipt(optedOut, {
         to: "+254712345678",
         template: "reception.receipt",
         data: { body: "receipt" },
       }),
-    ).toBeNull();
+    ).not.toBeNull();
     expect(
       await sender.sendReceipt(optedIn, {
         to: "+254799999999",
@@ -189,8 +191,8 @@ it("gates the receipt copy on SMS consent (P1-E05-S06 AC3)", async () => {
     ).not.toBeNull();
 
     const rows = await db.select().from(smsOutbox);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.template).toBe("reception.receipt");
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.template === "reception.receipt")).toBe(true);
   } finally {
     await close();
   }

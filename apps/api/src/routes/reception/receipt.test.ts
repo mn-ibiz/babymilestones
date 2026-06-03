@@ -127,7 +127,7 @@ describe("Reception receipt (P1-E05-S06)", () => {
     expect(audits).toHaveLength(1);
   });
 
-  it("drops the SMS copy for a non-consenting parent but still audits (AC3, consent-gated)", async () => {
+  it("sends the SMS copy even to a non-consenting parent — receipts are transactional (AC3)", async () => {
     const p = await seedParent(false);
     const txId = await postEntry(p.walletId, "k-1");
     const recep = await loginStaff("0712000001", "7421");
@@ -138,10 +138,12 @@ describe("Reception receipt (P1-E05-S06)", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json() as ReceiptSmsResponse;
-    expect(body.sent).toBe(false);
-    expect(body.reason).toBe("no_consent");
+    // A receipt is transactional (proof of a payment the parent requested), so it
+    // is sent regardless of the marketing opt-in flag (P1-E02-S04 AC3).
+    expect(body.sent).toBe(true);
+    expect(body.reason).toBeNull();
 
-    expect(await dbh.db.select().from(smsOutbox)).toHaveLength(0);
+    expect(await dbh.db.select().from(smsOutbox)).toHaveLength(1);
     const audits = await dbh.db
       .select()
       .from(auditOutbox)

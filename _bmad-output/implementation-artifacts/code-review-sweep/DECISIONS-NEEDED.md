@@ -33,6 +33,22 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 5 — Reception Operator Surface
+
+12. **[COMPLIANCE confirm · P1-E05-S06] Receipt SMS now sends regardless of marketing opt-in.** I
+    fixed receipts to send as transactional (they were wrongly gated on the marketing flag, so most
+    parents got no receipt). This follows the platform's own model (P1-E02-S04 AC3: transactional SMS
+    always sent) and is staff-triggered per explicit parent request — but confirm it matches your
+    intended SMS/compliance policy. File: `packages/sms/src/index.ts` `sendReceipt`.
+
+13. **[MED · P1-E05-S06] Receipt SMS has no idempotency.** A double-click/retry on POST `…/receipt/:id/sms`
+    sends duplicate texts + duplicate audit rows. **Choose:** accept resend-as-feature (+ client
+    debounce) or dedup by recent `(phone, template, transactionId)`. File: `apps/api/src/routes/reception/receipt.ts:139-174`.
+
+14. **[LOW · P1-E05-S02] `settled_on_credit` debt double-counts** on the reception header (negative
+    wallet balance AND outstanding). Pre-existing/consistent across `wallet.ts`, `parents-search.ts`.
+    **Choose:** exclude from outstanding, or show as a separate "owed on credit" line.
+
 ## Epic 4 — Payments Adapter
 
 10. **[HIGH · money · P1-E04-S05] No Paystack reconcile cron / recovery path.** Event-row insert and

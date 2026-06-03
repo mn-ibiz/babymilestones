@@ -1,0 +1,49 @@
+{
+  "id": "P1-E05-S02",
+  "verdict": "issues",
+  "diff_summary": "apps/api/src/routes/reception/parent-profile.ts (new GET /reception/parents/:userId/profile + /open-invoices, balance via @bm/wallet, outstanding from non-settled invoices), reception/index.ts registration, packages/contracts profile/open-invoices shapes + isOutstanding rule, apps/admin/lib/parent-header.ts pure view-model (full name/phone, balance, outstanding-red, admin-only auto-credit toggle), reusing the P1-E03-S07 admin-only audited auto-credit PATCH route.",
+  "ac_coverage": "AC1 header facts implemented & tested (name, full phone, balance, outstanding, auto-credit flag; toggle admin-only in view-model + server PATCH guard). AC3 open-invoices endpoint implemented & tested. AC2 (no stale state) satisfied by computed-never-stored balance; live refetch + click-to-open modal UI deferred to page-assembly story. Authz on the by-:userId read route is NOT correctly tested (only packer rejection asserted, not parent), and the route has a horizontal-authz/IDOR gap.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "IDOR: any logged-in parent can read another parent's wallet balance, outstanding, name and full phone via the by-:userId profile/open-invoices routes",
+      "detail": "GET /reception/parents/:userId/profile and /open-invoices guard only with requirePermission(\"read\", \"wallet\"). The `parent` role HOLDS `read wallet` (packages/auth/src/rbac.ts:73-74 — used for the parent's OWN /parents/me/wallet view), so the permission guard passes for any authenticated parent. The target parent is then resolved purely from the path param `:userId` (parent-profile.ts:156,167 -> loadParentRecord), with no check that the caller is staff or the same parent. A parent can therefore enumerate/guess another parent's userId and read their wallet balance, outstanding amount, full (unmasked) phone number and full name, plus their open invoices. This is the exact horizontal-authz gap the sibling by-id wallet route was explicitly hardened against: apps/api/src/routes/parents/statement.ts:145-150 adds `if (!isStaffRole(auth.user.role)) return 403` BEFORE the read-wallet check, with the comment \"Parents also hold `read wallet`, but only over their OWN wallet ... so a parent cannot traverse to another parent's wallet by guessing a userId.\" The new route omits that staff-only gate. The route docstring (parent-profile.ts:124-127) falsely claims the routes are \"staff-only\" and only enumerates packer/treasury as rejected — parent is neither named nor actually rejected. The integration test (parent-profile.test.ts:150-154) labels its case \"staff-only\" but only exercises a packer (who lacks read wallet entirely); no test logs in as a parent and asserts 403, so the gap is uncaught. Confirmed in the working tree (parent-profile.ts:129-152 still has no isStaffRole check).",
+      "location": "apps/api/src/routes/reception/parent-profile.ts:131-152",
+      "fix": "In the `authorize` helper, after `validateSession` succeeds and before (or together with) the read-wallet guard, reject non-staff callers: `import { isStaffRole } from \"@bm/auth\";` then `if (!isStaffRole(auth.user.role)) { reply.code(403).send({ error: \"Forbidden: missing permission\" }); return false; }`. Mirror apps/api/src/routes/parents/statement.ts:148-150 exactly. Add an integration test that logs in as a `parent` and asserts 403 on both /profile and /open-invoices for another parent's userId. Note the same omission has already propagated to the later sibling apps/api/src/routes/reception/recent-transactions.ts:36,51 (P1-E05-S05), which imports loadParentRecord from this file and copied the read-wallet-only guard — fix there too (out of this story's scope, see defer finding).",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "Authz test for the read route does not cover the role that actually holds the permission (parent), so the IDOR is unguarded by tests",
+      "detail": "AC1 requires the financial facts surface to be a staff (reception/admin) surface. The DoD requires every AC to have a passing test. The only negative-authz test (parent-profile.test.ts:150-154) uses a packer — a role that lacks `read wallet` entirely — and is therefore rejected by the permission guard alone. It does NOT cover the actual threat: a `parent` who DOES hold `read wallet`. Because no parent-as-caller test exists, the IDOR above ships green. This is a coverage gap that masks the security finding.",
+      "location": "apps/api/src/routes/reception/parent-profile.test.ts:150-154",
+      "fix": "Add a test that seeds a parent user with a real session (parents authenticate via the same phone+PIN primitives) and asserts GET /reception/parents/:otherUserId/profile and /open-invoices both return 403. This test should fail today and pass after the isStaffRole gate is added.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "settled_on_credit invoices are double-counted: their amount appears both as a negative wallet balance and as outstanding",
+      "detail": "outstandingForParent sums amountDue over invoices WHERE status NOT IN ('settled','void') (parent-profile.ts:67). A `settled_on_credit` invoice (auto-credit overdraw) is NOT excluded, so its amountDue is added to outstandingCents. But when an invoice is settled_on_credit, packages/wallet/src/debit.ts:205-230 posts a debit ledger row (amount: -amount) that drives the wallet balance negative AND leaves invoices.amountDue unchanged (only `status`/`updatedAt` are set). The same debt therefore shows twice on the header: once as a negative walletBalanceCents and once inside outstandingCents (and in the open-invoices modal list/total). Whether settled_on_credit should display as outstanding is a product call — arguably it represents money the parent owes back, but presenting it on top of the already-negative balance risks confusing reception. Pre-existing & consistent across siblings (apps/api/src/routes/parents/wallet.ts:27 and reception/parents-search.ts:162 use the identical filter), so not introduced by this story.",
+      "location": "apps/api/src/routes/reception/parent-profile.ts:67",
+      "fix": "Decision needed: either (a) exclude settled_on_credit from the outstanding sum so debt is shown once (as the negative balance) — change to NOT IN ('settled','void','settled_on_credit') — or (b) intentionally keep it as a separate 'owed on credit' line and make the header copy distinguish it from the wallet balance. Resolve consistently across wallet.ts and parents-search.ts. Defer the filter change out of this story's scope; flag for product/PM.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Same read-wallet-only IDOR pattern copied into reception/recent-transactions.ts (P1-E05-S05)",
+      "detail": "apps/api/src/routes/reception/recent-transactions.ts imports loadParentRecord from parent-profile.ts and reuses the identical authorize() pattern (requirePermission('read','wallet') with no isStaffRole gate, recent-transactions.ts:36,51). Its docstring also claims 'staff-only — packer/treasury are rejected', but a parent (who holds read wallet) would pass and read another parent's last 10 ledger postings by userId. Out of THIS story's scope (different story/commit), but the fix is the same isStaffRole gate and should be tracked.",
+      "location": "apps/api/src/routes/reception/recent-transactions.ts:36-57",
+      "fix": "Same as the primary IDOR fix: add `if (!isStaffRole(auth.user.role)) return 403` to its authorize() helper, plus a parent-as-caller 403 test. Tracked separately under P1-E05-S05.",
+      "ac_ref": ""
+    }
+  ]
+}

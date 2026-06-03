@@ -1,0 +1,59 @@
+{
+  "id": "P1-E05-S06",
+  "verdict": "issues",
+  "diff_summary": "Adds reception receipt surface: contracts ReceiptPayload/receiptLineDescription, @bm/ui renderReceiptHtml/receiptSmsBody (HTML-escaped browser-print template), @bm/sms ConsentAwareSmsSender.sendReceipt, api GET /reception/receipt/:id + POST .../sms (CSRF, audited), admin ReceiptActions (Print + SMS) after payment + reprint on history rows, next.config extensionAlias.",
+  "ac_coverage": "AC1 print+SMS pair: implemented (admin). AC2 browser print (Decision 13): implemented via Blob-URL print port. AC3 SMS via stub: implemented BUT gated on the MARKETING opt-in flag, which contradicts the platform consent model (receipts are transactional → always-send). AC4 reprint from history: implemented (payload reproduced from ledger) but receipt amount/total render negative for non-topup (debit/refund) entries. Tests cover staff (packer) 403 and consent-drop, but do NOT cover a parent role reaching the endpoints, nor reprint of a debit entry.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Receipt SMS gated on MARKETING opt-in — a transactional message is silently dropped for ~all parents",
+      "detail": "POST /reception/receipt/:id/sms calls ConsentAwareSmsSender.sendReceipt, which gates on isMarketingOptedIn (parents.sms_marketing_opt_in). That flag DEFAULTS FALSE (packages/db/src/schema/parents.ts:36) and per P1-E02-S04 AC3 + Technical Notes governs ONLY non-transactional/marketing SMS — 'Transactional SMS (booking confirms, OTP) always sent regardless of opt-in.' The @bm/sms package itself classifies receipts as transactional: ConsentAwareSmsSender.sendTransactional is documented 'Always send — booking confirms, OTP, receipts (never gated)' (packages/sms/src/index.ts:212). A receipt is proof of a payment the parent just made = textbook transactional. As written, a non-consenting parent (the default) who pays cash and asks for an SMS receipt gets nothing back (sent:false, reason:no_consent); the integration test at receipt.test.ts:130 actually codifies this wrong behavior. This both breaks AC3 intent and silently denies a parent-requested receipt.",
+      "location": "apps/api/src/routes/reception/receipt.ts:148-153 (call) and packages/sms/src/index.ts:229-232 (sendReceipt)",
+      "fix": "Route the receipt copy through ConsentAwareSmsSender.sendTransactional (the documented receipts path) instead of sendReceipt/the marketing gate, and update the test at receipt.test.ts:130 to assert the receipt sends for a non-consenting parent. Marked decision-needed only because there is a compliance dimension (unsolicited texts); if product genuinely wants explicit consent for receipt SMS, that needs a dedicated transactional-SMS consent flag, not the marketing flag — but the unambiguous, codebase-consistent fix is sendTransactional.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "blind",
+      "title": "IDOR: any authenticated parent can read another parent's receipt and trigger a receipt SMS to them",
+      "detail": "Both routes are guarded only by requirePermission: GET uses read+wallet, POST uses create+payment. The parent role HOLDS both grants (PERMISSION_MATRIX.parent: read wallet, create payment — rbac.ts:73-77), and parents authenticate against the SAME session store/users table as staff (staff.ts header: 'Staff authenticate with the SAME phone+PIN primitives as parents'). loadReceipt looks up the receipt by an arbitrary :transactionId (wallet_ledger id) with NO ownership/role scoping. So a logged-in parent can GET /reception/receipt/<any-ledger-id> and read another parent's name, phone, amount, method and date (PII leak), and POST .../sms to fire an SMS to another parent. This contradicts the story's 'reception-only' intent. The sibling recent-transactions route shares the same read-wallet guard and even comments 'staff-only — packer/treasury are rejected', overlooking that parent also holds read wallet. The auth package exposes isStaffRole() for exactly this.",
+      "location": "apps/api/src/routes/reception/receipt.ts:96-97,127-175",
+      "fix": "Add a staff-role gate to both routes (e.g. reject when !isStaffRole(auth.user.role), or introduce a requireStaff guard), in addition to the permission check; and/or scope the lookup to a staff context. At minimum reject parent role on these reception endpoints. Add a test that a parent session gets 403.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Receipt shows negative amount/total when reprinting a debit/refund/reversal entry (AC4)",
+      "detail": "loadReceipt sets both the single line item and amountCents to Number(row.amount) directly. wallet_ledger.amount is SIGNED (credits positive, debits negative — wallet-ledger.ts:36; debit.ts:209 posts amount:-amount with kind:'debit'). The happy path (AC1, a topup) is positive and renders fine, but AC4 requires reprint of ANY transaction-history row at any time, and recent-transactions surfaces debit/refund/reversal entries. For a debit, the receipt renders 'Service charge ... KES -500.00' and 'Total KES -500.00' — a confusing/incorrect proof of payment. renderReceiptHtml/formatReceiptCents do no sign normalization.",
+      "location": "apps/api/src/routes/reception/receipt.ts:61-66; packages/ui/src/receipt-preview.ts:formatReceiptCents",
+      "fix": "Present charges as their absolute value on the receipt (e.g. amountCents = Math.abs(Number(row.amount))) while keeping a credit/charge label, or format the displayed total via Math.abs in formatReceiptCents/renderReceiptHtml. Add a reprint-of-debit test asserting a non-negative displayed total.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "No idempotency on the SMS send — retries/double-clicks send duplicate texts and duplicate audit rows",
+      "detail": "POST /reception/receipt/:id/sms has no idempotency key and no dedup against existing sms_outbox/audit rows. Each call unconditionally invokes the stub sender (a new sms_outbox row) and writes a new reception.receipt_sms audit row. A double-click, network retry, or repeated reprint-then-resend results in N texts to the parent for one transaction. The wallet ledger itself is idempotent via idempotency_key, but this mutating SMS action is not. (Receipt READ/print is naturally idempotent and fine.)",
+      "location": "apps/api/src/routes/reception/receipt.ts:139-174",
+      "fix": "Decide intended semantics: either accept resend-as-feature (and add client-side debounce + clear UX), or enforce idempotency (e.g. dedup by recent sms_outbox row for (phone, template, transactionId) within a window, or accept an Idempotency-Key header). Deferred to product because 'allow re-send any time' may be intentional for AC4, but it should be a conscious choice with a guard against accidental duplicates.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "SMS send guarded by create+payment and receipt read by read+wallet — bypasses the dedicated 'receipt' resource",
+      "detail": "The RBAC model defines a dedicated 'receipt' resource (rbac.ts:29-53) with create/read grants per role, but these routes guard on payment/wallet instead. Sending a receipt is not 'creating a payment'. Using create+receipt would be semantically correct, but reception does NOT hold create receipt (only cashier/admin do), so switching naively would lock out the story's actor. This is a model/route inconsistency rather than a security hole given the parallel finding above will tighten the staff gate; flagged for a deliberate alignment of the receipt resource grants with who may issue/send receipts.",
+      "location": "apps/api/src/routes/reception/receipt.ts:96-97; packages/auth/src/rbac.ts:79-97",
+      "fix": "Product/auth decision: extend reception's grants to include create/read receipt and switch the guards to the receipt resource, or document that read wallet / create payment is the intended staff gate. Pre-existing pattern shared with sibling reception routes — out of this story's minimal scope to change the matrix.",
+      "ac_ref": ""
+    }
+  ]
+}
