@@ -55,12 +55,18 @@ export function formatCents(amount: Cents): string {
   return negative ? `-${body}` : body;
 }
 
-/** Escape a single CSV field per RFC 4180 (quote if it contains , " or newline). */
+/**
+ * Escape a single CSV field per RFC 4180 (quote if it contains , " or newline) and
+ * neutralise spreadsheet formula injection: a cell starting with `= + - @` (or a
+ * leading tab/CR) is prefixed with a single quote, except plain numbers (incl.
+ * signed money like `-500.00`) so numeric columns are not corrupted.
+ */
 function csvField(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const guarded = /^[=+\-@\t\r]/.test(value) && !/^[+-]?\d/.test(value) ? `'${value}` : value;
+  if (/[",\r\n]/.test(guarded)) {
+    return `"${guarded.replace(/"/g, '""')}"`;
   }
-  return value;
+  return guarded;
 }
 
 /**

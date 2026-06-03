@@ -13,7 +13,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 3  | 4 | ✅ | 3 (top-up double-pay BLOCKER, idempotency floatId, replay guard) | 3 | 4 | 14 |
 | 4  | 3 | ✅ | 3 (cron state-guard, paystack err-log, bank diff-parent 409) | 3 | 2 | 10 |
 | 5  | 2 | ✅ | 5 (reception IDOR ×3, receipt txn-SMS, receipt abs-amount) | 1 | 3 | 5 |
-| 6  | 1 | ⬜ | | | | |
+| 6  | 1 | ✅ | 1 (CSV formula-injection guard, repo-wide ×3) | 1 | 2 | 4 |
 | 7  | 3 | ⬜ | | | | |
 | 8  | 2 | ⬜ | | | | |
 | 9  | 2 | ⬜ | | | | |

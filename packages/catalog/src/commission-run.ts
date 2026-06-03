@@ -189,9 +189,15 @@ async function loadLines(
 /** The payout CSV column order (P3-E01-S05 AC1). Stable — tests assert it. */
 export const PAYOUT_CSV_COLUMNS = ["staff_name", "phone", "amount", "reference"] as const;
 
-/** Escape a CSV field per RFC 4180 (quote if it contains , " or newline). */
+/**
+ * Escape a CSV field per RFC 4180 (quote if it contains , " or newline) and
+ * neutralise spreadsheet formula injection: a cell starting with `= + - @` (or a
+ * leading tab/CR) is prefixed with a single quote, except plain numbers (incl.
+ * signed money) so numeric columns are not corrupted.
+ */
 function csvField(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const guarded = /^[=+\-@\t\r]/.test(value) && !/^[+-]?\d/.test(value) ? `'${value}` : value;
+  return /[",\r\n]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }
 
 /** Format integer cents as a plain decimal amount ("150000" → "1500.00"). */

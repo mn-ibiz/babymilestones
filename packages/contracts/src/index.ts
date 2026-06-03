@@ -3988,9 +3988,17 @@ export const staffUpdateSchema = z
   );
 export type StaffUpdateInput = z.infer<typeof staffUpdateSchema>;
 
-/** RFC-4180 escape: quote a field if it has a comma, quote, CR or LF. */
+/**
+ * RFC-4180 escape: quote a field if it has a comma, quote, CR or LF. Also
+ * neutralises spreadsheet formula injection — a cell starting with `= + - @` (or a
+ * leading tab/CR) is executed as a formula by Excel/Sheets, so such a cell is
+ * prefixed with a single quote. Plain numbers (incl. signed money like `-500.00`)
+ * are left intact so numeric columns are not corrupted.
+ */
 function csvField(value: string): string {
-  return /[",\r\n]/u.test(value) ? `"${value.replace(/"/gu, '""')}"` : value;
+  const guarded =
+    /^[=+\-@\t\r]/u.test(value) && !/^[+-]?\d/u.test(value) ? `'${value}` : value;
+  return /[",\r\n]/u.test(guarded) ? `"${guarded.replace(/"/gu, '""')}"` : guarded;
 }
 
 /**

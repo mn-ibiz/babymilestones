@@ -53,7 +53,7 @@
     "3": "done",
     "4": "done",
     "5": "done",
-    "6": "todo",
+    "6": "done",
     "7": "todo",
     "8": "todo",
     "9": "todo",
@@ -695,7 +695,7 @@
         "16eeb1b3665396fda0a99c7456f327d27ed91ea0"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "7-1-crud-services-with-effective-dated-price-history",
@@ -3068,8 +3068,16 @@
       "decisions_needed": 3,
       "dismissed": 5,
       "commit": ""
+    },
+    "6": {
+      "stories_reviewed": 1,
+      "patches": 1,
+      "deferred": 1,
+      "decisions_needed": 2,
+      "dismissed": 4,
+      "commit": ""
     }
   },
-  "epics_done": 5,
+  "epics_done": 6,
   "epics_total": 35
 }

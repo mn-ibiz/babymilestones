@@ -1,0 +1,49 @@
+{
+  "id": "P1-E06-S04",
+  "verdict": "issues",
+  "diff_summary": "Adds @bm/contracts reconciliation-export schema + KES/RFC-4180 CSV helpers, @bm/wallet reconciliationExportRows per-day-per-float-account read model, a guarded+audited GET /treasury/reconciliation/export route, and an admin export UI; the CSV is a projection of the P1-E06-S02 ledger float-liability + approved-adjustment model.",
+  "ac_coverage": "AC1 (date-range picker + CSV) implemented & tested (contract schema, UI form lib, route). AC2 columns (date, account, system, real, drift, adjustments-that-day) implemented & tested. Caveat: AC2 'real balance' and 'drift' are RECONSTRUCTED from approved adjustments (no real-world balance is persisted), so they do not carry the same meaning as the live P1-E06-S02 screen's operator-entered real balance — see findings.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "defer",
+      "lens": "blind",
+      "title": "CSV formula injection: float account name is not neutralized in the export",
+      "detail": "reconciliationRowsToCsv -> csvField only RFC-4180-quotes fields containing comma/quote/CR/LF (packages/contracts/src/index.ts:3992). It does NOT neutralize spreadsheet formula injection (leading =, +, -, @, TAB, or CR). The only user-controlled free-text field in this export is `account` (float account name), which is validated as free text with no character restriction (floatAccountCreateSchema/floatAccountUpdateSchema: z.string().trim().min(1).max(...), packages/contracts/src/index.ts:1243,1263). An admin/treasury user could name an account e.g. `=cmd|'/c calc'!A1` or `@SUM(...)`; when the accountant opens reconciliation_*.csv in Excel/LibreOffice the cell is interpreted as a formula -> data exfiltration / command execution. The export is sent as a downloadable attachment, the classic CSV-injection sink. Triaged `defer` because csvField is the single shared helper used by EVERY CSV export in the repo (auditLogEventsToCsv:4273, dispatch report:3706, P&L:5470, payout report:4809, etc.) — the gap is systemic and pre-existing, not introduced by this story, and hardening it touches all exports.",
+      "location": "packages/contracts/src/index.ts:3992 (csvField) and :4001 (reconciliationRowsToCsv)",
+      "fix": "Cross-cutting decision: harden the shared csvField to prefix-escape formula-trigger fields (e.g. if the value starts with one of = + - @ TAB CR, prepend a single quote or a tab/space, then RFC-4180-quote). Apply once in csvField so all existing exports are covered; add a unit test for account names beginning with =,+,-,@. Should be tracked as a repo-wide export-hardening item rather than fixed piecemeal here.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Exported 'real balance' / 'drift' are reconstructed from adjustments, not the actual reconciled figures the column names imply",
+      "detail": "On the live reconciliation screen (P1-E06-S02), `real` is the operator-entered actual cash count and `drift = system - real` is the discrepancy to investigate (computeDrift, packages/contracts/src/index.ts:1324). The export cannot use that real figure because it is never persisted, so reconciliationExportRows derives real = system + Σ(approved adjustments through the day) and therefore drift = system - real = -Σ(approved adjustments) (packages/wallet/src/reconciliation-export.ts:124-133; asserted in reconciliation-export.test.ts:87-145). Consequence: if a real-world drift existed but was never corrected by an APPROVED adjustment, the export reports drift = 0 and real = system — i.e. a perfectly reconciled account even though it was not. The CSV column headers (real_balance_kes, drift_kes) read to an accountant as the genuine real-world balance and discrepancy, but they only reflect corrections that were made, not the actual condition. AC2 asks for 'real balance' and 'drift'; whether a corrections-derived reconstruction satisfies that intent (and how to label it so the accountant is not misled) is a product call. The behavior is documented inline and intentional, so not a code bug — but it is a meaningful semantic divergence from the same-named live columns.",
+      "location": "packages/wallet/src/reconciliation-export.ts:124-133",
+      "fix": "Options: (a) accept and rename/annotate the columns so they cannot be mistaken for the live real-world figures (e.g. real_balance_implied_kes, residual_drift_kes) and document that drift here = uncorrected gap implied by approved adjustments; or (b) persist the operator-entered real-world balance per account per reconciliation day so a historical export can show the true real/drift; or (c) drop the real/drift columns from the export and emit only system balance + adjustments. Needs PM/treasury decision.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Adjustment sign convention (real = system + amount) is assumed but never pinned down anywhere",
+      "detail": "The export hard-codes real = system + Σ approved adjustment amounts, i.e. it assumes a negative adjustment means real is below system (reconciliation-export.ts:125). But adjusting entries never post to the ledger and nothing in the posting/approval path (apps/api/src/routes/treasury/reconciliation.ts) or the contract constrains what the signed `amount` means relative to drift — there is no shared helper linking adjustment sign to drift direction. If operators in practice post amounts as (system - real) rather than (real - system), every export's real and drift columns are sign-inverted. The convention currently lives only implicitly in this read model and its test, so it can silently disagree with how staff actually enter adjustments.",
+      "location": "packages/wallet/src/reconciliation-export.ts:125; apps/api/src/routes/treasury/reconciliation.ts:200-208",
+      "fix": "Document and centralize the adjustment sign convention (a single helper/comment shared by the posting UI guidance and this read model), and add a test asserting a positive adjustment moves real ABOVE system. Confirm with treasury which direction operators actually enter. Until pinned, the real/drift columns rest on an unverified assumption.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Opening balance and UTC day-bucketing can misstate per-day rows for an EAT business / pre-opening dates",
+      "detail": "Two pre-existing/systemic edges surface in the per-day export: (1) The read model ignores floatAccounts.openingDate and always adds the full opening balance to every day in the range (reconciliation-export.ts:104,124) — an account with openingDate mid-range still shows its opening balance (and is emitted as a row) on days BEFORE it existed, which is meaningless for historical reconciliation. (2) Days are bucketed with date_trunc('day', created_at AT TIME ZONE 'UTC') (reconciliation-export.ts:58,72) while the business operates in EAT (UTC+3, M-Pesa timestamps are EAT per packages/payments/src/mpesa/stkPush.ts:135). Transactions between 00:00-03:00 EAT are attributed to the previous calendar day vs. what the accountant and M-Pesa statements show. Both match the existing live float-liability model (floatLiabilities adds opening unconditionally) and the sibling finance read model float-vs-revenue-db.ts (also UTC-bucketed), so they are consistent conventions rather than new regressions — hence defer.",
+      "location": "packages/wallet/src/reconciliation-export.ts:58,72,104,124",
+      "fix": "Defer to a finance-reporting convention decision: (1) decide whether per-day rows should start at each account's openingDate (and suppress pre-opening rows); (2) decide whether all finance day-bucketing should use EAT (Africa/Nairobi) instead of UTC, and apply uniformly to floatLiabilities, this export, and float-vs-revenue-db. Out of scope to change for this story alone.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

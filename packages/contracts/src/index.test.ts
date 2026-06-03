@@ -173,6 +173,25 @@ describe("reconciliation export contract (P1-E06-S04)", () => {
     const csv = reconciliationRowsToCsv([]);
     expect(csv).toBe("date,account,system_balance_kes,real_balance_kes,drift_kes,adjustments_kes\r\n");
   });
+
+  it("neutralises spreadsheet formula injection in a user-controlled account name (review fix)", () => {
+    const csv = reconciliationRowsToCsv([
+      {
+        date: "2026-05-01",
+        floatAccountId: "a1",
+        account: "=cmd|'/c calc'!A1",
+        systemCents: -500,
+        realCents: -500,
+        driftCents: 0,
+        adjustmentsCents: 0,
+      },
+    ]);
+    // Formula-trigger account name is prefixed with a single quote so Excel/Sheets
+    // treats it as literal text, not a formula.
+    expect(csv).toContain(",'=cmd");
+    // Signed money columns are NOT corrupted by the guard.
+    expect(csv).toContain("-5.00");
+  });
 });
 
 describe("paystackInitSchema (P1-E04-S04 AC1, AC4)", () => {

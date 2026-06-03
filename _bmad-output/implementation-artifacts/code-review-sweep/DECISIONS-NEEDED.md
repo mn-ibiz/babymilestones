@@ -33,6 +33,23 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 6 — Treasury & Float
+
+15. **[MED · P1-E06-S04] Reconciliation export `real_balance`/`drift` are reconstructed from approved
+    adjustments**, not the operator's real cash count (never persisted). An uncorrected real-world
+    drift exports as `drift=0`/reconciled, and the columns diverge from the same-named live screen.
+    **Choose:** rename/annotate columns, persist the real balance per day, or drop the columns.
+    File: `packages/wallet/src/reconciliation-export.ts:124-133`.
+
+16. **[LOW · P1-E06-S04] Adjustment sign convention unpinned** (`real = system + Σ adjustments`).
+    If operators enter `system − real`, every export's real/drift is sign-inverted. Pin + document +
+    test the convention. File: `packages/wallet/src/reconciliation-export.ts:125`.
+
+17. **[finance · cross-cutting] Day-bucketing timezone: UTC vs EAT.** Statement `to`-date (item 5),
+    reconciliation export, float-liability and float-vs-revenue read models all bucket by UTC while
+    the business runs in EAT (UTC+3). Decide one convention (likely Africa/Nairobi) and apply
+    uniformly. (Folds in item 5's timezone question.)
+
 ## Epic 5 — Reception Operator Surface
 
 12. **[COMPLIANCE confirm · P1-E05-S06] Receipt SMS now sends regardless of marketing opt-in.** I
@@ -85,9 +102,7 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    `refund()`/`loyalty()` have; `amount=0` is a silent no-op that burns an idempotency key. Add a
    guard or document caller-trust. File: `packages/wallet/src/index.ts:191-202`.
 
-9. **[MED · security · cross-cutting] CSV formula-injection guard missing repo-wide.** `csvField`
-   helpers do RFC-4180 quoting only (no `= + - @` prefix neutralisation). Not exploitable in the
-   wallet statement (server-controlled fields) but other exporters emit user-controlled text. Worth a
-   single shared numeric-aware guard. Files: `packages/wallet/src/statement.ts`,
-   `packages/contracts/src/index.ts`, `packages/catalog/src/commission-run.ts`. (I will keep flagging
-   per-export exposure as the sweep reaches those epics.)
+9. **[RESOLVED ✅ in Epic 6 · was MED→HIGH] CSV formula-injection guard.** All three `csvField`
+   copies (`packages/contracts`, `packages/catalog/commission-run`, `packages/wallet/statement`) now
+   prefix a leading `= + - @ \t \r` cell with `'`, numeric-aware so signed money is preserved.
+   Regression test added. (Follow-up nicety, not blocking: dedupe the 3 copies into one shared helper.)
