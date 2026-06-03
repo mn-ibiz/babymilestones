@@ -17,7 +17,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 7  | 3 | ✅ | 2 (price one-open-row index+lock, staff no-op audit) | 3 | 0 | 11 |
 | 8  | 2 | ✅ | 2 (receipt parentId FK, void 409) | 3 | 2 | 6 |
 | 9  | 2 | ✅ | 1 (SSRF IPv4-compat IPv6 guard) | 0 | 0 | 9 |
-| 11 | 1 | ⬜ | | | | |
+| 11 | 1 | ✅ | 0 (code sound) | 2 | 0 | 3 |
 | 12 | 1 | ⬜ | | | | |
 | 13 | 2 | ⬜ | | | | |
 | 14 | 2 | ⬜ | | | | |

@@ -1,0 +1,29 @@
+{
+  "id": "P1-E11-S04",
+  "verdict": "issues",
+  "diff_summary": "Adds PUT /parents/me/pin (verify current PIN, reject weak/dup/malformed new PIN, rotate argon2 hash, invalidate all sessions, audit parent.pin.change, CSRF-guarded), pinChangeSchema in @bm/contracts, platform changePin client + pure validatePinChange + PinChangeForm, and a new (app)/profile/page.tsx (profile edit + SMS consent toggle + PIN change + export) replacing the duplicate app/profile/page.tsx.",
+  "ac_coverage": "AC1 (profile edit) reuses PUT /parents/me + ProfileForm (existing tests); AC2 (SMS consent toggle) reuses PUT /parents/me/consent/sms (existing tests); AC3 (PIN change, current PIN required) net-new and well-tested (pin.test.ts, pin-change.test.ts, profile-api.test.ts); AC4 (export link) reuses ExportDataButton/POST /parents/me/exports. All ACs implemented & covered.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "SMS consent toggle fails silently on API error (compliance-sensitive)",
+      "detail": "handleSmsConsent in the new (app)/profile/page.tsx is an async onChange handler with no try/catch. If setSmsConsent rejects (CSRF mismatch, network error, 404 profile-not-found), the promise rejection is unhandled, no error is surfaced to the parent, and the controlled checkbox (checked={smsOptIn}) silently reverts to its last server-confirmed value. For a compliance-sensitive marketing consent toggle, a parent could believe they opted in/out while nothing was recorded. Verified in working tree; this exact handler (sans catch) was carried over verbatim from the now-removed app/profile/page.tsx (git show 0d216d24fe^:apps/platform/app/profile/page.tsx), so it is a pre-existing pattern, not introduced by this story's net-new work.",
+      "location": "apps/platform/app/(app)/profile/page.tsx:39",
+      "fix": "Pre-existing pattern carried over from the legacy page; out of this story's net-new scope (AC3 PIN flow). Recommend a follow-up: wrap setSmsConsent in try/catch, surface a role=alert error, and re-sync the checkbox to server truth on failure. Server behavior (write + audit) is correct; this is a client UX/feedback gap only.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Unhandled fetchProfile rejection on profile page load",
+      "detail": "The page's useEffect calls fetchProfile().then(...).finally(...) with no .catch(). fetchProfile throws on any non-ok response (e.g. a 401 from an expired session, or network error). On rejection the page just clears loading and renders with no profile, no consent toggle, and no error message, leaving the parent on a blank-ish profile with no indication of what went wrong (no redirect to login on 401 either). Verified in working tree; pattern carried over from the removed legacy page.",
+      "location": "apps/platform/app/(app)/profile/page.tsx:27",
+      "fix": "Pre-existing pattern, out of this story's net-new scope. Follow-up: add a .catch that surfaces an error state and, on 401, redirects to /login. The API authz boundary is unaffected (every endpoint independently validates the session); this is purely client resilience.",
+      "ac_ref": "AC1"
+    }
+  ]
+}
