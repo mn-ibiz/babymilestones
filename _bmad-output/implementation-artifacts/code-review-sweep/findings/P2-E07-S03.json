@@ -1,0 +1,19 @@
+{
+  "id": "P2-E07-S03",
+  "verdict": "issues",
+  "diff_summary": "Adds parent read-only auto-credit status: apps/platform/lib/auto-credit.ts (autoCreditStatusViewModel + tests) and wallet/page.tsx wiring <AutoCreditStatus enabled={wallet.autoCreditEnabled}/>; the UI component (packages/ui/src/auto-credit-status.tsx) + the session-scoped read endpoint (apps/api/.../parents/wallet.ts GET /parents/me/wallet) landed in sibling commits d487083 / P1-E11-S01.",
+  "ac_coverage": "AC1 (status copy 'Enabled by admin' / 'Not enabled') implemented + tested (auto-credit.test.ts, compound.test.tsx, wallet.test.ts). AC2 (disabled helper copy) implemented + tested. AC3 (no edit affordance) implemented — AutoCreditStatus is presentational only (no input/button/toggle); covered by compound.test.tsx. Security focus: parent read is session-scoped via eq(wallets.userId, auth.user.id) on GET /parents/me/wallet — no userId param, no IDOR, no cross-parent leakage; the only write path is the separate permission-gated admin route (apps/api/src/routes/admin/auto-credit.ts, requirePermission('manage','wallet')) which parents cannot reach. All ACs met.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "autoCreditStatusViewModel is dead code — the wallet page bypasses it, leaving two parallel sources of truth for AC1/AC2 copy",
+      "detail": "This commit adds autoCreditStatusViewModel() plus a 41-line test suite (auto-credit.test.ts) that asserts the exact AC1/AC2 strings ('Auto-credit: Enabled by admin', 'Auto-credit: Not enabled', and the helper copy). But nothing in the app consumes it: wallet/page.tsx wires the UI directly with <AutoCreditStatus enabled={wallet.autoCreditEnabled}/>, and the only reference to autoCreditStatusViewModel anywhere in apps/ or packages/ is its own test file. The visible copy is owned entirely by packages/ui/src/auto-credit-status.tsx (which hardcodes its own strings) and validated by packages/ui/src/compound.test.tsx. Result: the viewmodel's strings and the component's strings are independent copies of the same AC text. If the displayed copy is ever changed in the component, the viewmodel's tests still pass green, giving false confidence that AC1/AC2 are covered by a test that exercises no rendered code path. Not a security or AC defect (the rendered component is correct and independently tested), but it is real unused production code added by this story.",
+      "location": "apps/platform/lib/auto-credit.ts:28",
+      "fix": "Either (a) wire the page through the viewmodel — pass autoCreditStatusViewModel(wallet) output (statusLabel/helperText) down so there is one source of truth, then have AutoCreditStatus render the provided strings; or (b) delete apps/platform/lib/auto-credit.ts and auto-credit.test.ts and rely solely on the @bm/ui component + compound.test.tsx, which is already the live path. Decision-needed because the intended layering (presentational component vs. app viewmodel) is a product/architecture call.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

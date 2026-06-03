@@ -1,0 +1,29 @@
+{
+  "id": "P2-E07-S01",
+  "verdict": "issues",
+  "diff_summary": "New @bm/ui OutstandingBalanceBanner compound (outstanding-balance-banner.tsx) + index/snapshot/compound.test export; apps/platform OutstandingBalanceBannerIsland client island (reads /parents/me/wallet via fetchWalletOverview, refetches on nav + window focus) wired into ParentShellLayout so the nudge shows on every parent page; pure outstanding-banner.ts gating helper + tests. Commit also carries unrelated pre-existing fixes (sms/pickups ordering, booking-commission wiring, admin commission preview, unused-import lint) outside this story's ACs.",
+  "ac_coverage": "AC1 implemented & tested (banner shows 'You owe KES X. Top up to settle.' when outstanding>0; @bm/ui DOM test + platform gating test). AC2 implemented & tested (CTA links to /top-up, which exists). AC3 implemented & tested for the NORMAL settlement path (top-up settles a `pending` invoice -> outstanding 0 -> banner unmounts), BUT AC3 is VIOLATED for the auto-credit overdraw (`settled_on_credit`) path: those invoices are never cleared by settlement, so the banner cannot disappear after a top-up. No test exercises the settled_on_credit case.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "AC3 violated for auto-credit overdraw: a `settled_on_credit` invoice keeps a non-zero amount_due that no settlement ever clears, so the parent banner never disappears",
+      "detail": "The banner's outstanding number comes from GET /parents/me/wallet -> outstandingForParent (apps/api/src/routes/parents/wallet.ts:23-29), which sums invoices.amount_due WHERE status NOT IN ('settled','void'). This INCLUDES `settled_on_credit`. When a check-in overdraws on auto-credit, packages/wallet/src/debit.ts:201-230 posts a -amount ledger debit (balance goes negative) and sets the invoice status to `settled_on_credit` WITHOUT zeroing amount_due. The FIFO top-up settler only matches `pending` invoices (packages/wallet/src/settle.ts:124 -> eq(invoices.status,'pending')), and grep confirms NO code path ever transitions `settled_on_credit` -> settled or reduces its amount_due (only debit.ts:228, settle.ts:138, and the two `void` paths mutate invoices). Net effect: after an auto-credit overdraw the banner shows the owed amount on every parent page, and a subsequent top-up restores the wallet balance toward 0 but NEVER removes the `settled_on_credit` invoice from the outstanding sum -- so the banner stays up forever, directly contradicting AC3 ('After settlement, banner disappears automatically'). Verified in working tree. The wallet route test (apps/api/src/routes/parents/wallet.test.ts:90-104) only seeds `outstanding`/`pending`/`settled`, never `settled_on_credit`, so this ships green.",
+      "location": "apps/api/src/routes/parents/wallet.ts:27 (filter) + packages/wallet/src/settle.ts:124 (settler scope) + packages/wallet/src/debit.ts:227-230 (amount_due not cleared)",
+      "fix": "Product/eng decision on what the parent-facing banner should treat as 'owed': (a) exclude settled_on_credit from the banner's outstanding sum (NOT IN ('settled','void','settled_on_credit')) so an auto-credit overdraw is represented once -- as the negative wallet balance -- and the banner clears once the negative balance is topped up; OR (b) keep settled_on_credit as outstanding but make the settler also clear/zero settled_on_credit invoices when a top-up funds the wallet, so AC3 actually holds. Must be resolved consistently with the sibling sums in apps/api/src/routes/reception/parent-profile.ts:67 and reception/parents-search.ts:162. Add a wallet.test.ts case seeding a `settled_on_credit` invoice + negative-balance ledger, top up, and assert outstandingCents -> 0.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "settled_on_credit debt is double-counted (negative balance AND outstanding) -- now surfaced to parents on every page",
+      "detail": "Same root cause as above: an auto-credit overdraw shows the same debt twice -- once as a negative balanceCents (the ledger debit) and once inside outstandingCents (the settled_on_credit invoice's amount_due, included by the NOT IN ('settled','void') filter). Previously this only appeared on the staff reception header (flagged in P1-E05-S02 as decision-needed/low). This story re-exports the identical filter into a PARENT-facing banner rendered on every dashboard page, so the inconsistency is now customer-visible: a parent who overdrew can see a positive wallet balance reconcile oddly against an 'You owe KES X' banner. The filter itself is pre-existing and shared across wallet.ts:27, parent-profile.ts:67, parents-search.ts:162, so the fix belongs with the cross-cutting decision in the finding above rather than this story alone.",
+      "location": "apps/api/src/routes/parents/wallet.ts:27",
+      "fix": "Defer to the consolidated settled_on_credit decision (above). Do not patch the parent route's filter in isolation -- it must stay consistent with the reception/profile and parents-search sums.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

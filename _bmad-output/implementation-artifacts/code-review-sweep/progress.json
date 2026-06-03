@@ -68,7 +68,7 @@
     "19": "done",
     "20": "done",
     "21": "done",
-    "22": "todo",
+    "22": "done",
     "23": "todo",
     "24": "todo",
     "25": "todo",
@@ -1827,7 +1827,7 @@
         "d487083c2e363d44bbb70885c37f461cb84b6164"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "22-2-sms-stub-nudge-templates-for-outstanding-balances",
@@ -1845,7 +1845,7 @@
         "d487083c2e363d44bbb70885c37f461cb84b6164"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "22-3-auto-credit-toggle-visibility-for-parent-read-only",
@@ -1863,7 +1863,7 @@
         "d487083c2e363d44bbb70885c37f461cb84b6164"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "23-1-per-staff-commission-rate-with-effective-dating",
@@ -3188,8 +3188,16 @@
       "decisions_needed": 4,
       "dismissed": 7,
       "commit": ""
+    },
+    "22": {
+      "stories_reviewed": 3,
+      "patches": 0,
+      "deferred": 3,
+      "decisions_needed": 5,
+      "dismissed": 9,
+      "commit": ""
     }
   },
-  "epics_done": 20,
+  "epics_done": 21,
   "epics_total": 35
 }

@@ -1,0 +1,59 @@
+{
+  "id": "P2-E07-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds outstanding.day1/7/30 SMS templates (packages/sms/src/templates.ts), a daily outstanding-reminders cron (apps/jobs/src/jobs/outstanding-reminders.ts) that nudges parents whose oldest open invoice hits an exact age milestone, gated on the marketing opt-in and idempotent via an audit_outbox marker; registered via registerOutstandingRemindersJob in apps/jobs/src/index.ts.",
+  "ac_coverage": "AC1 (3 templates) implemented + tested. AC2 (daily job, schedule, queued stub-SMS, idempotency) implemented + tested, but the per-milestone matching is exact-equality with no catch-up, so a missed scheduler tick on the milestone day permanently drops that nudge. AC3 (opt-out honoured) implemented + tested, but the spec says non-transactional 'opt-out' while the code gates on smsMarketingOptIn which DEFAULTS OFF (opt-in) — the dunning feature never fires for the majority of parents.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Dunning nudge gated on marketing opt-in (defaults OFF) — feature is dead-on-arrival for most parents",
+      "detail": "AC3 says 'Parent opt-out from non-transactional reminders honoured' — opt-OUT semantics (reminders default on, parent can turn them off). The job instead gates every nudge on isMarketingOptedIn(), which reads parents.sms_marketing_opt_in (packages/db/src/schema/parents.ts:36) that is .notNull().default(false). There is only ONE SMS consent flag in the schema/contracts (no separate transactional/reminder consent). Net effect: a parent who owes money but never opted into MARKETING SMS — the overwhelming default — is never reminded, so the story's job-to-be-done ('remind parents about their outstanding balance on a schedule') silently does nothing for most of the user base. It also conflates 'marketing' with 'outstanding-balance dunning', which in most consent regimes is a transactional/account message, not marketing. The test 'does NOT nudge a parent who opted out' only proves the gate fires; no test asserts the default-state behaviour, which is the dangerous one.",
+      "location": "apps/jobs/src/jobs/outstanding-reminders.ts:101",
+      "fix": "Product decision required: (a) classify outstanding-balance reminders as transactional and send regardless of the marketing flag (matches industry/ legal treatment of dunning); (b) add a dedicated sms_reminder_opt_out flag that defaults to opted-IN (true opt-out per AC3 wording) and gate on that instead; or (c) confirm marketing-opt-in gating is intended and accept that nudges only reach marketing-consented parents. As written the most likely product intent (remind everyone who owes) is not met.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Exact-day milestone match with no catch-up: one missed/late scheduler tick permanently drops a nudge",
+      "detail": "Milestone selection is strict equality: SCHEDULE.find(s => s.ageDays === fullDaysBetween(oldest, at)) where age = floor((now - oldest_createdAt)/DAY_MS). The scheduler (apps/jobs/src/runner.ts:145-160) fires on setInterval(intervalMs) anchored to process start and IGNORES the cron field entirely — so on a worker restart/deploy/crash the 24h tick re-anchors and can straddle a milestone day (floor(age) jumps 6 -> 8), or the overlap guard skips the tick that lands on the milestone day. Because matching is exact and the idempotency marker only suppresses double-sends (never catches up), the day-7 (or day-1/day-30) nudge is then lost forever for that debt episode. onFailure:retry-next-tick does not help: a missed tick is not a failed run, and the next run sees age=8 with no match. This is more fragile than the sibling coaching-reminders job, which matches a STORED slot date rather than a derived floored-day from createdAt. For a dunning ladder, dropping reminders undermines the feature.",
+      "location": "apps/jobs/src/jobs/outstanding-reminders.ts:96-98",
+      "fix": "Make matching catch-up-safe rather than exact: select the HIGHEST scheduled milestone whose ageDays <= current age that has not already been recorded for this debt episode (the existing oldest-keyed audit marker already prevents re-sends). E.g. pick the largest s.ageDays <= age, then skip if an audit marker for (that template, oldestKey) exists. This is a real logic change (a 10-day-old never-nudged debt should get day7, not day1), so confirm the desired escalation behaviour before implementing.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "blind",
+      "title": "SMS sent before idempotency marker is persisted — non-atomic, so a crash between send and audit double-sends on the next run",
+      "detail": "Per parent the flow is: read prior audit markers -> alreadyNudged check -> sender.send() (inserts sms_outbox row) -> audit() (writes the idempotency marker). The send and the marker are NOT in one transaction and there is no unique constraint backing idempotency. If audit() fails (DB blip) or the process dies after send() but before audit(), the next daily run finds no marker and re-sends the same nudge for the same debt episode. The 'idempotent — a second run the same day' test only covers the happy path where both writes succeeded. Single-worker + overlap guard prevents concurrent runs, so this is a partial-failure window rather than a race, hence medium not high.",
+      "location": "apps/jobs/src/jobs/outstanding-reminders.ts:135-146",
+      "fix": "Write the idempotency marker BEFORE (or in the same transaction as) the send, or back idempotency with a dedicated table carrying a UNIQUE(parentId, template, oldestKey) constraint and insert-on-conflict-do-nothing to claim the slot first; only send if the claim succeeded. At minimum, wrap send()+audit() in a single db.transaction so a failed audit rolls back the queued sms_outbox row.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "settled_on_credit invoices still counted as owed — nudges a parent who already paid via auto-credit overdraw",
+      "detail": "The owing query filters status NOT IN ('settled','void') and sums amount_due. An invoice resolved as settled_on_credit (wallet/src/debit.ts:227-230) keeps its original amount_due (the debit code sets status only, never zeroes amount_due) and is therefore counted as outstanding by this job. But settled_on_credit means the parent ALREADY paid via an auto-credit overdraw — the debt now lives as a negative wallet balance, not an open invoice — so an 'outstanding balance' nudge double-counts and is misleading. This is NOT introduced by S02: the canonical outstandingForParent() in apps/api/src/routes/parents/wallet.ts:22-28 uses the identical filter, so the job faithfully mirrors the existing (questionable) definition of 'outstanding'. Deferring as a pre-existing, cross-cutting definition issue rather than an S02 defect.",
+      "location": "apps/jobs/src/jobs/outstanding-reminders.ts:84-85",
+      "fix": "Out of scope for S02. Platform-wide decision: either exclude settled_on_credit from the 'owed' definition (and align the parent wallet route), or zero amount_due when an invoice becomes settled_on_credit. Track separately.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Nudge sender bypasses the per-day / per-recipient SMS caps",
+      "detail": "The job sends via a raw StubSmsSender (or injected sender), not via the CappedSmsSender that enforces SMS_CAP_PER_DAY / SMS_CAP_PER_RECIPIENT_DAY (packages/sms/src/limiter.ts). The natural per-debt-episode idempotency limits each parent to at most 3 nudges across 30 days, so this is not a practical spam vector, but it does mean the global daily SMS cost cap is not applied to dunning traffic. Sibling jobs follow the same uncapped pattern, so this is a shared convention, not an S02-specific regression.",
+      "location": "apps/jobs/src/jobs/outstanding-reminders.ts:66",
+      "fix": "Out of scope for S02. If dunning volume should count against the platform SMS caps, wire the cron's sender through CappedSmsSender at registration time. Track as a cross-job decision.",
+      "ac_ref": ""
+    }
+  ]
+}

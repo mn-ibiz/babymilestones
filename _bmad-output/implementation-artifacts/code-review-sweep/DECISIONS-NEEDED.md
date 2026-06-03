@@ -33,6 +33,21 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 22 — Auto-credit & Outstanding
+
+52. **[HIGH · P2-E07-S01] `settled_on_credit` AC3 violation** — the outstanding banner never clears for
+    an auto-credit parent (the overdraw invoice keeps `amount_due` that no settlement clears, and the
+    sum includes it). This is the cross-cutting `settled_on_credit` decision (#14) now confirmed as an
+    AC violation. Fix consistently across `wallet.ts`/`parent-profile.ts`/`parents-search.ts`.
+
+53. **[HIGH · compliance · P2-E07-S02] Outstanding-balance dunning nudge gated on the MARKETING opt-in
+    (defaults OFF)** → dead-on-arrival for most parents; spec says "opt-out" (on by default). Decide:
+    treat as transactional (always send), or add a dedicated dunning-consent flag. (+ HIGH: exact-day
+    milestone match has no catch-up — a missed tick drops the nudge; + MED: SMS sent before the
+    idempotency marker → double-send on crash.)
+
+54. **[LOW · P2-E07-S03] `autoCreditStatusViewModel` is dead code** (page bypasses it) — wire or delete.
+
 ## Epic 21 — Backup Retention
 
 49. **[HIGH · data-safety · P2-E06-S02] Two backup pruners with different policies coexist** — the
