@@ -35,7 +35,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 26 | 4 | ✅ | 1 (adjust reason persisted) | 2 | 3 | 6 |
 | 27 | 5 | ✅ | 3 (active-session bound, outstanding guard, revenue range cap) | 3 | 6 | 14 |
 | 28 | 5 | ✅ | 1 (commission fail-alert guard) | 4 | 5 | 8 |
-| 29 | 7 | ⬜ | | | | |
+| 29 | 7 | ✅ | 3 (stock lost-update BLOCKER, Woo SSRF BLOCKER, packing-slip print) | 6 | 6 | 18 |
 | 30 | 5 | ⬜ | | | | |
 | 31 | 5 | ⬜ | | | | |
 | 32 | 4 | ⬜ | | | | |

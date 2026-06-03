@@ -1,0 +1,39 @@
+{
+  "id": "P4-E04-S03",
+  "verdict": "issues",
+  "diff_summary": "Epic-29 commit 5a8777d implemented packing slip (contracts/packing-slip.ts -> toPackingSlip, ui/packing-slip-document.ts -> renderPackingSlipHtml, pos/lib/packing-slip-print.ts, OnlineOrders.tsx print button) and daily dispatch report (catalog/daily-dispatch{,-db}.ts reducer+DB, contracts/index.ts CSV+view-model+date helpers, api/admin/daily-dispatch.ts, admin dispatch-report page). The pinned SHA 20b86ef0db is a later epic fix (Woo per_page); review targeted the S03/S04 code in the working tree.",
+  "ac_coverage": "S03: AC1 print button present; AC2 slip carries order#, name+phone, address, delivery, items+qty, note (all HTML-escaped); AC3 print-to-default-printer via new window — BROKEN by noopener (see finding); AC4 built from mirror row, no Woo client. S04: AC1 wc_orders-only; AC2 counts/value/pack/dispatch averages (edge cases tested); AC3 CSV export (audited); AC4 date filter defaults to today (UTC — see finding); AC5 sync-health dead-letter row. All ACs have tests; S03 AC3 test stubs window.open so it masks the noopener defect.",
+  "dismissed_count": 6,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Packing-slip print silently no-ops in real browsers: window.open passed `noopener` returns null",
+      "detail": "printPackingSlip calls win.open(\"\", \"_blank\", \"noopener,noreferrer,width=720,height=900\"). Per the HTML spec/MDN, when `noopener` is present window.open() returns null (the opener relationship is severed so the script cannot hold a handle to the new window) — Chrome, Firefox and Safari all return null. The function then hits `if (!printWindow) return false;` and never writes the HTML or calls print(). So the 'Print packing slip' button (AC1) does nothing — no slip, no print dialog (breaks AC3, Decision 13). The unit test masks this: mockWindow stubs `win.open` to ALWAYS return a window object, so the test is green while production is broken. Note: the existing receipt path (SaleScreen.tsx) uses window.print() on the current document and never opens a new window, so it does not have this problem — this is a new defect in the distinct packing-slip path.",
+      "location": "apps/pos/lib/packing-slip-print.ts:27",
+      "fix": "Drop `noopener` from the features string when a handle to the print window is required. Change line 27 to `const printWindow = win.open(\"\", \"_blank\", \"width=720,height=900\");` (a fresh about:blank doc the slip is written into does not need noopener — there is no opener-abuse risk on a same-origin blank window the opener itself populates). Then add a test where `win.open` is stubbed to return null with `noopener` semantics, or assert the features string passed to win.open contains no `noopener`, so the regression is caught.",
+      "ac_ref": "AC1, AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Dispatch report day boundary is UTC, not the shop's local (EAT/UTC+3) day",
+      "detail": "S04 keys the report day on UTC midnight: resolveDispatchDate uses now.toISOString().slice(0,10) (UTC today), defaultDispatchDate does the same, and loadDailyDispatch builds the window as [date 00:00Z, date+1 00:00Z) on wc_orders.created_at. For a Kenya shop (EAT = UTC+3) orders created 00:00–03:00 local fall into the PREVIOUS UTC day, so the 'today' report and any picked day mis-bin orders around local midnight, and the displayed/exported total value + status counts for a given calendar day are off. However this is the ESTABLISHED platform-wide convention (revenue-by-period-db.ts explicitly documents 'Boundaries are UTC ... matching 27.1 today keying', and the other reporting surfaces — tax, pnl, peak-hours — key on UTC too). S04 faithfully follows the house pattern, so this is pre-existing / out of this story's scope, not a defect introduced here.",
+      "location": "packages/contracts/src/index.ts:3660 (resolveDispatchDate); packages/catalog/src/daily-dispatch-db.ts:36-57",
+      "fix": "Defer: fixing this for one report only would make S04 inconsistent with every other report. Options for a future platform-wide change: (a) introduce a single business-timezone constant (Africa/Nairobi) and bin all reports against local-day boundaries, or (b) accept UTC as the documented contract. No change for this story.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "XSS escaping test covers only customerNote; other Woo-sourced fields untested",
+      "detail": "renderPackingSlipHtml escapes every interpolated untrusted field (customerName, customerPhone, each shippingAddress line, deliveryMethod, item name, orderNumber) via escapeHtml — verified in code, so this is NOT a live XSS hole. But the test suite only asserts escaping for customerNote (packing-slip-document.test.ts:88). A future refactor could drop escaping on, e.g., an address line or a Woo item name (both attacker-influenceable via a compromised/abused WooCommerce store) without any test failing.",
+      "location": "packages/ui/src/packing-slip-document.test.ts:88; renderer packages/ui/src/packing-slip-document.ts:51,59,62,116",
+      "fix": "Add escaping assertions for the other Woo-sourced fields, e.g. render a slip with customerName/shippingAddress[0]/deliveryMethod/items[].name set to `<img src=x onerror=alert(1)>` and assert the raw markup is absent and `&lt;img` is present. Low priority — escaping is currently complete.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

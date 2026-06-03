@@ -24,7 +24,11 @@ export function printPackingSlip(
   if (!win) return false;
 
   const html = renderPackingSlipHtml(slip);
-  const printWindow = win.open("", "_blank", "noopener,noreferrer,width=720,height=900");
+  // NOTE: do NOT pass `noopener`/`noreferrer` here — both make window.open()
+  // return null (the opener handle is severed), so we could never write the slip
+  // or call print(). We open a blank window and write our own document (no URL
+  // navigation), so there is no cross-origin opener/referrer concern.
+  const printWindow = win.open("", "_blank", "width=720,height=900");
   if (!printWindow) return false;
 
   const doc = printWindow.document;

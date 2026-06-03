@@ -1,0 +1,49 @@
+{
+  "id": "P4-E04-S07",
+  "verdict": "issues",
+  "diff_summary": "Pinned commit 20b86ef0db only fixes the pull pagination (per_page) silent-order-drop; the full story spans migration 0092_woo_sync.sql (wc_sync_state/wc_orders/wc_outbox/wc_outbox_dead), packages/woocommerce/src/{sync,retry,errors,health,stock-push,order-transitions,client}.ts, apps/jobs/src/jobs/{wc-sync-pull,wc-outbox-drain}.ts, the scheduler runner.ts, and apps/api admin/woocommerce-sync.ts. Implements a 2-min order pull with checkpoint + FIFO writeback outbox drained with bounded concurrency, exponential backoff, dead-letter table, and an admin health/replay surface.",
+  "ac_coverage": "AC1 pull+checkpoint (tested), AC2 outbox FIFO+bounded concurrency (tested), AC3 retry/backoff+dead-letter (tested), AC4 dead-letter list/replay/resolve/discard (tested), AC5 health snapshot+staleness (tested), AC6 summary-level audit (tested), AC7 sync-now (tested). All ACs implemented & tested; the concurrency model is single-instance only (see findings).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Outbox claim is not race-safe across instances — relies on single-instance scheduler",
+      "detail": "claimDueWcWritebacks is a plain SELECT (WHERE status='pending' AND next_attempt_at<=now ORDER BY created_at LIMIT n) — no FOR UPDATE SKIP LOCKED, no transition to a 'claimed'/'processing' state, no DB-level ownership (grep for FOR UPDATE/SKIP LOCKED/forUpdate returns nothing in sync.ts and wc-outbox-drain.ts). The ONLY mutual exclusion is the in-process `inFlight` Set in startScheduler (apps/jobs/src/runner.ts:147-159), which guards overlap WITHIN one process only. With two jobs processes (the known open follow-up 'durable outbox claim for horizontal scale'), both workers select the same pending rows and both dispatch the same writeback to Woo. updateOrderStatus/updateProductStock PUTs are last-write-wins idempotent so most double-dispatches are harmless, but it confirms the queue is correct ONLY under a single jobs instance. This is the open follow-up made concrete; flagging so the horizontal-scale assumption is explicit and gated before a second jobs replica is ever deployed.",
+      "location": "packages/woocommerce/src/sync.ts:217-227",
+      "fix": "Either (a) document+enforce single-instance for the jobs worker (deployment guard), or (b) make the claim durable: SELECT ... FOR UPDATE SKIP LOCKED inside a tx, or atomically flip claimed rows to a 'claimed' status with a lease/claimed_at column and reclaim stale leases. Needs a product/infra decision on scale-out timeline before picking (b).",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Order-status writeback duplicates the Woo order note on every retry / double-dispatch",
+      "detail": "client.updateOrderStatus PUTs the status (idempotent) then POSTs the note as a SEPARATE append-only Woo resource (client.ts:251-259). dispatch() in the drain treats the whole call as one unit: if the status PUT succeeds but the note POST fails (network/5xx), classifyWooError marks it retryable and the row stays pending — the NEXT attempt re-runs the PUT AND posts the note AGAIN, so a transient note failure (or any concurrent double-dispatch per finding #1) produces duplicate notes on the order. The idempotency_key only dedups the OUTBOX enqueue; it is never passed to Woo, and Woo /orders/:id/notes has no idempotency. Notes are operator/courier-visible (dispatch detail), so duplicates are confusing, not just cosmetic.",
+      "location": "packages/woocommerce/src/client.ts:251-259",
+      "fix": "Make note posting idempotent: before POSTing, check whether a note with that exact text already exists for the order (GET /orders/:id/notes), or carry a sentinel marker in the note body and skip if present; alternatively split the note into its own outbox row so the status writeback can complete-and-mark-done independently of the note. Minimal patch: in updateOrderStatus, list existing notes and skip the POST when an identical note is already present.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Pull checkpoint never advances when Woo orders omit date_modified — re-pulls the same window every 2 min",
+      "detail": "wc-sync-pull derives the new checkpoint solely from parseModified(o.date_modified) (wc-sync-pull.ts:85-86); advanceCheckpoint keeps the old lastSyncAt when `newest` is null (sync.ts:99-102). wooOrderSchema marks date_modified OPTIONAL (contracts woocommerce.ts:40), so an order page with all date_modified absent leaves the checkpoint unmoved and the next pull re-requests modified_after=same instant and re-upserts the same orders forever. Upsert is idempotent so it is not data corruption — just wasted Woo calls and a checkpoint that can stall. In practice Woo always emits date_modified, hence low/defer.",
+      "location": "apps/jobs/src/jobs/wc-sync-pull.ts:85-96",
+      "fix": "Fall back to date_created (or the pull's `at` clock) when date_modified is absent so the checkpoint can still advance, or assert date_modified present and treat absence as a server error. Deferred: depends on confirming Woo's date_modified guarantees; out of this commit's scope.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "'since' boundary uses inclusive modified_after — boundary orders may be re-pulled (and the 6h ladder rung is dead code)",
+      "detail": "Two minor observations. (1) The checkpoint stores the exact newest date_modified and the next pull sends it as modified_after; if Woo treats modified_after inclusively, the boundary order(s) are re-pulled each cycle (harmless — upsert is idempotent). (2) The backoff ladder WC_BACKOFF_MS has 5 entries [1m,5m,30m,2h,6h] but recordWcWritebackFailure dead-letters at attempts>=WC_MAX_ATTEMPTS=5, so the 5th rung (6h) is never applied (attempt 5 dead-letters instead of waiting 6h). This matches the spec's 'up to 5 attempts' so behaviour is correct, but the 6h entry is dead and the comment 'after attempt 5' (sync.ts:53) is misleading.",
+      "location": "packages/woocommerce/src/sync.ts:48-66",
+      "fix": "No functional change required. If exact spec fidelity ('backoff ... 6h ... then dead-letter') is wanted, bump WC_MAX_ATTEMPTS handling so the 6h delay is actually served before dead-lettering; otherwise drop the unused 6h rung and correct the comment. Deferred — cosmetic/spec-interpretation.",
+      "ac_ref": "AC3"
+    }
+  ]
+}

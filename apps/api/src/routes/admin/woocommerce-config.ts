@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { audit, users, type Database } from "@bm/db";
 import { validateSession, can, CSRF_HEADER_NAME, type PermissionPrincipal } from "@bm/auth";
 import { wooConfigSaveSchema } from "@bm/contracts";
+import { checkProviderUrlSafety } from "@bm/sms";
 import {
   saveWooConfig,
   getWooConfigPublic,
@@ -106,6 +107,16 @@ export function registerAdminWooCommerceConfig(
     if (!parsed.success) {
       const first = parsed.error.issues[0];
       return reply.code(400).send({ error: first?.message ?? "Invalid input", field: first?.path[0] });
+    }
+    // SSRF guard: the saved site URL is fetched server-side (test-connection + all
+    // sync writebacks). HTTPS-only is not enough — block private/loopback/
+    // link-local/cloud-metadata hosts, reusing the same gate the SMS provider URL
+    // uses (the established two-gate convention).
+    if (typeof parsed.data.siteUrl === "string") {
+      const safety = checkProviderUrlSafety(parsed.data.siteUrl);
+      if (!safety.ok) {
+        return reply.code(400).send({ error: safety.message ?? "Invalid site URL", field: "siteUrl" });
+      }
     }
     await saveWooConfig(db, { input: parsed.data, encryptionKey });
 

@@ -128,7 +128,13 @@ export function createWcOutboxDrainJob(deps: WcOutboxDrainJobDeps): Job {
       await runBounded(due, concurrency, async (row) => {
         try {
           await dispatch(deps.client, row);
-          await markWcWritebackDone(db, { id: row.id, now: at });
+          // Pass the claimed row's nextAttemptAt so a concurrent re-enqueue that
+          // re-armed the row mid-dispatch is not clobbered (lost-update guard).
+          await markWcWritebackDone(db, {
+            id: row.id,
+            expectedNextAttemptAt: row.nextAttemptAt,
+            now: at,
+          });
           processed += 1;
         } catch (err) {
           const { message, retryable } = classifyWooError(err);

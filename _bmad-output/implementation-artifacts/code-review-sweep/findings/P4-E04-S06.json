@@ -1,0 +1,49 @@
+{
+  "id": "P4-E04-S06",
+  "verdict": "issues",
+  "diff_summary": "New @bm/woocommerce package: typed REST client (client.ts), AES-256-GCM secret-at-rest helper (crypto.ts), encrypted credential persistence (config.ts), typed errors (errors.ts), Zod response contracts (contracts/woocommerce.ts), admin API routes GET/PUT/test-connection (api/routes/admin/woocommerce-config.ts), admin form logic, DB table woo_config (migration 0091, additive). Pinned commit 20b86ef0db only adds WC_ORDERS_PER_PAGE per_page pinning to listOrders.",
+  "ac_coverage": "AC1 client surface implemented & tested; AC2 HTTPS-protocol enforced at construction + schema (tested) but SSRF host check MISSING (see finding); AC3 encrypted-at-rest + write-only public projection + admin-only implemented & tested; AC4 test-connection implemented & tested; AC5 typed errors + mapping 401/403/404/429/5xx + WooNetworkError tested; AC6 structured request logging with secret redaction tested.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "WooCommerce site URL is not SSRF-validated (only HTTPS-protocol checked) — server-side request forgery to private/metadata addresses",
+      "detail": "The Woo site URL is operator-supplied admin config that the server later fetches (testConnection now, all sync in S07+) via the production transport `(url, init) => fetch(url, init)` (apps/api/src/app.ts:189). Validation only checks `protocol === 'https:'`: in contracts (wooConfigSaveSchema.wooSiteUrlSchema, packages/contracts/src/woocommerce.ts:129-139) and in the client (createWooClient, packages/woocommerce/src/client.ts:159-161). Nothing blocks `https://169.254.169.254/...` (cloud metadata), `https://127.0.0.1`, `https://localhost`, or RFC1918/link-local/ULA hosts. The repo already has the canonical fix for exactly this: `checkProviderUrlSafety` in packages/sms/src/url-safety.ts, applied by the SMS admin route as a SECOND gate after the HTTPS shape check (apps/api/src/routes/admin/sms-config.ts:108-110 and :148-151; contracts/src/index.ts:4064-4068 documents this two-gate convention). The Woo route (apps/api/src/routes/admin/woocommerce-config.ts PUT handler, lines 102-128) never calls it. Both the woo_config schema comment (packages/db/schema/woo-config.ts) and migration 0091 claim 'HTTPS enforced at the edge (@bm/contracts + the API route)', but the API route adds no SSRF gate. No SSRF test exists (woocommerce.test.ts / config-form.test.ts only cover http:// rejection). This is the security focus the brief flags and is a real SSRF hole.",
+      "location": "apps/api/src/routes/admin/woocommerce-config.ts:105-110",
+      "fix": "In the PUT /admin/woocommerce-config handler, after `wooConfigSaveSchema.safeParse` succeeds and before `saveWooConfig`, apply the existing SSRF gate exactly like the SMS route: `const safety = checkProviderUrlSafety(parsed.data.siteUrl); if (!safety.ok) return reply.code(400).send({ error: safety.message ?? 'Invalid site URL', field: 'siteUrl' });` Import `checkProviderUrlSafety` (re-exported via @bm/contracts or from @bm/sms). Add a unit test asserting that siteUrl=https://169.254.169.254 and https://127.0.0.1 are rejected at save.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "No request timeout on the Woo transport — a hung Woo server stalls the request indefinitely",
+      "detail": "createWooClient.send awaits `transport(url, init)` with no AbortSignal/timeout (packages/woocommerce/src/client.ts:189-210), and the production transport is a bare `(url, init) => fetch(url, init)` (apps/api/src/app.ts:189) with no AbortController. Node's global fetch has no default timeout, so a slow/hung WooCommerce host leaves the admin test-connection request (and every S07 sync request, run from the jobs worker) pending until the OS socket timeout — there is no WooNetworkError-on-timeout path despite the errors comment claiming 'timeout' is covered (errors.ts:50). The brief explicitly calls out timeout handling. The client is intentionally 'dumb' (no retry), but a per-attempt timeout is a transport concern, not a retry concern.",
+      "location": "packages/woocommerce/src/client.ts:189",
+      "fix": "Decision needed on where the timeout lives and its value. Option A (recommended): give CreateWooClientOptions a `timeoutMs` (default e.g. 15000) and pass `signal: AbortSignal.timeout(timeoutMs)` into the RequestInit, mapping the resulting AbortError to WooNetworkError. Option B: bake the timeout into the production transport in app.ts. Either way add a test that a never-resolving transport surfaces a WooNetworkError within the budget.",
+      "ac_ref": "AC5"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "updateOrderStatus reports success even when the order note POST fails (silent partial failure)",
+      "detail": "updateOrderStatus (packages/woocommerce/src/client.ts:251-259) first PUTs the status, then if a note is supplied calls `await this.addOrderNote(...)`. If the note POST fails (network, 4xx, 5xx), the thrown error propagates and the caller sees the whole operation as failed — but the status change has ALREADY been committed on Woo. A retry by S07 would re-apply the status (idempotent enough) but could append a DUPLICATE note, or the caller may treat the status change as not-applied. There is no idempotency key on the note. Order matters for sync correctness.",
+      "location": "packages/woocommerce/src/client.ts:252-258",
+      "fix": "Product/eng decision: (a) treat the note as best-effort — catch the addOrderNote error, log it, and still return the updated order so the status write is not lost; or (b) document that updateOrderStatus is non-atomic and require S07's writeback to use a note idempotency marker so a replay does not duplicate notes. Add a test for the note-fails-after-status-succeeds path.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "scrypt key derivation uses default N=16384 with no maxmem/cost configuration — per-record derivation on every encrypt/decrypt",
+      "detail": "crypto.ts deriveKey calls scryptSync(masterKey, salt, 32) with Node defaults (N=16384, r=8, p=1) and derives a fresh key per record from a random salt (packages/woocommerce/src/crypto.ts:25-27). This is cryptographically sound (authenticated AES-256-GCM, unique salt+IV per call, fail-closed on tamper) and fine for the singleton woo_config row. Noted only because resolveWooClientConfig runs two scrypt derivations on every client construction (config.ts:107-118); if S07 constructs a client per writeback at high volume the scrypt cost could add up. Pre-existing design, out of this story's correctness scope.",
+      "location": "packages/woocommerce/src/crypto.ts:25",
+      "fix": "Defer. If client construction becomes hot in S07, cache the resolved WooConfig (derived key/plaintext) in-process rather than re-deriving per request, or memoize resolveWooClientConfig keyed on the row's updatedAt.",
+      "ac_ref": ""
+    }
+  ]
+}

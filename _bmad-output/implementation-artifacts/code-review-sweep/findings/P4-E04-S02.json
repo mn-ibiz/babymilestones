@@ -1,0 +1,39 @@
+{
+  "id": "P4-E04-S02",
+  "verdict": "issues",
+  "diff_summary": "POS order-status transitions: pure state machine + local→Woo mapping (packages/contracts/src/order-transitions.ts), atomic write-path that updates wc_orders.local_status + inserts an audit-grade order_events row + enqueues exactly one idempotent wc_outbox writeback with NO synchronous Woo call (packages/woocommerce/src/order-transitions.ts), the POS route (apps/api/src/routes/pos/order-transitions.ts), and the outbox drain worker that applies writebacks with bounded concurrency, exponential backoff + dead-letter (apps/jobs/src/jobs/wc-outbox-drain.ts). The pinned SHA 20b86ef itself is a per_page pull fix; the story implementation lives in the parent Epic-29 commit 5a8777d which I reviewed against the working tree.",
+  "ac_coverage": "AC1 (5 actions) implemented+tested; AC2 (order_events + outbox enqueue, atomic, audited) implemented+tested; AC3 defaults implemented+tested but the 'configurable' override hook is dormant (never wired to a config source from the write path/route); AC4 (no skips/no-ops/terminal-exits; admin-only reversal) implemented+tested; AC5 (dispatch detail captured + Woo note) implemented+tested; AC6 (local transition survives Woo failure; retried + dead-lettered) implemented+tested at the drain level, BUT the Woo order-NOTE write is non-idempotent on retry — the named open follow-up, CONFIRMED real and unmitigated.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Order-note retry is non-idempotent — a retried/partially-failed writeback duplicates the Woo order note (the named open follow-up, CONFIRMED)",
+      "detail": "An order_status outbox row carries { status, note } and is applied by WcClient.updateOrderStatus, which is two separate Woo calls: a PUT /orders/:id { status } (idempotent — re-PUTting the same status is a no-op) FOLLOWED BY a POST /orders/:id/notes { note } (client.ts:251-259). Woo order notes are append-only: every POST creates a NEW note. The outbox treats the whole row as one unit — on any throw it stays pending and the SAME row is re-claimed and re-dispatched (sync.ts:264-288 recordWcWritebackFailure; wc-outbox-drain.ts:128-155). So whenever updateOrderStatus throws AFTER the status PUT has already landed — e.g. the note POST returns 5xx/429 (classified retryable, retry.ts:25-39), or the network drops after Woo created the note but before the response arrived — the retry re-runs the whole call: the status PUT is a harmless no-op but the note POST fires AGAIN, posting a duplicate note. For a dispatched transition (AC5) the customer/staff sees the rider/courier tracking note duplicated, up to WC_MAX_ATTEMPTS=5 times, and a ready transition duplicates READY_NOTE. The outbox idempotency key (wc-order:<id>:<status>:<attempt>) only dedupes ENQUEUE; it does NOT make the downstream Woo side-effects idempotent. The drain test mocks updateOrderStatus as one atomic call (wc-outbox-drain.test.ts), so the status-PUT-ok / note-POST-fail path is entirely untested. This is exactly the 'order-note retry idempotency' open follow-up the brief asked to confirm — it is real and present in the working tree.",
+      "location": "packages/woocommerce/src/client.ts:251-259; apps/jobs/src/jobs/wc-outbox-drain.ts:57-69,128-155",
+      "fix": "Decision needed on the dedup strategy. Options: (a) split the note into its own outbox kind so the status writeback and the note writeback retry independently, each idempotent; (b) before POSTing, GET /orders/:id/notes and skip if a note with identical text already exists (or stamp a unique marker token, e.g. the outbox idempotency_key, into the note body and check for it); (c) at minimum, drive the note via a status PUT field where Woo supports it / make the note write best-effort + non-retryable so a duplicate is bounded to at most one. Needs product/eng call on acceptable customer-visible behavior.",
+      "ac_ref": "AC6"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC3 'configurable' local→Woo status map is a dormant hook — defaults work but no config feeds the override",
+      "detail": "AC3 says the local→Woo mapping is 'configurable, defaults: ...'. The defaults (WC_LOCAL_TO_WOO_DEFAULT) are correct and tested, and applyOrderTransition / mapLocalToWoo accept a statusMap override (order-transitions.ts:69,119; contracts order-transitions.ts:190,228). But nothing populates it: the POS route calls applyOrderTransition WITHOUT statusMap (apps/api/src/routes/pos/order-transitions.ts:105-116), and a grep shows no config source ever supplies a WcLocalToWooMap. So the override is plumbed but unreachable in production — only the hard-coded defaults are ever used. Not a correctness bug (defaults match the spec) but the 'configurable' half of AC3 is not actually wired.",
+      "location": "apps/api/src/routes/pos/order-transitions.ts:105-116; packages/woocommerce/src/order-transitions.ts:119",
+      "fix": "Either (a) confirm 'configurable via code/override hook' satisfies AC3 for this story and defer wiring a runtime config to a later story, or (b) load an optional override from the woo_config table and pass it through the route. Decision on intended scope.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Outbox claim has no row-level lock — relies on single-worker deployment to avoid double-claim across processes",
+      "detail": "claimDueWcWritebacks does a plain SELECT of pending+due rows with no status flip to 'claimed' and no SELECT ... FOR UPDATE SKIP LOCKED (sync.ts:217-227). Within one jobs process the runner's in-flight guard prevents the wc-outbox-drain job overlapping itself (apps/jobs/src/runner.ts:147-160), so this is safe in the intended single-worker topology. But if the jobs app is ever scaled to >1 replica, two drains can claim+dispatch the SAME row concurrently, double-applying the Woo writeback (and, combined with finding #1, duplicating notes). Pre-existing to the S07 sync infrastructure rather than introduced by this status-sync story, so deferred — flagging because it compounds the note-idempotency issue.",
+      "location": "packages/woocommerce/src/sync.ts:217-227",
+      "fix": "Out of S02 scope. If multi-replica jobs is ever on the roadmap, switch the claim to FOR UPDATE SKIP LOCKED or an atomic UPDATE ... RETURNING that flips status to a claimed/leased state. No action needed while jobs runs single-worker.",
+      "ac_ref": ""
+    }
+  ]
+}

@@ -33,6 +33,23 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 29 — POS ↔ WooCommerce Sync
+
+73. **[HIGH · P4-E04-S02/S06/S07] Woo order-note retry duplicates the note** (the named open
+    follow-up). `updateOrderStatus` = idempotent status PUT + append-only note POST; any failure after
+    the PUT re-POSTs the note on retry (up to 5×). Choose: split the note into its own outbox kind, or
+    dedupe by a note marker. `packages/woocommerce/src/client.ts:251-259`.
+
+74. **[HIGH · P4-E04-S07] Outbox claim not race-safe across instances** ("durable outbox claim for
+    horizontal scale" follow-up) — plain SELECT, no `FOR UPDATE SKIP LOCKED`/claim-state; only the
+    in-process scheduler Set guards. Single-instance-only. Document it, or make the claim durable.
+
+75. **[HIGH · P4-E04-S06] No request timeout on the Woo transport** — bare `fetch`, no AbortSignal; a
+    hung Woo host stalls test-connection + every sync request. Add `AbortSignal.timeout`.
+
+76. **[LOW · P4-E04-S01] Woo order money stored as decimal string, not `total_cents`** (display-only,
+    no arithmetic). Reconcile code vs the spec note.
+
 ## Epic 28 — Jobs Runner  ⚠️ FRAMEWORK
 
 70. **[HIGH · framework · P3-E06-S01] The jobs scheduler ignores `cron` and runs purely on `intervalMs`.**

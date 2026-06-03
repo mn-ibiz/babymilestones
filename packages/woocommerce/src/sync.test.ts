@@ -300,10 +300,40 @@ describe("WooCommerce sync state machine (Story 29.7)", () => {
         request: {},
         now: NOW,
       });
-      await markWcWritebackDone(dbh.db, { id: row.id, now: NOW });
+      await markWcWritebackDone(dbh.db, {
+        id: row.id,
+        expectedNextAttemptAt: row.nextAttemptAt,
+        now: NOW,
+      });
       const [after] = await dbh.db.select().from(wcOutbox).where(eq(wcOutbox.id, row.id));
       expect(after!.status).toBe("done");
       expect(after!.doneAt).not.toBeNull();
+    });
+
+    it("markWcWritebackDone does NOT clobber a row re-armed after claim (lost-update guard)", async () => {
+      const row = await enqueueWcWriteback(dbh.db, {
+        idempotencyKey: "rearmed",
+        kind: "stock_push",
+        request: { v: 1 },
+        now: NOW,
+      });
+      // Simulate a concurrent re-enqueue that re-armed the row with a NEWER value
+      // and a FUTURE next_attempt_at while a drain still held the claimed (old) row.
+      const later = new Date(NOW.getTime() + 60_000);
+      await dbh.db
+        .update(wcOutbox)
+        .set({ request: { v: 2 }, nextAttemptAt: later })
+        .where(eq(wcOutbox.id, row.id));
+      // The drain finishes its PUT and tries to mark the row it claimed done.
+      await markWcWritebackDone(dbh.db, {
+        id: row.id,
+        expectedNextAttemptAt: row.nextAttemptAt,
+        now: NOW,
+      });
+      const [after] = await dbh.db.select().from(wcOutbox).where(eq(wcOutbox.id, row.id));
+      // The newer value survives, still pending → drained next cycle. No lost update.
+      expect(after!.status).toBe("pending");
+      expect(after!.request).toEqual({ v: 2 });
     });
   });
 

@@ -1,0 +1,39 @@
+{
+  "id": "P4-E04-S05",
+  "verdict": "issues",
+  "diff_summary": "Pinned commit 20b86ef touches only the PULL side (wc-sync-pull per_page); the stock-PUSH story under review lives in the working tree: packages/woocommerce/src/{stock-push,sync,reconciliation,client}.ts, packages/contracts/src/woocommerce.ts, packages/catalog/src/stock-adjustments.ts, apps/api/src/routes/pos/sales.ts, apps/jobs/src/jobs/{wc-outbox-drain,wc-stock-reconcile}.ts. enqueueStockPush coalesces per-product mutations into one debounced wc_outbox row (latest value wins) keyed by wc-stock:{productId}; the outbox drain PUTs an ABSOLUTE stock_quantity to Woo and marks the row done; a nightly job reconciles drift.",
+  "ac_coverage": "AC1 (all mutation paths enqueue: POS sale + adjustStock for goods-received/stock-take/manual; online fulfilment intentionally not re-pushed) implemented; AC2 (SKU/woo_product_id mapping, unmapped = no-op) implemented + tested; AC3 (stock_quantity + stock_status via stockStatusFor, PUT) implemented + tested; AC4 (per-SKU debounce/coalesce to final value) implemented + tested. AC5 (SKU mapping admin screen + bulk CSV) and AC6 (nightly drift report) implemented (sku-mapping.ts, reconciliation.ts, wc-stock-reconcile.ts). GAP: no test covers the drain-vs-re-enqueue ordering/last-write-wins race, which the implementation does not actually guard against (see findings).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Lost update: drain unconditionally marks a row done, clobbering a concurrently re-armed newer stock value",
+      "detail": "enqueueStockPush coalesces by re-arming the SAME wc_outbox row (onConflictDoUpdate on idempotency_key wc-stock:{productId}, setting request=newValue, status='pending', nextAttemptAt=now+debounce, doneAt=null). The drain (apps/jobs/src/jobs/wc-outbox-drain.ts) claims due rows with claimDueWcWritebacks, which is a plain SELECT that does NOT transition the row out of 'pending' or lock it. The drain then awaits the Woo PUT (a network round-trip), and on success calls markWcWritebackDone, which runs UPDATE wc_outbox SET status='done' WHERE id=? UNCONDITIONALLY (sync.ts:230-238) -- no guard on the row's value/version/claimed-state. Race window: drain claims V1, begins PUT; meanwhile the API process (POS sale settleSale() at sales.ts:123, or adjustStock at stock-adjustments.ts:79) calls enqueueStockPush and overwrites that exact row with the newer value V2 (status back to 'pending', doneAt=null); the PUT returns; markWcWritebackDone forces the just-re-armed V2 row to 'done'. V2 is now silently dropped -- never drained, never dead-lettered, no retry. Because updateProductStock PUTs an ABSOLUTE stock_quantity (client.ts:269-280), Woo is left at V1. When V1>V2 (e.g. restock-to-10 in flight, then a sale drops local to 2), Woo shows MORE stock than reality -> overselling online, the exact failure this story exists to prevent. This is the API process and the jobs process running genuinely concurrently, so the in-process scheduler overlap guard (runner.ts) does not help. Violates the story's core invariant: 'a stale stock value can't overwrite a newer one' and 'a failed push is retried via the outbox without losing the update'. The nightly reconciliation (AC6) would only REPORT the resulting drift; it never repairs it.",
+      "location": "packages/woocommerce/src/sync.ts:230-238",
+      "fix": "Make markWcWritebackDone a conditional, optimistic write that cannot clobber a row that was re-armed after it was claimed. Capture the snapshot the drain pushed (its request/updated state) at claim time and only transition to 'done' when the row is unchanged. Concretely: (a) add a monotonically increasing version/revision column to wc_outbox bumped on every enqueueStockPush re-arm, claim it into the drain's row snapshot, and mark done with `UPDATE ... SET status='done' WHERE id=? AND version=?`; OR (b) gate done on the request still matching: `UPDATE ... SET status='done', doneAt=now, lastError=null WHERE id=? AND status='pending' AND request=:pushedRequest` -- if 0 rows update, a newer mutation re-armed the row, so leave it pending (it will be drained again with the final value). Either way, claimDueWcWritebacks should also transition claimed rows to an in-flight state (e.g. status='in_flight' with a claimed_at) under FOR UPDATE SKIP LOCKED so a re-enqueue distinguishes 'mutate the in-flight snapshot' from 'arm a fresh pending push'. Add a regression test: claim a row, re-arm it with a newer value mid-flight, complete the push, assert the row is still pending and carries the newer value (not done).",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "No test asserts push ordering / final-value-wins across the enqueue+drain boundary",
+      "detail": "AC4's coalescing is tested only at the enqueue layer (stock-push.test.ts collapses N mutations to one row with the final value). There is no integration test exercising enqueue -> drain -> re-enqueue-mid-drain, which is exactly where the lost-update race above hides. The story's stated review focus ('idempotent + ordered, a stale value can't overwrite a newer one') is therefore unverified end-to-end. Even if the maintainer disputes the severity of the race window, the absence of any ordering test means a future refactor of claim/done could silently regress the guarantee.",
+      "location": "packages/woocommerce/src/stock-push.test.ts:69-97",
+      "fix": "Add an integration test across the enqueue/drain boundary that interleaves a re-enqueue between claimDueWcWritebacks and markWcWritebackDone (e.g. via an instrumented client whose updateProductStock callback re-arms the row before resolving) and asserts: the row remains pending with the newer value, the drain does not strand the update, and the final Woo push carries the latest stock. Pairs with the markWcWritebackDone guard fix.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "No DB-level CHECK guaranteeing stock_qty >= 0 (relies entirely on application clamps)",
+      "detail": "products.stock_qty has no non-negative CHECK constraint (schema/products.ts:30). Local negative stock is prevented only in application code: the POS decrement is guarded by WHERE stock_qty >= qty (sales.ts:120) and adjustStock clamps via Math.max(0, next) (stock-adjustments.ts:56). These cover the paths in this story, so there is no live negative-stock bug here. But any future writer that issues a raw decrement without the guard could drive it negative, and stockStatusFor already defensively treats <=0 as outofstock -- a defense that only matters if the invariant can be broken. This is hardening, pre-existing to the schema, and out of this story's scope.",
+      "location": "packages/db/src/schema/products.ts:30",
+      "fix": "Defer. Optionally add a CHECK (stock_qty >= 0) in an additive migration as belt-and-suspenders for the source-of-truth invariant; not required by this story.",
+      "ac_ref": "AC3"
+    }
+  ]
+}

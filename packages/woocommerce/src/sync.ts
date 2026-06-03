@@ -229,12 +229,24 @@ export async function claimDueWcWritebacks(
 /** Mark a writeback applied (AC2). */
 export async function markWcWritebackDone(
   db: Executor,
-  input: { id: string; now?: Date },
+  input: { id: string; expectedNextAttemptAt: Date; now?: Date },
 ): Promise<void> {
+  // Only mark done if the row is STILL the exact one we claimed (same pending
+  // status AND unchanged next_attempt_at). A concurrent enqueue (stock push or
+  // re-enqueue) re-arms the row with a NEWER request and a FUTURE next_attempt_at,
+  // so this guard fails for the re-armed row and leaves the newer value pending to
+  // be drained — preventing a lost update (e.g. a stale stock value marked done
+  // while a newer one is dropped → overselling online).
   await db
     .update(wcOutbox)
     .set({ status: "done", doneAt: input.now ?? new Date(), lastError: null })
-    .where(eq(wcOutbox.id, input.id));
+    .where(
+      and(
+        eq(wcOutbox.id, input.id),
+        eq(wcOutbox.status, "pending"),
+        eq(wcOutbox.nextAttemptAt, input.expectedNextAttemptAt),
+      ),
+    );
 }
 
 export interface RecordFailureInput {

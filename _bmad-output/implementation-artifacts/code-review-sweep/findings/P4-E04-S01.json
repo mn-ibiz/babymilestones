@@ -1,0 +1,29 @@
+{
+  "id": "P4-E04-S01",
+  "verdict": "issues",
+  "diff_summary": "Pinned commit fixes the Woo orders pull pagination: WC_ORDERS_PER_PAGE=100 is now sent as an explicit per_page on every listOrders request and the pull-loop terminator compares orders.length against that SAME constant (apps/jobs/src/jobs/wc-sync-pull.ts, packages/woocommerce/src/client.ts). Working tree also contains the full S01 surface: wc_orders mirror + local_status (migration 0092/0093), idempotent upsertWcOrder, mirror-only listOnlineOrders read, toOnlineOrderCard view-model, POS-gated GET /pos/online-orders, and the OnlineOrders POS tab.",
+  "ac_coverage": "AC1-AC6 all implemented & tested. AC1 PosTabs nav + /online-orders route; AC2 New-first sort + toggle-able Web-Audio chime; AC3 items/qty, name, phone-last-4, delivery, payment (with API negative tests); AC4 filter chips; AC5 mirror-only read (no Woo client in listOnlineOrders by construction); AC6 woo id + last-synced on each card. Pinned-commit focus areas (authz, idempotency, pagination, money) all verified against the working tree.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Pull can still silently drop orders when a single run exceeds MAX_PAGES, because listOrders pins no orderby",
+      "detail": "The per_page terminator bug is correctly fixed. A residual silent-drop path remains: the pull loop caps at MAX_PAGES=50 (= 5000 orders/run at WC_ORDERS_PER_PAGE=100) and listOrders sends no `orderby`/`order` param, so Woo returns its default `orderby=date` (date_created) DESC ordering, NOT date_modified ascending. If a run is truncated at MAX_PAGES, advanceCheckpoint sets last_sync_at to the MAX date_modified seen across those 5000 rows; the next run asks modified_after=that-max and skips any not-yet-pulled order whose date_modified is older than that max while still recording 'success'. Trigger: >5000 orders modified since the last checkpoint in one 2-min window. Pre-existing and owned by S06 (client `orderby`) + S07 (pull-loop MAX_PAGES/checkpoint), outside the pinned commit's per_page scope. Evidence: client.ts listOrders query (lines 236-243) has no orderby; wc-sync-pull.ts MAX_PAGES=50 (line 10) + checkpoint advance to `newest` (lines 78-96).",
+      "location": "packages/woocommerce/src/client.ts:236; apps/jobs/src/jobs/wc-sync-pull.ts:10",
+      "fix": "Defer to S06/S07. Options: pin `orderby=modified&order=asc` on listOrders so a MAX_PAGES truncation has a clean date_modified frontier, OR drain to a true empty page (raise/remove MAX_PAGES with a separate runtime guard), OR emit a warn/non-success signal when a run hits MAX_PAGES so truncation is never silent.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Money stored/surfaced as raw Woo decimal string, not integer cents (spec Technical Note says total_cents)",
+      "detail": "Both the planning spec Technical Note and the impl story Dev Notes describe the mirror field as `total_cents` (integer cents). The implementation instead stores wc_orders.total as `text` (raw Woo decimal, e.g. \"12.99\") and the OnlineOrderCard.total is `string | null` (\"string as Woo reports it\") rendered display-only as `{order.total ?? \"—\"}`. This contradicts the project's money-as-integer-cents convention. It is NOT a money-correctness blocker: AC3 does not require a total at all, the value is never used in any arithmetic (grep confirms the only use is the OnlineOrders.tsx display string), and the locked decision excludes wallet/loyalty for Woo orders, so there is no rounding or summation path. The dev's Completion Notes explicitly chose to extract display fields from `payload` and NOT widen the table. Evidence: schema/wc-sync.ts:56 `total: text(\"total\")`; woocommerce-orders.ts:101 `total: string | null`; OnlineOrders.tsx:173.",
+      "location": "packages/db/src/schema/wc-sync.ts:56; packages/contracts/src/woocommerce-orders.ts:101",
+      "fix": "Decision-needed: confirm whether the integer-cents convention is required for this display-only mirror field. If yes, parse Woo `total` (+ currency minor-unit awareness) into total_cents at upsert time and type the card field as a number; if the current string-passthrough is acceptable for a non-arithmetic display field, amend the spec/Technical Note so code and spec agree. No fix applied (read-only review).",
+      "ac_ref": "AC3"
+    }
+  ]
+}

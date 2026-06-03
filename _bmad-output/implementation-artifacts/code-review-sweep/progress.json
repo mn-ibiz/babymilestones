@@ -75,7 +75,7 @@
     "26": "done",
     "27": "done",
     "28": "done",
-    "29": "todo",
+    "29": "done",
     "30": "todo",
     "31": "todo",
     "32": "todo",
@@ -2337,7 +2337,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-2-order-status-transitions-sync-back-to-woocommerce",
@@ -2355,7 +2355,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-3-print-packing-slip",
@@ -2373,7 +2373,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-4-daily-dispatch-report",
@@ -2391,7 +2391,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-5-stock-push-pos-catalogue-stock-changes-propagate-to",
@@ -2409,7 +2409,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-6-woocommerce-rest-client-credentials-config",
@@ -2427,7 +2427,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-7-sync-scheduler-dead-letter-for-woocommerce-calls",
@@ -2445,7 +2445,7 @@
         "5a8777d0af27d198592e0fb3400ac81183959b04"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "30-1-event-creation",
@@ -3244,8 +3244,16 @@
       "decisions_needed": 5,
       "dismissed": 8,
       "commit": ""
+    },
+    "29": {
+      "stories_reviewed": 7,
+      "patches": 3,
+      "deferred": 6,
+      "decisions_needed": 6,
+      "dismissed": 18,
+      "commit": ""
     }
   },
-  "epics_done": 27,
+  "epics_done": 28,
   "epics_total": 35
 }
