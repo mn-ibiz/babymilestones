@@ -23,7 +23,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 14 | 2 | ✅ | 2 (phantom @bm/config dep ×3, formatChildAge NaN) | 3 | 1 | 8 |
 | 15 | 1 | ✅ | 3 (last-backup BLOCKER, fail-alert, prunedAt) | 1 | 0 | 3 |
 | 16 | 7 | ✅ | 2 (reception-book BLOCKER IDOR, cancel double-fee lock) | 8 | 6 | 28 |
-| 17 | 6 | ⬜ | | | | |
+| 17 | 6 | ✅ | 2 (plan-price BLOCKER, reception sub/cancel IDOR ×2) | 7 | 12 | 15 |
 | 18 | 5 | ⬜ | | | | |
 | 19 | 5 | ⬜ | | | | |
 | 20 | 4 | ⬜ | | | | |

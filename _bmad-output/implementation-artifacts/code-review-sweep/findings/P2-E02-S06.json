@@ -1,0 +1,39 @@
+{
+  "id": "P2-E02-S06",
+  "verdict": "issues",
+  "diff_summary": "Adds cancel-at-period-end: db migration 0051 + schema column (additive), @bm/catalog request/reverseSubscriptionCancellation (state-guarded, row-locked), parent API POST /parents/me/subscriptions/:id/{cancel,uncancel} (owned-by-parent gated), and renewal cron reaping of flagged subs at period end (active) or immediately (dunning/paused) with no charge. 3 audit actions registered.",
+  "ac_coverage": "AC1 (cancel from parent dashboard, effective at period end) implemented + tested (catalog + api + cron tests). AC2 (reversible until period end) implemented + tested. AC3 (no refunds on paid periods) satisfied by design (cancel only sets a flag; cron terminates without charging or refunding) and asserted in cron test (no subscription.renewed, only top-up ledger entry). All ACs have a passing test.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Reception subscription pause/resume and booking-cancel routes are IDOR-open to parents (missing isStaffRole gate)",
+      "detail": "Per the brief's note, the reception subscription pause/resume routes share the create-payment guard. Confirmed real: POST /reception/subscriptions/:id/{pause,resume} (booking.ts:347-365) and POST /reception/bookings/:bookingId/cancel (booking.ts:299-343) authorize with ONLY `guard(authResult.user)` = requirePermission('create','payment'). The parent role holds {create, payment} (rbac.ts:76) and parents share the same session store/principal as staff. Unlike the sibling routes (requireBookingStaff at booking.ts:70-92 and the POST /reception/bookings handler at booking.ts:183-185), these three handlers OMIT the `if (!isStaffRole(...)) return 403` check. There is also no subscription/booking ownership check. Net effect: any authenticated parent can pause/resume ANY subscription and cancel ANY booking platform-wide by guessing/enumerating ids — a cross-tenant authz hole (can disrupt other families' subscriptions; cancelling a booking can trigger wallet fee/void side effects via cancelBooking). NOT introduced by this story's commit (839caaff0a) — pause/resume came from P2-E02-S04 (ecb8b0a) and booking-cancel from P2-E01-S06 (931d089) — so it is out of THIS story's scope, but it is the exact risk the brief asked to verify and it is live.",
+      "location": "apps/api/src/routes/reception/booking.ts:347, apps/api/src/routes/reception/booking.ts:299",
+      "fix": "Pre-existing — defer to a security follow-up. Recommended: add `if (!isStaffRole(authResult.user.role)) return reply.code(403).send({ error: 'Forbidden: missing permission' });` after validateSession in both the reception /subscriptions/:id/:verb loop handler and the /reception/bookings/:bookingId/cancel handler, matching requireBookingStaff (booking.ts:82). Note the parent /cancel + /uncancel routes added by THIS story (parents/subscriptions.ts) are correctly gated via requireParent + ownedSubscription and are NOT affected.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Renewal cron writes a spurious subscription.cancelled audit when a concurrent un-cancel wins the race",
+      "detail": "In the cron the cancel is applied with a conditional UPDATE ... WHERE id = sub.id AND cancel_at_period_end = true (subscription-renew.ts:146-149) so a concurrent reverseSubscriptionCancellation (which clears the flag) correctly leaves the row active. However the audit({action:'subscription.cancelled'}) call at lines 150-155 runs UNCONDITIONALLY — the UPDATE's affected-row count is never inspected (no .returning()). Trigger: parent calls /uncancel after the cron has read `due` but before its conditional UPDATE in the same tick. Result: the subscription stays active (correct) but the audit_outbox gains a subscription.cancelled event for a subscription that was NOT cancelled — a false audit record. The codebase treats money/audit correctness as paramount, so a lie in the audit trail matters.",
+      "location": "apps/jobs/src/jobs/subscription-renew.ts:146",
+      "fix": "Capture the conditional update result and only audit when a row actually changed, e.g.: `const reaped = await db.update(subscriptions).set({status:'cancelled', dunningSince:null, updatedAt:at}).where(and(eq(subscriptions.id, sub.id), eq(subscriptions.cancelAtPeriodEnd, true))).returning({ id: subscriptions.id });` then `if (reaped.length) { await audit(db, {...}); }`. (Postgres/drizzle .returning on an UPDATE returns one row per matched row.)",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Re-cancelling an already-flagged subscription is non-idempotent (emits a duplicate cancel_requested audit)",
+      "detail": "requestSubscriptionCancellation only rejects when status === 'cancelled' (subscriptions.ts:318). Calling /cancel a second time on a still-active subscription that already has cancelAtPeriodEnd = true re-sets the flag (no-op) but writes ANOTHER subscription.cancel_requested audit row each time. A double-tap from the parent UI (or a retry) thus pollutes the audit log with redundant cancel-requested events and bumps updatedAt with no state change. Harmless for money/entitlement (AC3 unaffected) but not idempotent.",
+      "location": "packages/catalog/src/subscriptions.ts:318",
+      "fix": "Make the request idempotent: after the state guard, `if (sub.cancelAtPeriodEnd) return sub;` (early-return the already-flagged row without a second UPDATE/audit). Same treatment is appropriate for reverseSubscriptionCancellation when the flag is already false.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

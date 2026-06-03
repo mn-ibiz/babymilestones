@@ -63,7 +63,7 @@
     "14": "done",
     "15": "done",
     "16": "done",
-    "17": "todo",
+    "17": "done",
     "18": "todo",
     "19": "todo",
     "20": "todo",
@@ -1444,7 +1444,7 @@
         "859d2678ede9365446d3d33778fdac76bb717504"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "17-2-parent-subscribes-to-a-plan",
@@ -1461,7 +1461,7 @@
         "99caa7fc1f88bbe360c73f054f7015ce53c4d828"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "17-3-bookings-deduct-subscription-entitlement-first",
@@ -1478,7 +1478,7 @@
         "838b1e830601db0404f8a9c222c859c23853f0d1"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "17-4-pause-freeze-and-resume-a-subscription",
@@ -1495,7 +1495,7 @@
         "ecb8b0af118900c3f86da850bb57731fb10f0031"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "17-5-renewal-dunning-state-machine",
@@ -1512,7 +1512,7 @@
         "4263445b074ab3ed661c01eb6c56905bb1bb3af6"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "17-6-cancel-subscription",
@@ -1529,7 +1529,7 @@
         "839caaff0a0b1710c5ccd3eaf27df6a15487955a"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "18-1-authorised-pickup-list-per-child",
@@ -3148,8 +3148,16 @@
       "decisions_needed": 6,
       "dismissed": 28,
       "commit": ""
+    },
+    "17": {
+      "stories_reviewed": 6,
+      "patches": 2,
+      "deferred": 7,
+      "decisions_needed": 12,
+      "dismissed": 15,
+      "commit": ""
     }
   },
-  "epics_done": 15,
+  "epics_done": 16,
   "epics_total": 35
 }

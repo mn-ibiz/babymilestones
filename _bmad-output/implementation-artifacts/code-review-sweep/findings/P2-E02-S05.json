@@ -1,0 +1,49 @@
+{
+  "id": "P2-E02-S05",
+  "verdict": "issues",
+  "diff_summary": "New daily cron apps/jobs/src/jobs/subscription-renew.ts drives a renewal/dunning state machine (charge next period from wallet on period-end -> roll period + reset entitlement, or dunning + SMS + 3-day grace -> paused); migration 0050 adds 'dunning' status + dunning_since; new audit actions subscription.renewed/dunning; new subscription.dunning SMS template; registry wiring in apps/jobs/src/index.ts.",
+  "ac_coverage": "AC1 (charge on period-end) implemented+tested; AC2 (roll+entitlement reset) implemented+tested; AC3 (dunning+SMS+daily retry) implemented+tested; AC4 (3-day grace -> paused, resumable) implemented+tested; AC5 (auto-credit to negative) implemented+tested. All five ACs have at least one passing test. Gaps are in failure-mode robustness, not happy-path AC coverage.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Non-atomic invoice-create-then-debit can orphan a 'pending' renewal invoice that a later wallet top-up settles -> double charge",
+      "detail": "attemptRenewal() is NOT transactional: it inserts a 'pending' invoice (subscription-renew.ts:56-59) in its own autocommitted statement, then calls debit() in a SEPARATE transaction (line 60). The per-period idempotency key (renewal:<sub>:<periodEnd>) only fences the wallet_ledger DEBIT row (wallet_ledger.idempotency_key is UNIQUE) -- it does NOT fence the invoice. If the process crashes (or debit() throws -- e.g. concurrent-run DoubleCheckInError from the un-onConflict ledger insert in debit.ts:205-216, or a transient error/lost wallet inside the debit tx) AFTER the invoice insert committed but BEFORE/while the debit runs, the invoice is left 'pending'. FIFO top-up (packages/wallet/src/settle.ts:121-125) selects ALL status='pending' invoices for the parent with no source exclusion, so the parent's next wallet top-up will settle this orphaned renewal invoice -- charging them for the period -- WHILE the next cron run posts a fresh debit for the same period on a new invoice (the original run posted no ledger row, so there is no replay to suppress it). Result: the period is charged twice. The dev's 'replay voids redundant invoice' fix (lines 94-100) only covers the case where the debit COMMITTED but the roll didn't; it does nothing for the case where the invoice committed but the debit never posted. Note the sibling subscribe flow (apps/api/src/routes/parents/subscriptions.ts:150-203) has the same shape but is protected differently: its idempotency anchor is the (child_id,plan_id) active-unique index which 409s a retry BEFORE the invoice is ever created, closing the window. The renewal job has no such pre-invoice fence.",
+      "location": "apps/jobs/src/jobs/subscription-renew.ts:56-68",
+      "fix": "Two acceptable directions (needs a human call on approach): (a) Wrap the whole attemptRenewal in a single db.transaction so the invoice insert, debit, void/roll and audit commit or roll back together -- a crash then leaves NO committed pending invoice. This requires threading the tx handle into debit() (debit already runs its own tx; it would need a tx-accepting overload). (b) Make the renewal invoice un-FIFO-settleable until the debit lands: either create the invoice with a non-'pending' placeholder status and flip it inside the debit, or have FIFO settlement exclude invoices whose source is subscription_renewal. Whichever path, add a test that (1) inserts the pending renewal invoice, (2) does NOT post the debit (simulated crash), (3) applies a top-up, and asserts the parent is not double-charged on the following run.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Period-roll subscription update and its subscription.renewed audit are not in the same transaction (audit-trail gap)",
+      "detail": "On the success path the subscription is updated with db.update(...) (subscription-renew.ts:103-113) and then audited with audit(db, ...) (line 114) as two SEPARATE top-level statements. The audit helper's own contract (packages/db/src/audit.ts:22-30) explicitly warns: when auditing a business write, pass the SAME tx to both so they commit or roll back together; using bare db for both makes them non-atomic. A crash between the update and the audit rolls the period forward (and resets entitlement) with NO subscription.renewed audit row -- violating DoD #4 (audited actions write to audit_outbox) for that renewal, and leaving a money-affecting transition with no audit trail. The same non-atomic update+audit shape repeats on the dunning branch (lines 73-82) and the grace-pause branch (lines 167-176).",
+      "location": "apps/jobs/src/jobs/subscription-renew.ts:103-119",
+      "fix": "Wrap each state transition's subscription update + audit (and, on the dunning path, the invoice void) in a single db.transaction so the audit row commits atomically with the business write, e.g. await db.transaction(async (tx) => { await tx.update(subscriptions)...; await audit(tx, ...); }). This is the pattern the audit helper doc prescribes and matches the rest of the subscriptions code (pauseSubscription/resumeSubscription pass tx to audit).",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "A due subscription with no resolvable plan price stalls silently forever (never renewed, never dunned)",
+      "detail": "If resolvePlanPriceAt returns null (no effective price covers the run date -- e.g. a price-history gap or a plan whose price was never set / was closed without a successor), attemptRenewal returns early at subscription-renew.ts:50 leaving status='active' and currentPeriodEnd unchanged in the past. The subscription is therefore 'due' on every subsequent run and silently re-evaluated forever: it is never charged, never moved to dunning, and emits no audit/alert. Meanwhile the booking flow still treats it as active (packages/catalog/src/schedules.ts:590 matches status='active'), so the parent could keep consuming the (stale) entitlement of an unpaid, un-renewed period until entitlement hits 0. This is a revenue-leak / silent-failure mode with no operator signal.",
+      "location": "apps/jobs/src/jobs/subscription-renew.ts:49-50",
+      "fix": "Decide the intended behaviour for a missing price: at minimum emit an audit/alert (e.g. a subscription.renew_failed or job-level warning) instead of a silent early-return so ops can see stalled renewals; optionally move the subscription to dunning so the booking flow stops honouring entitlement. Add a test for the no-price case asserting the chosen signal/transition.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Renewal cron loads ALL active/dunning subscriptions into memory with no pagination and no per-row lock (FOR UPDATE)",
+      "detail": "run() selects every active/dunning subscription in one unbounded query (subscription-renew.ts:129-137) and iterates in-process. At scale this is an unbounded result set. Separately, no SELECT ... FOR UPDATE is taken on the subscription row, so the cron relies on a single-instance scheduler assumption (the dev's own notes acknowledge 'no FOR UPDATE (singleton-cron assumption)'). Concurrent/overlapping runs are mostly fenced against double-charge by the wallet_ledger unique idempotency key, but the orphaned-invoice gap (see the high finding) is widened by overlap because the losing instance's just-inserted pending invoice is left behind when debit() throws DoubleCheckInError.",
+      "location": "apps/jobs/src/jobs/subscription-renew.ts:129-137",
+      "fix": "Deferred: scalability/concurrency hardening (batching/pagination and either a FOR UPDATE SKIP LOCKED per row or an explicit job-level singleton lock) is out of this story's AC scope and consistent with the singleton-cron assumption used by sibling jobs. Note for the deploy/scheduler story so the cron is guaranteed single-instance, and revisit if subscription volume grows.",
+      "ac_ref": ""
+    }
+  ]
+}

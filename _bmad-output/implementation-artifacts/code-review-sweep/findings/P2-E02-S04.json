@@ -1,0 +1,29 @@
+{
+  "id": "P2-E02-S04",
+  "verdict": "issues",
+  "diff_summary": "migration 0049 (subscriptions.paused_at + pause_history; widen unique fence to non-cancelled); @bm/catalog pauseSubscription/resumeSubscription (FOR UPDATE, state guards, ms-based period shift, in-txn audit); parent pause/resume/cancel routes + reception pause/resume route; audit-actions catalogue adds subscription.paused/resumed.",
+  "ac_coverage": "AC1 partial (parent path correct & tested; admin/Reception path: reception works but the 'admin' role is gated out by 'create payment' it does not hold — see finding 2). AC2 satisfied (booking flow matches status='active' only; renewal job excludes plain paused subs from charging). AC3 implemented & tested (ms-based period shift, entitlement carryover, pauseHistory). AC4 implemented (in-txn audit on pause & resume).",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Parent IDOR/privesc: any parent can pause/resume ANY subscription via the reception route",
+      "detail": "POST /reception/subscriptions/:id/{pause,resume} (apps/api/src/routes/reception/booking.ts:346-366) gates only on `guard = requirePermission('create','payment')`. The RBAC matrix grants `parent` the `create payment` permission (packages/auth/src/rbac.ts:73-77), and parents share the SAME session store as staff (deps.sessions is passed to both reception and parent routes in apps/api/src/app.ts). The other reception routes in this very file deliberately add an `isStaffRole(user.role)` check BEFORE the permission guard for exactly this reason (booking.ts:82-85, 183-185, with the comment 'parents also hold create payment ... so the permission guard alone would let a parent ...'), but the new pause/resume loop omits it. Consequence: a logged-in parent with a valid CSRF token can POST to /reception/subscriptions/<any-sub-id>/pause or /resume and succeed against ANY family's subscription — there is no ownership check on this surface (unlike the parent route which uses ownedSubscription()). This lets a parent grief other families: pause their subscriptions (freezing entitlement / blocking plan bookings) or resume+shift their billing period dates. The cross-parent block is tested only on the parent route (subscriptions.test.ts '404s pausing another parent's subscription') and the parent-IDOR-on-reception guard is tested only for the GET read endpoints (booking.test.ts:229) — the pause/resume routes have NO such test.",
+      "location": "apps/api/src/routes/reception/booking.ts:346-366",
+      "fix": "Add the same staff-role gate the sibling routes use, immediately after validateSession and before the permission guard: `if (!isStaffRole(authResult.user.role)) return reply.code(403).send({ error: 'Forbidden: missing permission' });` (isStaffRole is already imported in this file). Add a regression test: a parent session (which holds 'create payment') must get 403 on POST /reception/subscriptions/:id/pause.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC1 'admin' pause/resume path is unreachable for the admin role",
+      "detail": "AC1 states pause/resume may be done 'by admin/Reception'. The only staff pause/resume route (apps/api/src/routes/reception/booking.ts:347) is gated on `requirePermission('create','payment')`. Per the permission matrix (packages/auth/src/rbac.ts:127-144), the `admin` role does NOT hold `create payment` (it holds manage user/service/receipt/refund/wallet, read audit/report, manage config/loyalty/expense). `can('admin','create','payment')` is therefore false, so a real admin session gets 403 on this route. Only `reception`, `cashier`, and `super_admin` (wildcard) can use it. So the AC1 'admin' actor cannot pause/resume unless they happen to also be super_admin. (Note: simply adding the isStaffRole gate from finding 1 does NOT fix this — admin IS a staff role but still lacks the permission.)",
+      "location": "apps/api/src/routes/reception/booking.ts:347-354",
+      "fix": "Product/RBAC decision needed on the correct gate for the staff pause/resume surface. Options: (a) if 'create payment' is the intended capability and admins were never meant to operate it directly, update the spec/AC1 to drop 'admin'; (b) if admins should pause/resume, gate the route on a permission admins hold (e.g. a 'manage subscription' permission added to the matrix, or an explicit allow-list of reception+admin+super_admin roles) instead of 'create payment'. Either way the gate must still exclude `parent` (see finding 1).",
+      "ac_ref": "AC1"
+    }
+  ]
+}

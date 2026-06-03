@@ -1,0 +1,39 @@
+{
+  "id": "P2-E02-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds subscription_plans + subscription_plan_prices (migration 0046, drizzle schema), @bm/catalog plan CRUD + effective-dated setPlanPrice, @bm/contracts zod schemas, and apps/api admin routes (manage-service gated, audited). Mirrors the P1-E07 service catalogue.",
+  "ac_coverage": "AC1 implemented & tested (table cols name/service_id/entitlement_count/period/is_active; price held in effective-dated subscription_plan_prices). AC2 implemented & tested (create/update/get/list + audit_outbox, manage-service gated; soft-retire via isActive, no hard delete by design). AC3 implemented & tested (effective-dated price history, backdate rejected) BUT missing the concurrency backstop the service-price equivalent has.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "setPlanPrice has no concurrency guard — two concurrent calls can create two open price rows (corrupts effective-dated history)",
+      "detail": "This is the exact race that was found and fixed for service prices, but it was NOT carried over to plan prices despite the commit claiming a 'faithful mirror'. setServicePrice (packages/catalog/src/services.ts) serialises by locking the parent services row with .for(\"update\") inside the transaction, and migration 0107_service_prices_one_open.sql adds a partial unique index `service_prices_one_open_per_service ON service_prices(service_id) WHERE effective_to IS NULL` as a durable backstop. setPlanPrice (packages/catalog/src/subscriptions.ts:135-166) does NEITHER: it reads the open row, then closes+inserts, with no row lock; and migration 0046 creates only a plain (plan_id, effective_from) index — there is no partial unique index on subscription_plan_prices WHERE effective_to IS NULL (verified: no such index exists in any migration in the repo). Under READ COMMITTED, two concurrent setPlanPrice calls for the same plan each see no/stale open row, both pass the order check, and both insert a row with effective_to IS NULL. Result: the plan has two simultaneous 'current' prices, so the price applied to a subscription/booking becomes non-deterministic — a money-correctness and effective-dating defect. The current working tree still has the bug (the .for(\"update\") calls at subscriptions.ts:232+ belong to later-story functions pauseSubscription/resumeSubscription, not setPlanPrice).",
+      "location": "packages/catalog/src/subscriptions.ts:135-166, packages/db/migrations/0046_subscription_plans.sql:30-39",
+      "fix": "Two parts, mirroring service prices exactly. (1) Migration: add a new additive migration (e.g. subscription_plan_prices_one_open) `CREATE UNIQUE INDEX IF NOT EXISTS subscription_plan_prices_one_open_per_plan ON subscription_plan_prices (plan_id) WHERE effective_to IS NULL;`. (2) setPlanPrice: at the top of the transaction, lock the parent plan row before reading the open price — `const [plan] = await tx.select({ id: subscriptionPlans.id }).from(subscriptionPlans).where(eq(subscriptionPlans.id, input.planId)).for(\"update\"); if (!plan) throw new Error(...);` — so the close+insert is serialised even for the first price (when there is no open row to lock).",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "PATCH /admin/plans/:id non-null-asserts the update result (latent TOCTOU)",
+      "detail": "The route does getPlan() to 404, then updatePlan() which can return null, then serializePlan(row!) (apps/api/src/routes/admin/plans.ts in the PATCH handler). Today plans are never hard-deleted so the row cannot vanish between the check and the update, making this benign — but it is a non-null assertion on a value the function explicitly types as possibly-null, so it would throw a 500 (TypeError) rather than a clean 404 if a delete path is ever added. The catalog updatePlan correctly returns null; the route discards that signal. Minor / defensive only.",
+      "location": "apps/api/src/routes/admin/plans.ts (PATCH /admin/plans/:id handler)",
+      "fix": "Handle the null return instead of asserting: `const row = await updatePlan(db, id, parsed.data); if (!row) return reply.code(404).send({ error: \"Plan not found\" });` then send serializePlan(row).",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "No DELETE endpoint for plans (soft-retire only) — consistent with project rules, flagged for completeness",
+      "detail": "AC2 says 'CRUD with audit' but there is no hard-delete route; retirement is via PATCH isActive=false. This matches the service catalogue precedent and the project's append-only / no-hard-delete invariant (a plan id may be referenced by future subscriptions, so a hard delete would orphan FKs). Calling it out so the omission is a recorded decision, not an oversight; no action needed.",
+      "location": "apps/api/src/routes/admin/plans.ts",
+      "fix": "No change. Soft-retire via isActive is the correct design and mirrors services; the 'D' in CRUD is intentionally a soft delete.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

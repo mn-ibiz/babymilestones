@@ -71,6 +71,12 @@ export const subscriptionPlanPrices = pgTable(
   },
   (t) => ({
     planIdIdx: index("subscription_plan_prices_plan_id_idx").on(t.planId, t.effectiveFrom),
+    // At most one OPEN (current) price row per plan — prevents concurrent
+    // setPlanPrice calls from creating two effective_to IS NULL rows (mirrors
+    // service_prices_one_open_per_service).
+    oneOpenPerPlan: uniqueIndex("subscription_plan_prices_one_open_per_plan")
+      .on(t.planId)
+      .where(sql`${t.effectiveTo} IS NULL`),
   }),
 );
 

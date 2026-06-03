@@ -1,0 +1,49 @@
+{
+  "id": "P2-E02-S03",
+  "verdict": "issues",
+  "diff_summary": "packages/catalog/src/schedules.ts (bookSlot: entitlement-first deduct under FOR UPDATE + half-open period gate, settled 0-invoice, paid_via/subscription_id; cancelBooking: refund +1 unit) + bookings schema/migration 0048 (paid_via, subscription_id) + tests. Subscription-matched bookings consume one entitlement unit (no wallet charge); else wallet pending invoice.",
+  "ac_coverage": "AC1 (entitlement decrement + no wallet charge, period+service+child match) implemented & tested; AC2 (wallet fallback on exhaustion) implemented & tested; AC3 (paid_via recorded) implemented & tested. Deduct path is concurrency-safe (subscription rows FOR UPDATE under READ COMMITTED + DB CHECK entitlement_remaining>=0 backstop). Gaps are on the surrounding lifecycle (cancel refund period/status correctness, revenue/commission attribution, reschedule), not the AC happy paths.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Cancel refunds an entitlement unit with no period check — over-grants after renewal",
+      "detail": "cancelBooking refunds +1 to entitlement_remaining whenever booking.paidVia==='subscription' && booking.subscriptionId, with no check that the booking's slot is still within the subscription's CURRENT period. The renewal cron (apps/jobs/src/jobs/subscription-renew.ts:108-110) rolls currentPeriodStart/End forward and RESETS entitlement_remaining = plan.entitlementCount. So: parent books a subscription slot in period 1 (entitlement -1), renewal resets period 2's entitlement to the full plan cap, then parent cancels the period-1 booking -> entitlement_remaining + 1 pushes period 2 ABOVE the plan cap. The parent gains a free covered booking each period this is exploited. The same +1 is also wrong because the consumed unit belonged to a period that is now closed. Money/entitlement leak.",
+      "location": "packages/catalog/src/schedules.ts:826-833",
+      "fix": "Only refund when the cancelled booking's slot still falls in the subscription's current half-open period AND the refund would not exceed the plan cap. Read the slot (slotStartUtcMs) + plan.entitlementCount and guard: refund only if slotInstantMs in [currentPeriodStart, currentPeriodEnd) and entitlement_remaining < plan.entitlementCount (e.g. UPDATE ... SET entitlement_remaining = LEAST(entitlement_remaining + 1, plan.entitlementCount) WHERE id=? AND status='active' AND current_period_end > now-equivalent). Needs a product call on the exact cross-period-cancel policy (refund vs forfeit), hence decision-needed.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Cancel refund is silently dropped when subscription is paused/dunning — parent loses a paid unit",
+      "detail": "The refund UPDATE filters WHERE subscriptions.id=? AND status='active'. paused (P2-E02-S04) and dunning (P2-E02-S05) are reachable live states. If a parent books with an active subscription (unit consumed), the subscription is later paused or enters dunning, then the booking is cancelled, the refund matches 0 rows and is silently discarded while the booking IS cancelled and the seat freed. The parent permanently loses an entitlement unit they paid for, with no error. The cancel function's own comment claims the unit 'returns to the (still-active) subscription' but does not handle the non-active live states.",
+      "location": "packages/catalog/src/schedules.ts:828-832",
+      "fix": "Decide product policy for refunding into a paused/dunning subscription, then either (a) broaden the WHERE to status IN ('active','paused','dunning') so a live (non-cancelled) subscription still receives its unit back, or (b) explicitly document forfeiture. Currently the behaviour is neither chosen nor surfaced — it just silently no-ops.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Subscription bookings record zero revenue and zero staff commission (staffRateSnapshot=0)",
+      "detail": "For a subscription-matched booking the code sets amountCents=0 and writes staffRateSnapshot: amountCents (0). staffRateSnapshot is the REVENUE source for revenue-by-period-db.ts:69, float-vs-revenue-db.ts:123, operations-dashboard-db.ts:57, staff-leaderboard-db.ts:83, and the COMMISSION base in packages/wallet/src/commission-hook.ts:61 (commissionCents(booking.staffRateSnapshot, rate)). The commission-hook docstring explicitly states it fires on 'subscription consumption' — so a staff member who delivers a subscription-covered session accrues ZERO commission, and all revenue dashboards count the session as 0. Revenue-at-booking being 0 may be intended (the period was pre-paid at subscribe time), but zeroing staff commission for work actually performed is very likely unintended. This is a behaviour change introduced by this story (previously every booking carried a non-zero rate snapshot).",
+      "location": "packages/catalog/src/schedules.ts:642",
+      "fix": "Product/finance decision needed: define the per-session value recognized for a subscription booking (e.g. the plan price / entitlementCount, or the service's effective price) and snapshot THAT into staffRateSnapshot for revenue + commission, while keeping the invoice amountCents=0 (entitlement covered). Do not silently leave staffRateSnapshot=0 unless zero commission for subscription work is the explicit policy.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "rescheduleBooking does not re-validate the subscription period — cross-period double-dip",
+      "detail": "rescheduleBooking only repoints bookings.slot_id; it never touches paid_via, subscription_id, or entitlement and never re-validates the new slot against the subscription's current period. A booking consumed in period 1 (paid_via='subscription') can be rescheduled to a slot in period 2 (or to a date the subscription no longer covers): the booking remains flagged subscription-covered but period 2's entitlement is never decremented, giving the parent a free covered booking in period 2. The story dev notes acknowledge this ('reschedule across periods rides the already-consumed unit (accepted for v1)'). Confirmed real and money-relevant now that subscription bookings exist; pre-existing reschedule path (P2-E01-S05), product-accepted for v1, so deferred rather than patched.",
+      "location": "packages/catalog/src/schedules.ts:718-779",
+      "fix": "Deferred (v1-accepted). When addressed: on reschedule of a paid_via='subscription' booking, re-run the entitlement match against the NEW slot's period — if the new slot is outside the consumed period, either re-deduct from the now-current period (refunding the old) or reject the reschedule. Track as a follow-up story.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

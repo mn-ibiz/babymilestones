@@ -137,6 +137,18 @@ export async function setPlanPrice(
   input: { planId: string; amountCents: number; effectiveFrom: string },
 ) {
   return db.transaction(async (tx) => {
+    // Serialise all price changes for this plan (incl. the first) by locking the
+    // parent plan row, so two concurrent setPlanPrice calls cannot both create an
+    // open (effective_to IS NULL) row — mirrors setServicePrice. The partial unique
+    // index subscription_plan_prices_one_open_per_plan is the durable backstop.
+    const [plan] = await tx
+      .select({ id: subscriptionPlans.id })
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, input.planId))
+      .for("update");
+    if (!plan) {
+      throw new Error(`setPlanPrice: plan ${input.planId} not found`);
+    }
     const [open] = await tx
       .select()
       .from(subscriptionPlanPrices)

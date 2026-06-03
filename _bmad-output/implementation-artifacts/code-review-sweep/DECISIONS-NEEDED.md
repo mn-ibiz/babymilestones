@@ -33,6 +33,37 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 17 — Subscription Plans  (several HIGH money/finance decisions)
+
+31. **[HIGH · money · P2-E02-S05] Non-atomic renewal can double-charge.** Crash between the pending
+    invoice insert and the separate-tx `debit()` orphans an invoice that a later wallet top-up
+    FIFO-settles while the next cron posts a fresh debit. Wrap in one tx (tx-accepting debit) or make
+    renewal invoices un-FIFO-settleable. `apps/jobs/src/jobs/subscription-renew.ts:56-68`.
+
+32. **[HIGH · finance · P2-E02-S03] Subscription bookings record ZERO revenue & ZERO staff
+    commission** (`staffRateSnapshot=0`) — feeds 4 dashboards + commission-hook. Decide the per-session
+    value to recognise for subscription-covered sessions. `packages/catalog/src/schedules.ts:642`.
+
+33. **[HIGH · P2-E02-S03] Subscription entitlement-refund semantics on cancel.** (a) Over-refund:
+    cancelling an old-period booking after renewal pushes the new period above cap (free unit/period);
+    (b) Under-refund: refund UPDATE requires `status='active'`, so a paused/dunning cancel silently
+    drops the refund (parent loses a paid unit). Define correct cross-period + paused-state refund rules.
+    `packages/catalog/src/schedules.ts:826-832`.
+
+34. **[MED · P2-E02-S02] Subscription charge bypasses pre-pay for auto-credit parents** (negative
+    wallet) AND is recorded as a `checkin` settlement / `wallet.checkin_debit` (reporting miscounts it
+    as a check-in) AND a concurrent FIFO top-up of the pending invoice 500s. (3 related subscribe-flow items.)
+
+35. **[MED · P2-E02-S05] Renewal transitions' update+audit are non-atomic; a no-plan-price sub stalls
+    silently forever** (never charged/dunned, still honours entitlement — revenue leak). Wrap update+audit
+    in a tx; emit an alert on no-price.
+
+36. **[MED · P2-E02-S04] AC1 "admin" pause/resume unreachable** — route gates on `create payment`,
+    which `admin` lacks. Add a `manage subscription` perm or drop "admin" from the AC.
+
+37. **[MED/LOW · P2-E02-S06] Renewal cron writes a spurious `subscription.cancelled` audit on an
+    un-cancel race** (`.returning()`-gate it); re-`/cancel` is non-idempotent (duplicate audit).
+
 ## Epic 16 — Booking Engine
 
 26. **[HIGH · money · P2-E01-S05] Subscription-paid reschedule can cross the subscription period →

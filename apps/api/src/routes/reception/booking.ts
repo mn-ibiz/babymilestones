@@ -304,6 +304,12 @@ export function registerReceptionBooking(app: FastifyInstance, deps: ReceptionDe
         { sessions, resolveUser },
       );
       if (!authResult.ok) return reply.code(authResult.status).send({ error: authResult.error });
+      // Staff-only: parents hold `create payment` too, so gate on the staff role
+      // before acting on any subscription/booking by id (else a parent could
+      // pause/resume/cancel another family's records). Mirrors the sibling routes.
+      if (!isStaffRole(authResult.user.role)) {
+        return reply.code(403).send({ error: "Forbidden: missing permission" });
+      }
       const perm = guard(authResult.user);
       if (!perm.ok) return reply.code(perm.status).send({ error: perm.error });
 
@@ -350,6 +356,12 @@ export function registerReceptionBooking(app: FastifyInstance, deps: ReceptionDe
         { sessions, resolveUser },
       );
       if (!authResult.ok) return reply.code(authResult.status).send({ error: authResult.error });
+      // Staff-only: parents hold `create payment` too, so gate on the staff role
+      // before acting on any subscription/booking by id (else a parent could
+      // pause/resume/cancel another family's records). Mirrors the sibling routes.
+      if (!isStaffRole(authResult.user.role)) {
+        return reply.code(403).send({ error: "Forbidden: missing permission" });
+      }
       const perm = guard(authResult.user);
       if (!perm.ok) return reply.code(perm.status).send({ error: perm.error });
       const { id } = req.params as { id: string };

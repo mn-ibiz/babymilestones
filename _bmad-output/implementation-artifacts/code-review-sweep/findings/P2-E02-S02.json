@@ -1,0 +1,69 @@
+{
+  "id": "P2-E02-S02",
+  "verdict": "issues",
+  "diff_summary": "New POST /parents/me/subscriptions (+ GET .../plans) in apps/api creates a subscription-first idempotency anchor under a partial-unique active fence, then debits the wallet for the full period via @bm/wallet debit() (rollback+402 on insufficient funds); adds subscriptions table (migration 0047) + drizzle schema, catalog addPeriod() (month-end-clamped), subscription.created audit action, subscription.confirmed SMS template, and a platform Subscribe section.",
+  "ac_coverage": "AC1 (eligible-plans list + age gate) implemented & tested; AC2 (full period charged immediately) implemented & tested for the funded + outstanding paths but the settled_on_credit/auto-credit path bypasses pre-pay (untested); AC3 (subscriptions row with all fields) implemented & tested; AC4 PARTIAL — SMS-stub confirm implemented & tested, but loyalty-earn-on-settled-charge is NOT implemented (deferred to P2-E05; the loyalty earn ledger did not exist at this commit, but now exists in the working tree).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Auto-credit parents can subscribe with insufficient funds (negative wallet), bypassing the AC2 pre-pay requirement",
+      "detail": "debit() (packages/wallet/src/debit.ts:171-203) resolves to one of three outcomes. The subscribe route only rolls back on outcome === 'outstanding' (subscriptions.ts:195). When the wallet balance < amount AND wallet.autoCreditEnabled is true, debit() posts the debit anyway and returns 'settled_on_credit', driving the wallet balance negative. The route then proceeds to a 201 success. AC2 requires the 'full period charged from wallet immediately' / 'pre-pay for the period' — a subscription funded by going into wallet debt is not a pre-pay. autoCreditEnabled defaults to false (wallets.ts:15) so most parents are unaffected, but any parent with it enabled creates subscriptions on credit. There is no test for this path (grep for settled_on_credit/autoCredit in subscriptions.test.ts returns none).",
+      "location": "apps/api/src/routes/parents/subscriptions.ts:195",
+      "fix": "Decide intended policy: if subscriptions must be strictly pre-paid, treat result.outcome !== 'settled' (i.e. also 'settled_on_credit') as a failure and roll back + 402 (and reverse the posted debit, since for credit it actually charged). If credit subscriptions are allowed by design, document it and add a test asserting the negative-balance success. Needs a product/payments decision.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Subscription charge is recorded as a 'checkin' in the settlement linkage and audited as wallet.checkin_debit",
+      "detail": "The route reuses debit() — built for check-in (P1-E03-S05) — to charge the subscription. debit() hardcodes the settlement linkage kind to 'checkin' (debit.ts:224) and writes audit action 'wallet.checkin_debit' (debit.ts:232-244). So a subscription pre-pay is persisted/audited as a check-in even though the route passes source:'subscription' on the ledger row. Any reporting or metrics that filter by settlement kind='checkin' or audit action 'wallet.checkin_debit' (e.g. the repeat-attendance / check-in metrics being built in adjacent commits) will miscount subscription charges as check-ins. Functional correctness of the money movement is fine (correct amount, idempotent on subscription:<id>, one fresh invoice per sub so the checkin_uniq fence does not collide).",
+      "location": "packages/wallet/src/debit.ts:220-244",
+      "fix": "Either add a dedicated subscription debit path (or a 'kind' parameter to debit/the settlement linkage so subscription charges are tagged 'subscription' and audited as a subscription debit), or accept the mislabel and adjust reporting to key off ledger.source instead of linkage.kind/audit action. Needs a decision on the ledger taxonomy.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Concurrent top-up FIFO-settling the subscription's pending invoice causes an unhandled 500 (parent charged + subscribed but sees an error)",
+      "detail": "The flow commits a 'pending' subscription invoice in one transaction (subscriptions.ts:159-178), then calls debit() in a separate transaction (subscriptions.ts:187). Between/concurrent with these, applyTopup() scans ALL pending invoices for the parent FIFO and settles them (settle.ts:120-173) — including this subscription invoice (same parentId), creating a settlement linkage with kind='topup'. When debit() then runs it finds inv.status='settled' (not pending), finds no 'checkin' linkage, and throws a plain Error 'invoice X is not pending' (debit.ts:138-159). isUniqueViolation does not catch it, so it bubbles to a 500. End state: subscription row is 'active', invoice is 'settled' (charged once, correctly), but the API returns 500 with no SMS/subscription.created audit — a confusing partial success. Not a double-charge, but a real race robustness gap; requires a concurrent top-up during the subscribe window.",
+      "location": "apps/api/src/routes/parents/subscriptions.ts:159-193",
+      "fix": "Detect the already-settled-by-FIFO case and treat it as success: after debit() throws/returns non-pending, re-read the subscription invoice; if it is 'settled' with a settlement linkage, proceed to audit+SMS+201 instead of 500. Alternatively create the invoice + debit it inside a single transaction so the window cannot open. Needs a decision on the preferred approach (touches the shared debit/settle contract).",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "AC4 loyalty-earn-on-settled-charge not implemented (deferred)",
+      "detail": "AC4 requires 'loyalty earns on the settled charge.' The route sends the SMS confirmation but never accrues loyalty points; the code comment and commit message explicitly defer this to the P2-E05 loyalty engine. This was legitimate at commit time: the loyalty earn ledger (commit 25d9cca '20-1-loyalty-earn-ledger', 2026-05-30 01:05) landed AFTER this commit (2026-05-29 17:55), so earnPoints/earnPointsV2 did not exist when this story was built. As of the current working tree the loyalty ledger DOES exist (packages/wallet/src/loyalty.ts), so the AC is now technically fillable, but doing so belongs to the loyalty epic (P2-E05) per the documented plan.",
+      "location": "apps/api/src/routes/parents/subscriptions.ts:205-217",
+      "fix": "Deferred to P2-E05 by design. When that epic wires loyalty earn into the booking/checkin/charge paths, ensure the subscription settled charge also accrues points (earnPointsV2 on the subscription debit) to satisfy AC4. Not in scope for this story's commit.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Price-resolution 'today' uses UTC date, can be off by one day near midnight EAT (pre-existing codebase convention)",
+      "detail": "today = now.toISOString().slice(0,10) (subscriptions.ts:146) resolves the effective plan price by UTC calendar date, but the business operates in EAT (UTC+3; KES, +254 phones). Between 21:00-23:59 EAT the UTC date is already the next day, so a price whose effectiveFrom is that next calendar day would be applied a few hours early (or a closing price applied early). This mirrors the existing booking route (apps/api/src/routes/parents/booking.ts:98,151,268), so it is a codebase-wide convention, not introduced by this story; addPeriod() period math is correct (both start and end derive from the same now, so period length is exact).",
+      "location": "apps/api/src/routes/parents/subscriptions.ts:146",
+      "fix": "Out of scope for this story. If precise local-day price boundaries matter, standardise on a Nairobi-local 'today' helper across the booking + subscription price-resolution call sites; pre-existing and consistent, so defer.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Route-level subscription.created audit runs outside any transaction; a failure leaves a charged+subscribed state with no subscription audit row",
+      "detail": "audit() (subscriptions.ts:205) runs after debit() commits and is its own standalone insert. If it fails, the wallet charge and the subscription stand but no subscription.created row is written. Impact is limited because debit() itself writes a wallet.checkin_debit audit row inside its own transaction, so the money movement is independently audited; only the higher-level subscription.created event would be missing. Same pattern as other route audits in the repo.",
+      "location": "apps/api/src/routes/parents/subscriptions.ts:205-217",
+      "fix": "Low priority / pre-existing pattern. If stronger durability is wanted, fold the subscription.created audit into the same transaction as the subscription/invoice creation (or into the debit transaction). Defer.",
+      "ac_ref": ""
+    }
+  ]
+}
