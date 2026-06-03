@@ -33,6 +33,25 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 28 — Jobs Runner  ⚠️ FRAMEWORK
+
+70. **[HIGH · framework · P3-E06-S01] The jobs scheduler ignores `cron` and runs purely on `intervalMs`.**
+    No cron parser in `apps/jobs`; `job.cron` is decorative (and shown in the admin UI). Calendar jobs
+    drift: monthly commission run uses `intervalMs=30 days` (≠ a month, slides + resets on restart);
+    daily backup/anonymise/reminders fire every 24h from boot at an arbitrary hour, not their declared
+    time. **This is the root of the cron findings in Epics 15/18/22/23/27.** Wire a cron scheduler, or
+    drop/relabel the cron field. `apps/jobs/src/runner.ts:145-164`.
+
+71. **[HIGH · P3-E06-S01] Admin "run now" failures aren't sent to the error tracker** — the route
+    re-implements the run lifecycle and only logs/records `job_runs`, never `captureException`. Thread the
+    existing `errorTracker` in, or delegate to `runJob`. `apps/api/src/routes/admin/jobs.ts:179-193`.
+
+72. **[NOTE · deploy] No job scheduler is invoked in any production boot path** — all ~20 workers are
+    registered/exported but `startScheduler` is never called (`index.ts` only logs). The crons don't
+    fire in production yet; owned by the deploy story. (+ MED: SMS-retry has no provider-side
+    idempotency → a DB failure after a successful send re-sends; + onFailure not enforced; + no
+    distributed lock for >1 replica.)
+
 ## Epic 27 — Operational Reporting
 
 67. **[BLOCKER · correctness · P3-E05-S05] Peak-hours heatmap buckets hour/weekday in UTC, not EAT.**

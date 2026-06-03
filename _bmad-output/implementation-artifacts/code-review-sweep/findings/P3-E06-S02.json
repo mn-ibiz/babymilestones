@@ -1,0 +1,49 @@
+{
+  "id": "P3-E06-S02",
+  "verdict": "issues",
+  "diff_summary": "Three jobs-runner worker registrations in apps/jobs/src/jobs/{anonymise-observations,sms-retry,mpesa-reconcile}.ts + index.ts register* wiring helpers + registry.ts/runner.ts. Each createXJob() returns a Job descriptor carrying name/cron/intervalMs/onFailure; sms-retry adds backoff+dead-letter; mpesa-reconcile recovers missing Daraja callbacks idempotently; anonymise strips PII nightly.",
+  "ac_coverage": "S02 AC1 (cron 0 2 * * *) + AC2 (count log) implemented & tested (anonymise-observations.test.ts). S04 AC1 (failed + attempt_count<5 eligibility) / AC2 (1m/5m/30m/2h/12h backoff) / AC3 (dead-letter+audit+alert at 5th) all implemented & tested (sms-retry.test.ts). S05 AC1 (mpesa.reconcile 60s) + AC2 (recovered count log) implemented & tested. GAP: none of the register* helpers nor startScheduler is invoked by any production boot path — registration into a live runner is deferred (see finding).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Workers are defined + exported but never wired into a running scheduler in any boot path",
+      "detail": "S02/S04/S05 AC1 say the jobs are 'registered' on a schedule. The Job descriptors correctly carry name/cron/intervalMs/onFailure, and index.ts defines registerAnonymiseObservationsJob / registerSmsRetryJob / registerMpesaReconcileJob helpers. But a repo-wide grep (excluding dist/node_modules) shows NO caller of any register* helper and NO caller of startScheduler outside runner.test.ts. apps/jobs/src/index.ts only runs logger.info(jobs.boot) at module load and registers nothing. So at runtime today these crons do not actually fire on their cadence. This is deliberate per index.ts:116-120 ('The boot shim below registers nothing until real infra is injected ... with the deploy story; tests construct the job directly.'). Evidence: index.ts:121-273, grep of repo. Treating as deferred because it is an explicitly documented, repo-wide convention shared by all ~20 jobs, not a defect these three stories introduced; the deploy/wiring story owns it.",
+      "location": "apps/jobs/src/index.ts:116-273",
+      "fix": "No code change in scope. Confirm the deploy/boot story (the 'real infra is injected' work) calls register*Job(...) for each worker AND startScheduler(deps, allJobs()); add an integration test asserting allJobs() contains the three names with their expected cron after boot wiring. Until then AC1 ('registered on a schedule') is only satisfied at the descriptor level, not the running-scheduler level.",
+      "ac_ref": "S02-AC1, S04-AC1, S05-AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "SMS retry can re-send an already-delivered message (no provider-side idempotency)",
+      "detail": "In createSmsRetryJob the per-row try block (sms-retry.ts:108-157) wraps BOTH deps.resend(row) AND the success update that sets status='sent'. If resend() succeeds at the provider but the immediately-following db.update(...sent) throws (DB blip / connection drop), control falls into the catch, which treats it as a delivery failure: attempt_count++ and next_attempt_at is scheduled, so the SAME message is re-sent on a later tick. There is no provider-level dedup: SmsResend is a bare (row)=>Promise<void>, and the live sender (packages/sms/src/live.ts:110-129) calls the provider with no idempotency key and no providerMessageId guard before sending. Result: a narrow but real double-SMS window for every retried message. Same shape as the runner's swallow-and-retry, but here the side effect is an external irreversible send, not a DB row.",
+      "location": "apps/jobs/src/jobs/sms-retry.ts:108-115",
+      "fix": "Decision needed (provider contract): either (a) move only resend() inside the try and the success-update outside, accepting that a row may briefly stay 'failed' after a real send (favours possible-double-mark over double-send is still possible); or (b) pass an idempotency/client-message-id to the provider keyed on row.id so a re-send of the same outbox row is de-duplicated provider-side; or (c) record providerMessageId on a successful send and skip rows that already have one. (b)/(c) are the durable fixes. Out of these three stories' scope to pick the provider contract, hence decision-needed.",
+      "ac_ref": "S04-AC1"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "SMS dead-letter status-update + audit + alert are not atomic",
+      "detail": "In the dead-letter branch (sms-retry.ts:120-140) the row update (status='dead_lettered'), the audit(db,...) write, and the log.error alert are three separate awaits on the non-transactional db, not wrapped in db.transaction. If the audit insert fails after the status update commits, the row is dead-lettered with no audit_outbox record (DoD #4) and the catch isolation in runJob swallows the throw — the alert log line at :136 may also not run. The row is then permanently dead-lettered (excluded from the due query by deadLetteredAt IS NULL / attempt_count>=5) with no forensic trail. Contrast anonymise-observations.ts:177-190, which correctly wraps its row update + audit in db.transaction.",
+      "location": "apps/jobs/src/jobs/sms-retry.ts:120-140",
+      "fix": "Wrap the dead-letter mutation + audit in a single db.transaction((tx) => { update(...); audit(tx, ...); }) so the status change and its audit row commit atomically (mirror the anonymise-observations pattern). Keep the log.error alert after the transaction resolves.",
+      "ac_ref": "S04-AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Retry worker writes last_error but leaves stale live-send error/dispatchedAt; column divergence",
+      "detail": "The live sender records a failed initial send in sms_outbox.error + dispatchedAt (live.ts:127), while the retry worker reads/writes only last_error (sms-retry.ts:113,127-128,148-149) and on a successful retry sets status='sent'/sent_at but never clears the stale error/dispatchedAt left by the prior failed live attempt. So a successfully-retried row carries a non-null 'error' alongside status='sent'. Purely a forensic/reporting inconsistency (two error columns, two timestamp columns for the same lifecycle) — no correctness or money impact, and the producer column choice predates this story.",
+      "location": "apps/jobs/src/jobs/sms-retry.ts:111-114",
+      "fix": "Out of scope here. When the SMS schema is next touched, consolidate on one error column + one terminal timestamp, or have the retry success-update also clear error/dispatchedAt for consistency. Noted, not fixing.",
+      "ac_ref": "S04-AC2"
+    }
+  ]
+}

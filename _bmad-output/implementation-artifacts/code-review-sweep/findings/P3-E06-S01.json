@@ -1,0 +1,47 @@
+{
+  "id": "P3-E06-S01",
+  "verdict": "issues",
+  "diff_summary": "apps/jobs job framework: runner.ts (runJob run-record lifecycle + startScheduler setInterval loop), registry.ts (Job type with name/cron/intervalMs/onFailure/maxAttempts + schedule() descriptors), job_runs schema, and apps/api/src/routes/admin/jobs.ts (super-admin run-now + observability). Pinned SHA 32a0f53328 is the S03 commission-run wiring; framework itself landed in ef78486/f346133.",
+  "ac_coverage": "AC1 PARTIAL (registry exposes name/cron/handler/on-failure, but the declared cron expressions are decorative — scheduler ignores them). AC2 met (job_runs ledger w/ started_at/ended_at/status/error + running-row, tested). AC3 met for the SCHEDULER path (runJob captureException, tested) but the admin run-now path does NOT alert Sentry on failure. AC4 met (super-admin run-now endpoint, audited, tested).",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Scheduler ignores declared cron expressions — runs purely on intervalMs, so calendar-aligned jobs drift and never fire at the declared time",
+      "detail": "Job.cron is declared across the registry (commission.monthly '0 2 1 * *', anonymise '0 2 * * *', outstanding-reminders '0 9 * * *', recurring-expenses '0 1 * * *', coaching-reminders '0 18 * * *', wc-stock-reconcile '0 0 * * *', etc.) and the spec AC1 says the registry's schedule is a 'cron expression'. But startScheduler (runner.ts:145-164) only reads job.intervalMs and calls setInterval(fn, intervalMs); job.cron is never parsed or used at runtime anywhere (confirmed: no node-cron/cron-parser/croner/BullMQ dependency in apps/jobs/package.json; grep shows .cron is referenced only in comments and the schedule() display descriptor). Consequences: (1) The monthly commission run uses intervalMs = 30*24h (MONTHLY_MS, commission-run.ts:7,62). 30 days != a calendar month, so it fires relative to process boot and slides ~1-2 days earlier each cycle — it will NOT run at 02:00 on the 1st as declared, and a worker restart resets the clock so a month can be skipped or double-fired (idempotency saves correctness but not timing). (2) Daily jobs declaring '0 2 * * *' actually fire every 24h from boot — at whatever wall-clock time the process started, not 02:00. The daily DB backup (db-backup.ts, intervalMs=DAY_MS) thus runs at an arbitrary hour, defeating the 'run during low-traffic window' intent. The declared cron is purely cosmetic metadata surfaced in admin observability, which is actively misleading: ops sees '02:00 on the 1st' but the job fires somewhere else entirely.",
+      "location": "apps/jobs/src/runner.ts:145-164; apps/jobs/src/registry.ts:16-22; apps/jobs/src/jobs/commission-run.ts:7,62-63",
+      "fix": "Either (a) wire a real cron scheduler (node-cron/croner/cron-parser) so startScheduler honors job.cron when present and falls back to intervalMs only for queue-drain workers; or (b) if the single-worker interval model is the intentional P3 design, drop/clearly relabel the cron field so the registry + admin UI do not advertise calendar schedules the runner cannot honor. Spec AC1 literally calls the schedule a 'cron expression', so option (a) matches intent; the choice is a product/eng decision (effort + scale-out plan).",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "Admin 'run now' failures are not reported to the error tracker (AC3 gap on the manual path)",
+      "detail": "AC3: 'Failed runs alert via Sentry.' The scheduler path satisfies this — runJob (runner.ts:107-110) calls deps.tracker?.captureException on a thrown handler. But the admin run-now endpoint (apps/api/src/routes/admin/jobs.ts:179-193) re-implements the run lifecycle inline and on failure only updates job_runs.status='failed' + logs via req.log; it never forwards the error to any ErrorTracker. The API app already constructs an errorTracker (apps/api/src/app.ts:106,239) and uses it for the global error handler, so the seam exists — it is simply not passed into / used by registerAdminJobs. Result: a super-admin manually triggering a failing job gets a recorded job_runs row but NO Sentry alert, contradicting AC3 for the exact path an operator is most likely to be watching.",
+      "location": "apps/jobs/src/routes/admin/jobs.ts:179-193 (apps/api/src/routes/admin/jobs.ts)",
+      "fix": "Thread the existing errorTracker into AdminJobsDeps and call errorTracker.captureException(err, { job: name, run_id: runId, trigger: 'manual', actor: actor.id }) in the catch at apps/api/src/routes/admin/jobs.ts:183-193. Better: have the run-now route delegate to the framework's runJob (which already records + alerts) instead of duplicating the lifecycle, removing the divergence entirely.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Declared onFailure policy (alert-only vs retry-next-tick) is never enforced by the scheduler",
+      "detail": "registry.ts:23-24 declares onFailure per job and the doc comment says alert-only jobs (e.g. commission.monthly, commission-run.ts:64) should 'take no scheduling action' after a failure, while retry-next-tick jobs roll forward. startScheduler never reads onFailure — every job is unconditionally re-fired on its next intervalMs tick regardless of policy. So an 'alert-only' one-shot that fails is still re-attempted on the next interval. Today this is only saved from causing harm by the commission run being idempotent per period; the framework contract (AC1: registry exposes on-failure policy, implying it is acted on) is not actually implemented. Marked defer because the scheduler itself is out of this story's pinned-commit diff and no current job suffers a correctness bug from it, but it is a real framework gap the cron rework should also address.",
+      "location": "apps/jobs/src/runner.ts:145-164; apps/jobs/src/registry.ts:10,23-24",
+      "fix": "When the scheduler is reworked, branch on job.onFailure: for 'alert-only' jobs, track last-run outcome and suppress automatic re-firing after a terminal failure (require manual run-now), or otherwise make the policy observably affect scheduling. Until then the field is descriptive-only and should be documented as such."
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "No distributed lock / single-instance guard — overlap protection is per-process in-memory only",
+      "detail": "startScheduler's overlap guard is a per-process in-memory Set (runner.ts:147,153). The spec technical note assumes a single-worker model in P3, but nothing enforces it: if apps/jobs is ever run with >1 replica (or during a rolling deploy where old+new overlap), every replica's scheduler will independently fire the same job concurrently. For commission.monthly this is mitigated by the period unique index (idempotent), but for non-idempotent or side-effecting jobs (db-backup writes duplicate snapshots/backup_runs rows; reminder/SMS jobs could double-send) there is no DB advisory lock or leader election. Deferred because P3 explicitly scopes single-worker, but it is the load-bearing assumption behind correctness and should be guarded before any scale-out.",
+      "location": "apps/jobs/src/runner.ts:145-164",
+      "fix": "Before scaling beyond one worker, acquire a per-job pg_advisory_lock (or a leased row in job_runs) around each tick so only one instance executes a given job at a time. Document the single-instance requirement loudly until then."
+    }
+  ]
+}

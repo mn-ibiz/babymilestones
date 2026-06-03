@@ -74,7 +74,7 @@
     "25": "done",
     "26": "done",
     "27": "done",
-    "28": "todo",
+    "28": "done",
     "29": "todo",
     "30": "todo",
     "31": "todo",
@@ -2248,7 +2248,7 @@
         "547b0902ef6ddd17ab02a68e7446547be36b07f0"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "28-2-anonymisation-worker-registered",
@@ -2266,7 +2266,7 @@
         "547b0902ef6ddd17ab02a68e7446547be36b07f0"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "28-3-commission-run-registered",
@@ -2283,7 +2283,7 @@
         "32a0f53328ff421855732b85be1e55fd5a0dda0d"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "28-4-sms-retry-worker-registered",
@@ -2301,7 +2301,7 @@
         "547b0902ef6ddd17ab02a68e7446547be36b07f0"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "28-5-m-pesa-stk-reconciliation-cron-now-under-framework",
@@ -2319,7 +2319,7 @@
         "547b0902ef6ddd17ab02a68e7446547be36b07f0"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "29-1-online-orders-tab-in-pos-pulled-from-woocommerce",
@@ -3236,8 +3236,16 @@
       "decisions_needed": 6,
       "dismissed": 14,
       "commit": ""
+    },
+    "28": {
+      "stories_reviewed": 5,
+      "patches": 1,
+      "deferred": 4,
+      "decisions_needed": 5,
+      "dismissed": 8,
+      "commit": ""
     }
   },
-  "epics_done": 26,
+  "epics_done": 27,
   "epics_total": 35
 }

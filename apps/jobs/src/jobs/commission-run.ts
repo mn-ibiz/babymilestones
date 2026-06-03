@@ -78,19 +78,30 @@ export function createCommissionRunJob(deps: CommissionRunJobDeps): Job {
         }
       }
 
-      // AC2: all attempts exhausted — raise the alert (audit + error log) and
-      // rethrow so the framework records + reports the failed run.
+      // AC2: all attempts exhausted — raise the alert and rethrow lastError so the
+      // framework records + reports the REAL failure. Order matters: the error log
+      // fires FIRST and the audit insert is GUARDED, because the most common cause
+      // of failing every attempt is the DB itself being down — in which case the
+      // audit insert would also throw, and (unguarded) would swallow the alert log
+      // and propagate a misleading insert error instead of lastError.
       const message = errorMessage(lastError);
-      await audit(db, {
-        actor: null,
-        action: "commission.run.failed",
-        target: { table: "commission_runs", id: null },
-        payload: { attempts: maxAttempts, last_error: message },
-      });
       log.error(
         { event: "commission.run.failed", attempts: maxAttempts, err: message },
         "commission run failed after max attempts — manual intervention required",
       );
+      try {
+        await audit(db, {
+          actor: null,
+          action: "commission.run.failed",
+          target: { table: "commission_runs", id: null },
+          payload: { attempts: maxAttempts, last_error: message },
+        });
+      } catch (auditErr) {
+        log.error(
+          { event: "commission.run.failed_audit_error", err: errorMessage(auditErr) },
+          "failed to write commission.run.failed audit row",
+        );
+      }
       throw lastError instanceof Error ? lastError : new Error(message);
     },
   };
