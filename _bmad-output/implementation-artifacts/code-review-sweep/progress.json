@@ -76,7 +76,7 @@
     "27": "done",
     "28": "done",
     "29": "done",
-    "30": "todo",
+    "30": "done",
     "31": "todo",
     "32": "todo",
     "33": "todo",
@@ -2462,7 +2462,7 @@
         "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "30-2-public-event-listing-detail-page",
@@ -2479,7 +2479,7 @@
         "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "30-3-ticket-purchase-with-guest-checkout",
@@ -2496,7 +2496,7 @@
         "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "30-4-free-events-rsvp-only",
@@ -2513,7 +2513,7 @@
         "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "30-5-door-check-in-via-ticket-code-or-manual-list",
@@ -2530,7 +2530,7 @@
         "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "31-1-coaching-catalogue-1-1-group",
@@ -3252,8 +3252,16 @@
       "decisions_needed": 6,
       "dismissed": 18,
       "commit": ""
+    },
+    "30": {
+      "stories_reviewed": 5,
+      "patches": 1,
+      "deferred": 2,
+      "decisions_needed": 3,
+      "dismissed": 9,
+      "commit": ""
     }
   },
-  "epics_done": 28,
+  "epics_done": 29,
   "epics_total": 35
 }

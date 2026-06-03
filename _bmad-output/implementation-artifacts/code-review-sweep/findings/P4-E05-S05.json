@@ -1,0 +1,29 @@
+{
+  "id": "P4-E05-S05",
+  "verdict": "issues",
+  "diff_summary": "apps/api/src/routes/admin/door.ts (+test): staff-gated door list (GET /admin/events/:id/door, name/phone/code search + capacity counter) and code check-in (POST .../door/check-in with double-scan guard). Ticket schema/migration (0069) carries a unique code; public/ticket-code.ts only generates codes (no public lookup endpoint).",
+  "ac_coverage": "AC1 (list + name/phone/code search) implemented & tested. AC2 (check-in + double-scan block) implemented & tested for the sequential case, but the double-admit guard is not atomic (race). AC3 (capacity-vs-checked-in counter over all event tickets) implemented & tested. AC4 (browser camera) correctly deferred.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Double-admit guard is a non-atomic read-then-write (TOCTOU race)",
+      "detail": "check-in does a SELECT to read ticket.status (door.ts:148-163) and then a SEPARATE UPDATE whose WHERE only matches the id, with no status predicate (door.ts:165-169). The two statements are not in a transaction and take no row lock. Two concurrent requests for the same code (a shared/forwarded ticket code scanned at two doors, or a double-tap that fires two requests) both read status='issued', both pass the 409 guard, and both run the UPDATE — so a single ticket is admitted twice and two audit rows are written. The DB unique constraint is on `code`, not on the admitted state, so it offers no protection here. The rest of the codebase already handles ticket state transitions transactionally (public/tickets.ts:185 confirm flow uses db.transaction), so this route is the outlier. This directly weakens AC2's 'double-scan blocked' guarantee under concurrency.",
+      "location": "apps/api/src/routes/admin/door.ts:165",
+      "fix": "Make the transition atomic: gate it in the UPDATE itself and treat zero affected rows as 'already checked in'. e.g. const [updated] = await db.update(tickets).set({ status: 'checked_in', checkedInAt: now(), checkedInBy: actor.id }).where(and(eq(tickets.id, ticket.id), eq(tickets.status, 'issued'))).returning(); if (!updated) { re-read the row and return the existing 409 'already checked in'/'cancelled' branch }. (Drizzle returns [] when no row matches.) Only audit when a row was actually transitioned, so a losing concurrent request does not emit a spurious ticket.checked_in audit event.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "checkedInBy stores actor id but column has no FK to users",
+      "detail": "door.ts:167 sets checkedInBy = actor.id, but tickets.checkedInBy (schema/tickets.ts:40, migration 0069:40) is a bare UUID with no FK reference to users(id) and no index. Not a security/correctness bug for this story (the value written is a real session user id), but it leaves the 'who admitted this ticket' audit trail unenforced at the DB level and unqueryable cheaply. Pre-existing schema decision from the 30-3/30-4 ticket table, out of scope for the door story to change.",
+      "location": "packages/db/src/schema/tickets.ts:40",
+      "fix": "Defer. If a future migration adds it, reference users(id) ON DELETE SET NULL (staff can be deleted) plus an index; additive-only.",
+      "ac_ref": ""
+    }
+  ]
+}

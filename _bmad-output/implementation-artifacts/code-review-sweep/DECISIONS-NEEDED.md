@@ -33,6 +33,26 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 30 — Events & Recital Ticketing  ⚠️ PAYMENT NOT WIRED
+
+77. **[BLOCKER · money/security · P4-E05-S03] Paid event tickets are issued with NO payment.** The
+    public, unauthenticated `POST /public/ticket-orders/:id/confirm` takes a client-supplied
+    `paymentReference`, calls no M-Pesa/Paystack, verifies no settled amount, and flips the order to
+    `paid` + issues tickets + texts the e-ticket — so anyone can self-issue free "paid" tickets. The
+    dev notes claim it reuses `@bm/payments`; the code does not. **Build the real flow:** initiate
+    STK/Paystack on checkout, issue tickets only from the IP-allowlisted M-Pesa callback /
+    HMAC-verified Paystack webhook (amount-verified, idempotent on the reference).
+
+78. **[BLOCKER → HIGH · capacity · P4-E05-S03/S04] Ticket/RSVP capacity oversell race** — `committedSeats`
+    is an unlocked read then a separate insert (not in a tx for checkout). Concurrent last-seat buyers
+    both pass → oversell (paid AND free RSVP). **Fix:** `SELECT … FOR UPDATE` on the tier row in one tx,
+    recount, then insert (apply to both paths). `apps/api/src/routes/public/tickets.ts`.
+
+79. **[HIGH · P4-E05-S02] Public remaining-capacity ignores pending paid orders** (storefront shows
+    seats checkout rejects); **[HIGH]** the AC1/AC2 platform UI (public listing/detail + Buy CTA) was
+    not built. **[MED · S03]** abandoned pending orders hold seats forever (no TTL/reaper). **[MED · S04]**
+    no duplicate-RSVP guard (one phone grabs 20 seats/call on an unauthenticated endpoint).
+
 ## Epic 29 — POS ↔ WooCommerce Sync
 
 73. **[HIGH · P4-E04-S02/S06/S07] Woo order-note retry duplicates the note** (the named open

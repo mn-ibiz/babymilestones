@@ -162,12 +162,22 @@ export function registerDoorCheckIn(app: FastifyInstance, deps: DoorDeps): void 
       });
     }
 
+    // Gate the transition on the ticket STILL being 'issued' so two concurrent
+    // scans of the same code can't both admit it (the read-side guard above is not
+    // atomic). The loser matches 0 rows and is reported as already-checked-in.
     const [updated] = await db
       .update(tickets)
       .set({ status: "checked_in", checkedInAt: now(), checkedInBy: actor.id })
-      .where(eq(tickets.id, ticket.id))
+      .where(and(eq(tickets.id, ticket.id), eq(tickets.status, "issued")))
       .returning();
-    if (!updated) return reply.code(404).send({ error: "Ticket not found for this event" });
+    if (!updated) {
+      const [current] = await db.select().from(tickets).where(eq(tickets.id, ticket.id));
+      return reply.code(409).send({
+        error: current?.status === "checked_in" ? "Ticket already checked in" : "Ticket not admittable",
+        status: current?.status ?? "unknown",
+        checkedInAt: current?.checkedInAt ? current.checkedInAt.toISOString() : null,
+      });
+    }
 
     await audit(db, {
       actor: actor.id,

@@ -1,0 +1,49 @@
+{
+  "id": "P4-E05-S02",
+  "verdict": "issues",
+  "diff_summary": "apps/api/src/routes/public/events.ts (+index.ts wiring, +events.test.ts) — adds the unauthenticated GET /public/events list (published+non-deleted+upcoming, include_past opt-in) and GET /public/events/:slug detail (by slug or UUID id) with a PublicEventDto/PublicEventTierDto projection exposing per-tier remaining capacity + soldOut/isFree flags. No platform UI page was added in this story.",
+  "ac_coverage": "AC2 (remaining-capacity) implemented but DIVERGES from the checkout gate (pending paid orders are not reflected). AC3 (SEO slug/id detail + 404) fully implemented & tested. AC1 (public list on apps/platform public group) is only HALF done: the API exists and is tested, but no apps/platform page/route consumes it — no 'Buy ticket' CTA surface exists, so AC2's UI half is also unmet at the platform layer.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Public 'remaining capacity' ignores pending paid orders; storefront can show seats that checkout will reject",
+      "detail": "The public detail/list endpoint computes remaining via loadSoldByTier, which counts ONLY rows in the tickets table with status issued|checked_in (events.ts:78-88, remaining = allotment - sold at events.ts:20). But the checkout gate committedSeats (tickets.ts:63-73) counts issued/checked_in tickets PLUS the quantity of still-pending paid orders. A paid checkout creates a ticket_orders row with status 'pending' and issues NO tickets rows until /confirm. Therefore a tier with all seats held by pending orders shows remaining>0 and soldOut:false on the public page, yet every checkout returns 409 'Not enough tickets left in this tier' (tickets.ts:134-135). This is a direct AC2 ('remaining capacity per tier') correctness/UX defect: the storefront advertises availability that cannot be purchased. Verified by reading both code paths in the working tree.",
+      "location": "apps/api/src/routes/public/events.ts:78-88",
+      "fix": "Decide the product semantics for the public counter, then align it with committedSeats. Option A (recommended): make the public route subtract pending paid-order quantities too (reuse/share committedSeats so the two paths can never drift), so remaining/soldOut reflect what is actually sellable. Option B: keep the public counter as issued-only but document that pending holds are excluded and ensure checkout reconciles. The choice (whether unpaid holds count as 'sold' for public display) is a product call, hence decision-needed.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC1/AC2 platform UI not delivered — no apps/platform public event listing or detail page exists",
+      "detail": "AC1 requires 'Public list on apps/platform (public group)' and AC2 requires a detail page with tiers, remaining capacity, and 'Buy ticket' CTAs. The diff and working tree add ONLY the API (apps/api/src/routes/public/events.ts). There is no events route under apps/platform/app/(public): no source page references /public/events or PublicEventDto (git grep across apps/platform finds only middleware.ts/[unit]/page.tsx comments mentioning '/events'; the only apps/platform .next/server/app/events.* are stale build artifacts, not source). The implementation story file's File List (30-2-...md) lists no apps/platform file and its note claims 'the platform public group consumes it' — but nothing does. So AC1 is half-met (API only) and the AC2 'Buy ticket CTA' surface is entirely absent.",
+      "location": "apps/platform/app/(public)/",
+      "fix": "Confirm whether the platform-facing listing/detail page was intentionally deferred to a later story or is genuinely in-scope for S02. If in-scope, the page (server-rendered list + slug detail consuming GET /public/events) must be built before S02 is Done; if deferred, update the story scope/AC and tracking so AC1/AC2's UI half is not silently dropped.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Tier sale window (saleStartsAt/saleEndsAt) is never enforced — 'Buy ticket' CTA shown for tiers outside their sale window",
+      "detail": "event_ticket_tiers carries saleStartsAt/saleEndsAt (schema event-ticket-tiers.ts:26-27, set in S01), but neither the public route (events.ts) nor the checkout/RSVP route (tickets.ts) references them (grep for sale* in both files returns nothing). The public detail therefore lists every tier as buyable regardless of whether its sale window is open, and checkout will accept a purchase outside the window. For S02 specifically the page would render a misleading 'Buy ticket' CTA. This is primarily a checkout-enforcement (30-3) gap and S02 is read-only, so it is deferred rather than patched here.",
+      "location": "apps/api/src/routes/public/events.ts:19-31",
+      "fix": "Out of S02 read-only scope. Track sale-window enforcement against the ticketing story (30-3): the checkout gate should reject out-of-window purchases and the public projection should flag tiers whose sale window is not currently open (e.g. saleOpen boolean) so the CTA can be disabled.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Public list endpoint has no pagination/limit (unbounded result set on an unauthenticated route)",
+      "detail": "GET /public/events selects ALL matching published events with no LIMIT/offset (events.ts:101) and then loads all their tiers and a single grouped sold-count query. Realistic event counts for one organisation are small, so the practical risk is low, but an unauthenticated endpoint with an unbounded result set is a mild DoS/perf footgun if events accumulate (e.g. with include_past=1 over years). Verified: no limit/offset in events.ts.",
+      "location": "apps/api/src/routes/public/events.ts:101",
+      "fix": "Deferred (low risk, not an S02 AC). If event volume grows, add a sane default LIMIT with cursor/page params, especially for the include_past=1 branch.",
+      "ac_ref": ""
+    }
+  ]
+}

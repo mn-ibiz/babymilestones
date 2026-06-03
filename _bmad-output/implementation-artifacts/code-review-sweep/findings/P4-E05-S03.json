@@ -1,0 +1,59 @@
+{
+  "id": "P4-E05-S03",
+  "verdict": "issues",
+  "diff_summary": "New unauthenticated public guest-ticket flow in apps/api/src/routes/public/tickets.ts (+ contracts ticketCheckout/ticketRsvp schemas, ticket-code generator, ticket_orders/tickets tables in migration 0069, event.eticket/event.rsvp SMS templates): POST /public/events/:id/checkout creates a pending paid order; POST /public/ticket-orders/:id/confirm marks it paid and issues coded tickets; POST /public/events/:id/rsvp issues free tickets immediately.",
+  "ac_coverage": "AC1 partial (buy flow + server-computed amount present, but the 'pay (M-Pesa or Paystack)' step is NOT wired to any payment rail — see blocker). AC2 implemented & tested (unique codes + e-ticket SMS stub). AC3 client-prefill seam only, server trusts body (acceptable per dev notes). AC4 (decision ref 28 / reuse @bm/payments adapters) NOT implemented — no adapter is invoked anywhere in this flow.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Paid tickets are issued with NO payment: public unauthenticated /confirm self-serves a 'paid' order",
+      "detail": "POST /public/ticket-orders/:id/confirm is registered on the public (unauthenticated) router (apps/api/src/routes/public/index.ts:29, app.ts:320) and has zero auth and zero payment verification. Anyone who calls /checkout gets the order id back in the 201 body (toOrderDto includes `id`), then POSTs to /confirm with an arbitrary (or empty) `paymentReference` and the server flips status to 'paid', issues the coded tickets, and texts the e-ticket. No M-Pesa STK is initiated, no Paystack hosted checkout is created, no provider callback/webhook is consulted, and no amount is ever charged or verified. The route's own comment admits it 'simulate[s] the provider callback/webhook'. This directly contradicts the dev notes (which claim the flow 'reuses the @bm/payments M-Pesa/Paystack adapters' and 'credit lands async on the existing callbacks/webhooks') and breaks AC1's pay step and AC4. On a public endpoint this is free tickets for anyone — a money/security hole. `paymentReference` is also client-supplied and never deduped, so replaying a real reference across multiple orders would 'pay' all of them.",
+      "location": "apps/api/src/routes/public/tickets.ts:167-240",
+      "fix": "Do NOT keep a public self-confirm. Decision needed: route fulfilment through the real rails. On /checkout, call createMpesaAdapter STK push (to buyerPhone) or createPaystackAdapter hosted-checkout (as the dev notes describe) and return checkoutRequestId/authorizationUrl. Issue tickets only from the authenticated/verified provider path: the M-Pesa C2B callback (IP-allowlisted, already in apps/api/src/routes/payments/mpesa) and the Paystack webhook (HMAC signature verified, already in payments/paystack), matching on a server-stored provider reference and verifying the settled amount equals order.amountCents before flipping to paid. Make the issuance keyed/idempotent on the provider reference so a webhook replay does not double-issue.",
+      "ac_ref": "AC1,AC4"
+    },
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Capacity oversell race: committedSeats read then insert with no lock / atomic guard / DB constraint",
+      "detail": "committedSeats() (tickets.ts:63-73) runs two un-locked SELECT COUNT/SUM queries, then the route does the capacity comparison (checkout:133-136, rsvp:260-263) and only afterwards inserts the order/tickets. In /checkout the read and the insert are not even in a transaction; in /rsvp the read at line 260 happens BEFORE the db.transaction at line 265. There is no SELECT ... FOR UPDATE on the tier row, no SERIALIZABLE isolation, and no DB-level constraint capping issued+pending seats at tier.allotment. Two guests buying the last seat concurrently both read the same committed count, both pass `committed + quantity <= allotment`, and both succeed — overselling the venue. The existing test (tickets.test.ts:235) only exercises sequential requests, so the race is untested.",
+      "location": "apps/api/src/routes/public/tickets.ts:63-73,133-163,260-304",
+      "fix": "Serialize per-tier. Decision needed on mechanism: (a) wrap the read+insert in a single transaction and take `SELECT ... FOR UPDATE` on the eventTicketTiers row (or a pg advisory lock keyed on tier id) before recounting and inserting; or (b) add an atomic guard — e.g. a `seats_committed` counter column on the tier updated with `UPDATE ... SET seats_committed = seats_committed + :qty WHERE seats_committed + :qty <= allotment` and treat 0 rows-affected as 409. Then add a concurrent (Promise.all) oversell test.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Abandoned pending orders hold seats forever — phantom sell-out",
+      "detail": "committedSeats() counts every ticket_orders row with status='pending' (tickets.ts:68-71) toward the allotment, but nothing ever expires or cancels a pending order. Because the (broken) confirm step aside, in a correct payment design a guest who starts checkout and never pays leaves a 'pending' order that permanently consumes seats. Over time a popular event reports sold-out (409) while real seats sit unsold, with no reaper to release them.",
+      "location": "apps/api/src/routes/public/tickets.ts:68-71",
+      "fix": "Decide a hold policy: give pending orders a TTL (e.g. 15 min after the STK push / checkout init) and either exclude expired-pending from committedSeats (WHERE status='pending' AND created_at > now() - interval) or run a sweeper job that marks stale pending orders 'cancelled'. Align the TTL with the M-Pesa STK timeout.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Ticket-code collision against the UNIQUE constraint is unhandled (no retry)",
+      "detail": "generateTicketCode() (ticket-code.ts) draws 8 chars from a 30-char alphabet (~39 bits) using crypto.randomInt — unguessable, good. But the code column is UNIQUE (migration 0069 / tickets.ts) and the issuance loop (tickets.ts:188-203, 281-296) inserts without catching a unique-violation and retrying. A collision is astronomically unlikely at this volume, but if one occurred the whole confirm/RSVP transaction would throw and roll back (the buyer's paid order would fail to issue). Acceptable to defer given the probability, but worth a retry-on-conflict guard.",
+      "location": "apps/api/src/routes/public/ticket-code.ts:17-23",
+      "fix": "Wrap each ticket insert in a small retry loop that regenerates the code on a unique-violation (a few attempts), or generate codes and pre-check, before giving up. Low priority given the collision probability.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Tier sale window (saleStartsAt / saleEndsAt) is ignored at purchase",
+      "detail": "eventTicketTiers carries saleStartsAt/saleEndsAt columns (event-ticket-tiers.ts:26-27), but loadPublishedTier (tickets.ts:101-113) and both purchase routes never check them. Tickets can be bought before the sale opens or after it closes. AC1 does not explicitly mention a sale window, so this is out of this story's strict scope, but the schema implies the intent.",
+      "location": "apps/api/src/routes/public/tickets.ts:101-113",
+      "fix": "If sale windows are intended to be enforced, reject (400/409) when now() is outside [saleStartsAt, saleEndsAt] for tiers that set them. Deferred pending product confirmation that windows should gate guest checkout.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

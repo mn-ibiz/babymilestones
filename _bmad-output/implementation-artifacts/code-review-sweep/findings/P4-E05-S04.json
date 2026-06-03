@@ -1,0 +1,37 @@
+{
+  "id": "P4-E05-S04",
+  "verdict": "issues",
+  "diff_summary": "Epic-30 merge; for this story the free-RSVP slice lives in apps/api/src/routes/public/tickets.ts (POST /public/events/:id/rsvp): price_cents=0 tier issues tickets immediately in a tx (order status 'free', amount_cents=0, no provider/payment), audits ticket.rsvp.created, sends event.rsvp SMS-stub. Validated by ticketRsvpSchema in packages/contracts; capacity via committedSeats(); event.rsvp template in packages/sms.",
+  "ac_coverage": "AC1 (price_cents=0 -> no payment, just RSVP) implemented + tested (tickets.test.ts:200, :225). AC2 (same info minus payment) implemented + tested via ticketRsvpSchema (name/phone required, email optional, no provider). AC3 (SMS-stub confirmation) implemented + tested (tickets.test.ts:212). All 3 ACs covered.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "RSVP capacity check is a non-atomic read-then-write — concurrent RSVPs overbook the tier",
+      "detail": "In POST /public/events/:id/rsvp, committedSeats(db, tier.id) is computed at tickets.ts:260 OUTSIDE the transaction that begins at :265, with no SELECT ... FOR UPDATE on the tier row, no SERIALIZABLE isolation, and no unique seat/allotment constraint in 0069_tickets.sql. Two concurrent requests against a tier with allotment=2 both read committed=0, both pass `committed + quantity > allotment`, and both insert their seats -> 4 tickets issued for 2 spots. The existing 'sold-out guard' test (tickets.test.ts:235) is sequential and does not exercise the race. The identical flaw exists in the paid checkout path (tickets.ts:133). The brief flags this as the #1 focus; it defeats the no-overbook acceptance intent of capacity tracking, which is the entire point of a free-RSVP tier.",
+      "location": "apps/api/src/routes/public/tickets.ts:260-263",
+      "fix": "Move the capacity check inside the db.transaction and serialize on the tier: at the top of the tx, lock the tier row with `SELECT ... FROM event_ticket_tiers WHERE id = tierId FOR UPDATE` (drizzle: tx.execute(sql`... for update`) or a tx.select().for('update')), then recompute committed seats inside the tx, then insert. Apply the same fix to the paid checkout path. (A unique partial constraint cannot express an N-seat allotment, so row-level locking is the correct mechanism.)",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "No duplicate-RSVP guard — one guest can grab the whole tier across repeated calls",
+      "detail": "There is no per-guest/per-phone dedup or cap on the RSVP endpoint. ticketRsvpSchema caps a single request at TICKET_ORDER_MAX_QUANTITY=20 (contracts index.ts:2128), and there is no UNIQUE on (tier_id, buyer_phone) in 0069_tickets.sql nor any check in tickets.ts. A single anonymous guest (or bot) can POST /rsvp repeatedly with the same phone, each call taking up to 20 free seats, until the tier is exhausted — denying real attendees. Because the endpoint is fully unauthenticated, this is also a trivial capacity-exhaustion vector. The brief flags 'one guest can't grab unlimited free seats' as a focus, but the spec (AC1-AC3) defines no per-guest limit and the paid path has the same shape, so the intended policy (one RSVP per phone? a per-phone seat cap? rate limit?) is a product decision.",
+      "location": "apps/api/src/routes/public/tickets.ts:243-321",
+      "fix": "Decide the policy, then enforce: (a) one active RSVP per (tier_id, buyer_phone) -> reject 409 if a non-cancelled ticket_orders row already exists for that pair; or (b) a per-phone seat cap; or (c) IP/phone rate limiting on the public route. Option (a) is cleanest and can be enforced with a guarded SELECT inside the same locked tx as the capacity fix."
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "RSVP SMS-stub send failure is swallowed with no observability",
+      "detail": "tickets.ts:316-318 catches and silently swallows any error from the event.rsvp StubSmsSender.send. The comment explains the intent (RSVP is committed; SMS is a side-channel), which is the right ordering, but a swallowed catch with no log/metric means a systematically broken SMS path (e.g. renderTemplate throwing on a missing field, templates.ts:42) would be invisible. AC3 ('SMS-stub confirmation sent') would silently regress with the happy-path test still green. Same pattern in the paid e-ticket path (tickets.ts:233). Pre-existing repo convention, not specific to this story's logic.",
+      "location": "apps/api/src/routes/public/tickets.ts:316-318",
+      "fix": "Out of scope for this slice; consider logging the swallowed error (req.log.warn) or recording a failed-send metric so a broken template/transport is detectable."
+    }
+  ]
+}

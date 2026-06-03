@@ -1,0 +1,39 @@
+{
+  "id": "P4-E05-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds events + event_ticket_tiers tables (migrations 0067/0068 + drizzle schema), admin CRUD route apps/api/src/routes/admin/events.ts (POST/GET/GET:id/PATCH/DELETE) gated on `manage service`, pure slug helpers, EventDto/EventTierDto contracts, audit `event.*` catalogue, and integration + unit tests. Capacity and price stored as INTEGER cents.",
+  "ac_coverage": "AC1 (events table: name/description/unit/starts_at/ends_at/venue/capacity) implemented & tested. AC2 (event_ticket_tiers: event_id/name/price_cents/allotment/sale_starts_at/sale_ends_at) implemented & tested. AC3 (admin CRUD with audit) implemented & tested for events; tiers are create-only (no tier-level update/delete) but that is within S01 scope. AC4 (decision ref 28 = guest checkout) belongs to S03, not S01. Migrations additive-only (CREATE ... IF NOT EXISTS, no DROP/ALTER). Audit rows written for create/update/publish/unpublish/delete.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Concurrent create of two identically-named events returns a raw 500 instead of a clean 409",
+      "detail": "POST /admin/events reads ALL existing slugs (line 164) into memory, computes a unique slug via uniqueSlug(), then inserts in a separate transaction (lines 167-200). Two concurrent requests with the same name both observe the same `existing` set, compute the same slug, and the second INSERT violates the `events_slug` UNIQUE index. There is no onConflict handling and no catch around the slug insert, so the postgres 23505 error propagates to the global app.ts error handler (apps/api/src/app.ts:238-248) which maps it to a 500 'Internal Server Error'. Sibling slug-based admin routes (articles.ts:138-141, cms-pages.ts:183-194) explicitly catch the conflict and return 409. Admin-only + low concurrency keeps severity low, but the response is a server error rather than a graceful conflict.",
+      "location": "apps/api/src/routes/admin/events.ts:164-200",
+      "fix": "Either retry the slug computation+insert on a unique-violation (loop a couple of times re-reading slugs), or wrap the insert in try/catch and on a 23505 on the slug index return reply.code(409). Could also move the slug SELECT inside the transaction, though that alone does not fully close the race without SERIALIZABLE.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Tier sale window (saleStartsAt/saleEndsAt) is accepted without ordering or in-event-window validation",
+      "detail": "tierSchema (events.ts:26-32) accepts saleStartsAt and saleEndsAt as independent optional datetimes with no refinement. A tier can be created with saleEndsAt earlier than saleStartsAt, or a sale window entirely outside the event's starts_at/ends_at. The event's own window is validated (createSchema .refine endsAt>=startsAt, line 46), but tier sale windows are not, so a structurally-invalid sale window persists. This becomes meaningful once ticketing (S03) gates sales on these timestamps. Low severity because nothing in S01 reads the window yet.",
+      "location": "apps/api/src/routes/admin/events.ts:26-32",
+      "fix": "Add a .refine on tierSchema: when both present, require saleEndsAt >= saleStartsAt. Optionally validate the sale window falls on/before the event's endsAt. Defer the in-window check to product if intent is unclear, but the saleEndsAt>=saleStartsAt ordering check is unambiguous.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "event.created audit row is written non-atomically (bare db) after the event transaction commits",
+      "detail": "The event + tiers insert runs inside db.transaction() (events.ts:167-200), but the audit('event.created') call uses the top-level `db` AFTER the transaction commits (events.ts:202-207). packages/db/src/audit.ts documents an explicit ATOMICITY CONTRACT: when auditing a business write, pass the SAME tx handle so they commit/roll back together; using bare db lets the event persist without its audit row if the audit insert fails. Deferred because this matches the established codebase-wide convention for single-row admin writes (plans.ts, articles.ts, cms-pages.ts, expenses.ts all call audit(db,...) outside any transaction), so it is pre-existing convention rather than a defect introduced by this story, and DoD #4 is satisfied on the happy path. Events is mildly worse only in that it already had a transaction open that the audit could have joined.",
+      "location": "apps/api/src/routes/admin/events.ts:167-207",
+      "fix": "To make it atomic, move the audit('event.created') call inside the db.transaction callback and pass tx: `await audit(tx, {...})`. Deferred pending a consistent project-wide decision on admin-write audit atomicity.",
+      "ac_ref": "AC3"
+    }
+  ]
+}
