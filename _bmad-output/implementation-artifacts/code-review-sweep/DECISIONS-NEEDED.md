@@ -3,6 +3,50 @@
 These are real findings where the correct fix requires a human/product decision (ambiguous intent).
 They are NOT auto-fixed. Review and tell me how to resolve each.
 
+## Epic 33 — SMS Go-Live  ⚠️ NOT WIRED TO PRODUCTION (same pattern as Epic 32)
+
+90. **[BLOCKER · wiring · P5-E03-S02] Flipping the live/stub flag does NOTHING.** `resolveSmsSender` (the
+    only reader of `sms.live_enabled`) has no production caller; every send path hardcodes
+    `new StubSmsSender(db)` or `createSmsSender(db)` (defaults to stub), and `app.ts` injects no sms dep.
+    So "go live" writes an audit row + the UI says "Live", but every OTP/booking/receipt SMS still goes
+    to the stub — no real SMS is ever sent. **Fix:** resolve the sender once at the composition root via
+    `resolveSmsSender` (flag + active `sms_config.api_key_ref` from env) and inject it everywhere; replace
+    the hardcoded `new StubSmsSender(db)` call sites (reset-request, tickets, reprint, export, all booking
+    routes). (The admin toggle's own credentials bug was patched this review.)
+
+91. **[BLOCKER · money · P5-E03-S03] The SMS spend cap is NEVER enforced AND deferred messages are lost.**
+    `CappedSmsSender` is exported but never wraps any sender, so the per-day/per-recipient/cost caps do
+    nothing at go-live. Separately, `defer()` writes a `status='deferred'` row (body='') that NO worker
+    ever re-sends (`sms-retry` only selects `status='failed'`) — a capped OTP/booking SMS is silently
+    dropped forever. **Fix:** wrap the resolved sender in `CappedSmsSender` at the composition root, and
+    add a deferred-resend worker that re-renders the body from template+data. Decide first: exempt
+    OTP/transactional from the cap (else a capped recipient is locked out of login).
+
+92. **[HIGH · P5-E03-S03] Cap correctness gaps (resolve when wiring #91):** (a) the cap check is
+    read-then-send with no lock → concurrent sends collectively overshoot the cap (needs an atomic
+    reserve / advisory lock); (b) hitting the cap is never alerted/audited (AC2 unmet); (c) there's no
+    admin API/UI to adjust the `sms.cap.*` caps (AC3 — needs a manual DB write today); (d) a failed send
+    still burns a cap slot and a multi-segment SMS counts as 1 + a flat cost (decide cap unit:
+    message vs segment); (e) the cap window is fixed UTC, not the Africa/Nairobi business day.
+
+93. **[HIGH · P5-E03-S04] Template editor accepts UNKNOWN placeholders → a stray `{token}` bricks that
+    send path.** Save-validation only checks the required set isn't dropped, never that ADDED tokens are
+    bindable. `interpolateTemplate` throws on an unbound token, and `auth.reset.code` (data bag `{code}`
+    only, send not wrapped in try/catch) would 500 every password reset for all users if someone saved a
+    `{name}`. (I drafted a guard that froze the placeholder set to the current body and REVERTED it — the
+    system as-tested explicitly allows adding placeholders, and the seeded body isn't a reliable
+    allowed-set.) **Fix:** define a per-key allowed-placeholder catalogue (the renderer's data-bag fields)
+    and validate against it on save; OR make `interpolateTemplate` fail-soft. **[MED]** only 7 of 21
+    template keys are editable (rest keep hardcoded copy); **[MED]** no SMS segment / GSM-7-vs-UCS-2
+    validation (silent multi-segment cost fan-out).
+
+94. **[MED · P5-E03-S01] Live SMS send trusts the transport 2xx blindly** — a provider 200 with a
+    per-recipient failure body (Africa's Talking `InsufficientBalance` etc.) is recorded as `sent` and
+    never retried. Add a provider-aware success predicate (or treat a null provider messageId on a 2xx
+    as a soft failure). Also defer-tracked: the retry worker has no DB-level claim before the HTTP send
+    (double-send risk once scaled past one instance), and `LiveSmsAdapter.send()` would duplicate outbox
+    rows if naively reused for retry — wire a row-based `resendOutbox(row)` instead.
+
 ## Epic 32 — eTIMS Writer Swap  ⚠️ NOT WIRED TO PRODUCTION
 
 84. **[BLOCKER · wiring · P5-E02-S03/S01] Turning eTIMS ON does nothing — the whole epic is dead code in

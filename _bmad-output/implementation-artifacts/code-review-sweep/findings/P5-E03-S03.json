@@ -1,0 +1,10 @@
+{"id":"P5-E03-S03","verdict":"issues","patches_applied":0,"decisions":7,"deferred":0,"dismissed":2,
+ "findings":[
+  {"severity":"blocker","category":"decision-needed","title":"Cap NEVER enforced — CappedSmsSender never instantiated on any send path","location":"packages/sms/src/switch.ts:33-40"},
+  {"severity":"blocker","category":"decision-needed","title":"Deferred messages queued but NEVER re-sent (no worker queries status=deferred) — silent loss","location":"apps/jobs/src/jobs/sms-retry.ts:90-102"},
+  {"severity":"high","category":"decision-needed","title":"Cap check read-then-send, no lock — concurrent sends blow the cap","location":"packages/sms/src/limiter.ts:158-185"},
+  {"severity":"high","category":"decision-needed","title":"Hitting the cap never alerted/audited (AC2 unimplemented)","location":"packages/sms/src/limiter.ts:195-215"},
+  {"severity":"high","category":"decision-needed","title":"No admin API/UI to adjust caps (AC3) — sms.cap.* needs a manual DB write","location":"apps/api/src/routes/admin/sms-live.ts:82"},
+  {"severity":"medium","category":"decision-needed","title":"Failed send consumes a cap slot; multi-segment counted as 1 — counting correctness","location":"packages/sms/src/limiter.ts:170,177-184"},
+  {"severity":"medium","category":"decision-needed","title":"Cap gates OTP/transactional → deferred OTP = login lockout; UTC vs Nairobi day window","location":"packages/sms/src/limiter.ts:158-174"}
+ ]}

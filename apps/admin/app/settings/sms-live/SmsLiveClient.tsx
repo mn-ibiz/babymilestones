@@ -13,7 +13,10 @@ export function SmsLiveClient() {
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/sms-live")
+    // credentials:include so the session + CSRF cookies are sent cross-origin —
+    // without it the API never sees the session and this GET silently 401s to the
+    // {enabled:false} fallback (and the PUT below is rejected). Matches sms-config.
+    fetch("/api/admin/sms-live", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { enabled: false }))
       .then((j) => setEnabled(Boolean(j.enabled)))
       .catch(() => setStatus("error"));
@@ -25,6 +28,7 @@ export function SmsLiveClient() {
     setStatus("saving...");
     const res = await fetch("/api/admin/sms-live", {
       method: "PUT",
+      credentials: "include",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ enabled: next }),
     });

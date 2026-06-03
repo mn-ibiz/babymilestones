@@ -1,0 +1,8 @@
+{"id":"P5-E03-S04","verdict":"issues","patches_applied":0,"decisions":3,"deferred":2,"dismissed":3,
+ "findings":[
+  {"severity":"high","category":"decision-needed","title":"Editor accepts unknown placeholders → stray {token} 500s send path (OTP reset bricked); needs allowed-catalogue (patch drafted+reverted)","location":"packages/sms/src/template-editor.ts:75-93"},
+  {"severity":"medium","category":"decision-needed","title":"Only 7 of 21 template keys editable; rest keep hardcoded copy","location":"apps/api/src/routes/admin/sms-templates.ts:130-132"},
+  {"severity":"medium","category":"decision-needed","title":"No SMS segment / GSM-7 vs UCS-2 validation — silent multi-segment cost fan-out","location":"packages/sms/src/template-editor.ts:21,80-84"},
+  {"severity":"low","category":"defer","title":"No URL allowlist for literal URLs in template bodies (phishing) — admin-gated","location":"packages/sms/src/template-editor.ts:75-93"},
+  {"severity":"low","category":"defer","title":"Orphan seeded key topup.success editable but never sent","location":"packages/db/migrations/0036_sms_templates.sql:43"}
+ ]}
