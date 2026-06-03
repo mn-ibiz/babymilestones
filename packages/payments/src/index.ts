@@ -112,7 +112,6 @@ export type {
   EtimsInvoice,
   EtimsInvoiceItem,
   EtimsInvoiceSeller,
-  BuildEtimsInvoiceOptions,
   EtimsQueueRow,
   EnqueueEtimsInput,
   ClaimDueInput,

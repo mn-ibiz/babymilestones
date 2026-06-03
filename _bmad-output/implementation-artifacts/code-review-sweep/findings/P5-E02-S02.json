@@ -1,0 +1,8 @@
+{"id":"P5-E02-S02","verdict":"issues","patches_applied":2,"decisions":2,"deferred":1,"dismissed":4,
+ "findings":[
+  {"severity":"high","category":"patch","title":"Lost-update in recordFailure/markSent — compare-and-set + status guard added","location":"packages/payments/src/receipts/etims-queue.ts:163","status":"FIXED"},
+  {"severity":"medium","category":"patch","title":"etims-retry job declared no cron — added cron '* * * * *' for registry parity","location":"apps/jobs/src/jobs/etims-retry.ts:69","status":"FIXED"},
+  {"severity":"blocker","category":"decision-needed","title":"AC1 producer gap — nothing enqueues a failed submission; receipt lost when KRA down","location":"packages/payments/src/receipts/etims-queue.ts:90"},
+  {"severity":"high","category":"decision-needed","title":"No atomic claim of due rows — double-submit to KRA under multi-instance","location":"packages/payments/src/receipts/etims-queue.ts:129-140"},
+  {"severity":"medium","category":"defer","title":"registerEtimsRetryJob never called — systemic jobs boot/deploy story","location":"apps/jobs/src/index.ts:214-219"}
+ ]}

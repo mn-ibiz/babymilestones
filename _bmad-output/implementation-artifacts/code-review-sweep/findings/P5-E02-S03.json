@@ -1,0 +1,7 @@
+{"id":"P5-E02-S03","verdict":"issues","patches_applied":1,"decisions":2,"deferred":1,"dismissed":3,
+ "findings":[
+  {"severity":"medium","category":"patch","title":"Flag-change audit recorded only new value — now logs previous_enabled + enabled","location":"apps/api/src/routes/admin/settings.ts:205","status":"FIXED"},
+  {"severity":"blocker","category":"decision-needed","title":"Flag disconnected from live receipt path — eTIMS ON does nothing (resolveReceiptWriter unwired)","location":"packages/payments/src/receipts/index.ts:178-192"},
+  {"severity":"low","category":"decision-needed","title":"Live fiscalization toggle gated only by manage config (admin), not super_admin","location":"apps/api/src/routes/admin/settings.ts:83-87"},
+  {"severity":"low","category":"defer","title":"etims metadata wiped by {enabled:false} toggle (full-replace upsert) — defer to S04","location":"apps/api/src/routes/admin/settings.ts:187-194"}
+ ]}

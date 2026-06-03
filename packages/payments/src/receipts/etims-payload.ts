@@ -57,31 +57,31 @@ export interface EtimsInvoice {
   taxAmount: number;
 }
 
-export interface BuildEtimsInvoiceOptions {
-  /** When true, lines with lineTax = 0 have their VAT derived (VAT-inclusive). */
-  deriveTax?: boolean;
-}
-
 /**
  * Build the eTIMS invoice from a receipt payload. The invoice number is the
  * caller-allocated display number (e.g. `BM-2026-000001`) so the eTIMS record
  * and our receipt share an identity — the idempotency key used on retries.
+ *
+ * The per-line VAT declared to KRA is the line's authoritative `lineTax` verbatim
+ * — the same value computed from the line's tax_treatment (`computeLineTax`) and
+ * persisted on the receipt. We do NOT re-derive VAT here: a `lineTax === 0` line
+ * is the canonical encoding of an EXEMPT / ZERO-RATED supply, so fabricating 16%
+ * on it would over-declare output VAT to KRA and make the fiscal declaration
+ * disagree with both the persisted receipt (`taxTotal = Σ lineTax`) and the
+ * printed receipt. Declare exactly what was charged.
  */
 export function buildEtimsInvoice(
   seller: EtimsInvoiceSeller,
   payload: WriteReceiptPayload,
   invoiceNumber: string,
-  options: BuildEtimsInvoiceOptions = {},
 ): EtimsInvoice {
   const items: EtimsInvoiceItem[] = payload.lines.map((line) => {
     const itemRef = line.serviceId ?? line.productId ?? "";
-    const taxAmount =
-      options.deriveTax && line.lineTax === 0 ? computeLineVat(line.lineTotal) : line.lineTax;
     return {
       itemRef,
       quantity: line.quantity,
       unitPrice: line.unitPrice,
-      taxAmount,
+      taxAmount: line.lineTax,
       totalAmount: line.lineTotal,
     };
   });

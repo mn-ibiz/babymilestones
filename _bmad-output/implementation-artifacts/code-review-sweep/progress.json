@@ -78,7 +78,7 @@
     "29": "done",
     "30": "done",
     "31": "done",
-    "32": "todo",
+    "32": "done",
     "33": "todo",
     "34": "todo",
     "35": "todo",
@@ -2637,7 +2637,7 @@
         "b79873741e1ea79edaf25c99adb4693525f20440"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "32-2-etims-retry-dead-letter",
@@ -2654,7 +2654,7 @@
         "b79873741e1ea79edaf25c99adb4693525f20440"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "32-3-switch-flag-with-rollback",
@@ -2671,7 +2671,7 @@
         "b79873741e1ea79edaf25c99adb4693525f20440"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "32-4-vat-registration-metadata",
@@ -2688,7 +2688,7 @@
         "b79873741e1ea79edaf25c99adb4693525f20440"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "33-1-live-sms-adapter-provider-agnostic",
@@ -3268,8 +3268,16 @@
       "decisions_needed": 6,
       "dismissed": 16,
       "commit": ""
+    },
+    "32": {
+      "stories_reviewed": 4,
+      "patches": 5,
+      "deferred": 3,
+      "decisions_needed": 10,
+      "dismissed": 12,
+      "commit": ""
     }
   },
-  "epics_done": 30,
+  "epics_done": 31,
   "epics_total": 35
 }

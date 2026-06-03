@@ -77,15 +77,34 @@ describe("eTIMS invoice builder (P5-E02-S01)", () => {
     expect(invoice.taxAmount).toBe(1600 + 320);
   });
 
-  it("derives line tax when a line omits it (VAT-inclusive at 16%)", () => {
-    const noTax: WriteReceiptPayload = {
+  it("declares a lineTax=0 line as EXEMPT (taxAmount 0) — never fabricates 16% VAT", () => {
+    // lineTax === 0 is the canonical encoding of an exempt / zero-rated supply.
+    // The builder must declare exactly the authoritative VAT to KRA (0 here), so
+    // the fiscal declaration matches the persisted receipt (taxTotal = Σ lineTax).
+    const exempt: WriteReceiptPayload = {
       series: "BM-2026",
       paymentMethod: "cash",
       postedBy: "cashier-1",
       lines: [{ serviceId: "svc-1", quantity: 1, unitPrice: 11600, lineTax: 0, lineTotal: 11600 }],
     };
-    const invoice = buildEtimsInvoice(seller, noTax, "BM-2026-000002", { deriveTax: true });
+    const invoice = buildEtimsInvoice(seller, exempt, "BM-2026-000002");
+    expect(invoice.items[0]!.taxAmount).toBe(0);
+    expect(invoice.taxAmount).toBe(0);
+  });
+
+  it("declares mixed exempt + standard lines with the per-line authoritative VAT", () => {
+    const mixed: WriteReceiptPayload = {
+      series: "BM-2026",
+      paymentMethod: "cash",
+      postedBy: "cashier-1",
+      lines: [
+        { serviceId: "svc-1", quantity: 1, unitPrice: 11600, lineTax: 1600, lineTotal: 11600 },
+        { productId: "prd-1", quantity: 1, unitPrice: 5000, lineTax: 0, lineTotal: 5000 },
+      ],
+    };
+    const invoice = buildEtimsInvoice(seller, mixed, "BM-2026-000003");
     expect(invoice.items[0]!.taxAmount).toBe(1600);
+    expect(invoice.items[1]!.taxAmount).toBe(0);
     expect(invoice.taxAmount).toBe(1600);
   });
 });

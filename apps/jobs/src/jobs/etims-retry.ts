@@ -68,6 +68,9 @@ export function createEtimsRetryJob(deps: EtimsRetryJobDeps): Job {
   return {
     name: "etims-retry",
     intervalMs: DEFAULT_INTERVAL_MS,
+    // Declared cadence for the registry/observability surface (mirrors sms-retry /
+    // mpesa-reconcile). The scheduler runs off intervalMs; this exposes the intent.
+    cron: "* * * * *",
     run: async () => {
       const at = now();
       const due = await claimDueEtimsSubmissions(db, { now: at, limit: batchSize });

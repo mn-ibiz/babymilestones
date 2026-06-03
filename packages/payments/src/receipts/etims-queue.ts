@@ -139,7 +139,8 @@ export async function claimDueEtimsSubmissions(
   return rows.map(toRow);
 }
 
-/** Mark a submission accepted by KRA. */
+/** Mark a submission accepted by KRA. Guarded on `status='pending'` so a concurrent
+ *  transition (a racing failure-record / dead-letter) can't be silently clobbered. */
 export async function markEtimsSubmissionSent(
   db: Executor,
   input: { id: string; now?: Date },
@@ -147,7 +148,7 @@ export async function markEtimsSubmissionSent(
   await db
     .update(kraEtimsQueue)
     .set({ status: "sent", sentAt: input.now ?? new Date() })
-    .where(eq(kraEtimsQueue.id, input.id));
+    .where(and(eq(kraEtimsQueue.id, input.id), eq(kraEtimsQueue.status, "pending")));
 }
 
 export interface RecordFailureResult {
@@ -169,21 +170,52 @@ export async function recordEtimsSubmissionFailure(
   if (!current) {
     throw new Error(`eTIMS queue row not found: ${input.id}`);
   }
+  // Only a still-pending row can fail-and-retry. A concurrent worker tick (or an
+  // admin requeue) may already have moved it — report the row's actual state
+  // rather than re-incrementing.
+  if (current.status !== "pending") {
+    return { status: current.status === "dead_letter" ? "dead_letter" : "pending", attempts: current.attempts };
+  }
   const attempts = current.attempts + 1;
+  // Compare-and-set: scope the UPDATE to the observed (status, attempts) so two
+  // interleaving failure-records can't both write attempts+1 (lost-update on the
+  // counter) and a failure can't clobber a concurrent requeue/mark-sent. A 0-row
+  // result means another writer moved it first — re-read and report the truth.
+  const guard = and(
+    eq(kraEtimsQueue.id, input.id),
+    eq(kraEtimsQueue.status, "pending"),
+    eq(kraEtimsQueue.attempts, current.attempts),
+  );
 
   if (attempts >= current.maxAttempts) {
-    await db
+    const updated = await db
       .update(kraEtimsQueue)
       .set({ status: "dead_letter", attempts, lastError: input.error, deadLetteredAt: now })
-      .where(eq(kraEtimsQueue.id, input.id));
+      .where(guard)
+      .returning();
+    if (updated.length === 0) {
+      const [fresh] = await db.select().from(kraEtimsQueue).where(eq(kraEtimsQueue.id, input.id));
+      return {
+        status: fresh?.status === "dead_letter" ? "dead_letter" : "pending",
+        attempts: fresh?.attempts ?? attempts,
+      };
+    }
     return { status: "dead_letter", attempts };
   }
 
   const nextAttemptAt = new Date(now.getTime() + etimsBackoffMs(attempts));
-  await db
+  const updated = await db
     .update(kraEtimsQueue)
     .set({ status: "pending", attempts, lastError: input.error, nextAttemptAt })
-    .where(eq(kraEtimsQueue.id, input.id));
+    .where(guard)
+    .returning();
+  if (updated.length === 0) {
+    const [fresh] = await db.select().from(kraEtimsQueue).where(eq(kraEtimsQueue.id, input.id));
+    return {
+      status: fresh?.status === "dead_letter" ? "dead_letter" : "pending",
+      attempts: fresh?.attempts ?? attempts,
+    };
+  }
   return { status: "pending", attempts };
 }
 

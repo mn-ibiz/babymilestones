@@ -1,0 +1,7 @@
+{"id":"P5-E02-S04","verdict":"issues","patches_applied":0,"decisions":4,"deferred":0,"dismissed":2,
+ "findings":[
+  {"severity":"blocker","category":"decision-needed","title":"VAT/PIN metadata never reaches printed receipt (AC2 broken end-to-end) — fix entangled w/ immutability","location":"apps/api/src/routes/receipts/render.ts:159"},
+  {"severity":"high","category":"decision-needed","title":"Reprints would re-stamp historical receipts with current VAT metadata (immutability) — snapshot at issue","location":"apps/api/src/routes/receipts/reprint.ts:50-118"},
+  {"severity":"high","category":"decision-needed","title":"No KRA PIN / VAT-number format validation; optional with no required-when-enabled gate","location":"packages/contracts/src/index.ts:4370"},
+  {"severity":"high","category":"decision-needed","title":"AC1 Settings->Tax UI does not exist; 3 fields have no UI/test","location":"apps/admin/app/(console)/settings"}
+ ]}

@@ -1,0 +1,8 @@
+{"id":"P5-E02-S01","verdict":"issues","patches_applied":2,"decisions":2,"deferred":1,"dismissed":3,
+ "findings":[
+  {"severity":"blocker","category":"patch","title":"VAT fabricated on exempt/zero-rated lines (deriveTax) — over-declared to KRA + diverged from persisted receipt","location":"packages/payments/src/receipts/etims-payload.ts:78","status":"FIXED"},
+  {"severity":"high","category":"patch","title":"KRA 2xx acceptance trusted blindly — blank control-unit/CU-invoice/QR persisted as 'accepted'","location":"packages/payments/src/receipts/etims-receipt-writer.ts:221","status":"FIXED"},
+  {"severity":"medium","category":"decision-needed","title":"Sequence allocation read-then-insert, no lock — orphaned/duplicate KRA invoice on collision","location":"packages/payments/src/receipts/etims-receipt-writer.ts:187-193"},
+  {"severity":"low","category":"decision-needed","title":"No unitPrice*qty==lineTotal consistency check before KRA registration","location":"packages/payments/src/receipts/etims-payload.ts:76-87"},
+  {"severity":"low","category":"defer","title":"Live writer dead code on real sale path (writeReceipt always Local) — see S03","location":"packages/payments/src/receipts/index.ts:178-192"}
+ ]}

@@ -160,6 +160,21 @@ describe("eTIMS receipt writer adapter (P5-E02-S01)", () => {
     expect(await dbh.db.select().from(receipts)).toHaveLength(0);
   });
 
+  it("writes NO receipt when KRA returns 2xx but omits the control-unit / CU-invoice / QR proof", async () => {
+    const serviceId = await seedService();
+    // A 200 with a blank/partial acceptance body must not persist an
+    // unverifiable 'accepted' receipt — it drops into the retry queue instead.
+    const emptyAcceptance: EtimsTransport = async () => ({
+      status: 200,
+      json: async () => ({ controlUnitNumber: "CU-1", cuInvoiceNumber: "", qrData: "" }),
+    });
+    const writer = createEtimsReceiptWriter(CONFIG, { transport: emptyAcceptance });
+    await expect(
+      writer.writeReceipt(dbh.db, payload({ lines: [{ serviceId, quantity: 1, unitPrice: 100, lineTax: 0, lineTotal: 100 }] })),
+    ).rejects.toBeInstanceOf(EtimsTransportError);
+    expect(await dbh.db.select().from(receipts)).toHaveLength(0);
+  });
+
   it("validates the payload (rejects an empty receipt) before contacting KRA", async () => {
     const transport = vi.fn(accepted);
     const writer = createEtimsReceiptWriter(CONFIG, { transport });

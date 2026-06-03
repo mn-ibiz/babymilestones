@@ -202,7 +202,6 @@ class LiveEtimsReceiptWriter implements ReceiptWriter {
       },
       payload,
       invoiceNumber,
-      { deriveTax: true },
     );
 
     // Register with KRA FIRST. Any failure throws and persists NOTHING — a clean
@@ -222,6 +221,15 @@ class LiveEtimsReceiptWriter implements ReceiptWriter {
     } catch (err) {
       if (err instanceof EtimsTransportError) throw err;
       throw new EtimsTransportError(err instanceof Error ? err.message : String(err));
+    }
+
+    // A 2xx is necessary but NOT sufficient: the control-unit number, CU invoice
+    // number, and QR are the legal proof of fiscalisation (AC3). A success
+    // response missing any of them must NOT be persisted as 'accepted' (that
+    // would be an unverifiable fiscal receipt) — treat it as a transport failure
+    // so the receipt drops cleanly into the retry queue (32-2).
+    if (!kra || !kra.controlUnitNumber || !kra.cuInvoiceNumber || !kra.qrData) {
+      throw new EtimsTransportError("acceptance response missing control-unit / CU-invoice / QR fields");
     }
 
     const [header] = await db

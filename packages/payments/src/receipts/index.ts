@@ -123,7 +123,6 @@ export type {
   EtimsInvoice,
   EtimsInvoiceItem,
   EtimsInvoiceSeller,
-  BuildEtimsInvoiceOptions,
 } from "./etims-payload.js";
 export {
   resolveReceiptWriter,

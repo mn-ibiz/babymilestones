@@ -38,7 +38,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 29 | 7 | ✅ | 3 (stock lost-update BLOCKER, Woo SSRF BLOCKER, packing-slip print) | 6 | 6 | 18 |
 | 30 | 5 | ✅ | 1 (door double-admit TOCTOU) | 2 | 3 (incl. payment-not-wired BLOCKER, capacity oversell race) | 9 |
 | 31 | 5 | ✅ | 2 (public coach-summary UUID guard, discreet-label PATCH 400-not-500) | 5 | 6 | 16 |
-| 32 | 4 | ⬜ | | | | |
+| 32 | 4 | ✅ | 5 (VAT-fabrication BLOCKER, KRA blind-trust, queue CAS, retry cron, flag before/after audit) | 3 | 10 (incl. not-wired BLOCKER, producer-gap BLOCKER, AC2-not-rendered BLOCKER) | 12 |
 | 33 | 4 | ⬜ | | | | |
 | 34 | 4 | ⬜ | | | | |
 | 35 | 6 | ⬜ | | | | |

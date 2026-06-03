@@ -183,6 +183,10 @@ export function registerAdminSettings(app: FastifyInstance, deps: AdminSettingsD
       return reply.code(400).send({ error: parsed.error, field: parsed.field });
     }
 
+    // Capture the prior value BEFORE the upsert so a tax-critical flag flip
+    // (eTIMS enable/rollback) records a full before/after pair in the audit (AC3).
+    const [prior] = await db.select().from(settings).where(eq(settings.key, key));
+
     const now = new Date();
     const [row] = await db
       .insert(settings)
@@ -203,11 +207,17 @@ export function registerAdminSettings(app: FastifyInstance, deps: AdminSettingsD
     // P5-E02-S03 (AC3): a dedicated audit for the eTIMS enable-flag change, so
     // the on/off rollback is traceable beyond the generic settings.update row.
     if (key === "etims") {
+      const priorEnabled =
+        (prior?.value as { enabled?: boolean } | undefined)?.enabled === true;
       await audit(db, {
         actor: actor.id,
         action: "etims.flag.changed",
         target: { table: "settings", id: key },
-        payload: { enabled: (parsed.value as { enabled?: boolean }).enabled === true, ip: req.ip },
+        payload: {
+          previous_enabled: priorEnabled,
+          enabled: (parsed.value as { enabled?: boolean }).enabled === true,
+          ip: req.ip,
+        },
       });
     }
 

@@ -133,4 +133,28 @@ describe("eTIMS queue state machine (P5-E02-S02)", () => {
     expect(requeued.deadLetteredAt).toBeNull();
     expect(requeued.nextAttemptAt.getTime()).toBe(NOW.getTime());
   });
+
+  it("a failure on an already-sent row is a no-op (compare-and-set, no spurious increment)", async () => {
+    const row = await enqueue(1, { maxAttempts: 5 });
+    await markEtimsSubmissionSent(dbh.db, { id: row.id, now: NOW });
+    // A racing failure-record after the row was already marked sent must NOT
+    // resurrect it or bump the counter — it reports the row's actual state.
+    const res = await recordEtimsSubmissionFailure(dbh.db, { id: row.id, error: "late", now: NOW });
+    expect(res.attempts).toBe(0);
+    const [after] = await dbh.db.select().from(kraEtimsQueue).where(eq(kraEtimsQueue.id, row.id));
+    expect(after!.status).toBe("sent");
+    expect(after!.attempts).toBe(0);
+    // The late failure did not overwrite the row with its error.
+    expect(after!.lastError).not.toBe("late");
+  });
+
+  it("does not mark a dead-lettered row sent (status-guarded transition)", async () => {
+    const row = await enqueue(1, { maxAttempts: 1 });
+    await recordEtimsSubmissionFailure(dbh.db, { id: row.id, error: "terminal", now: NOW });
+    // markSent is guarded on status='pending', so a late success can't flip a
+    // dead-lettered row to 'sent' behind the admin's back.
+    await markEtimsSubmissionSent(dbh.db, { id: row.id, now: NOW });
+    const [after] = await dbh.db.select().from(kraEtimsQueue).where(eq(kraEtimsQueue.id, row.id));
+    expect(after!.status).toBe("dead_letter");
+  });
 });

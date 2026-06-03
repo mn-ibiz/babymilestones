@@ -3,6 +3,52 @@
 These are real findings where the correct fix requires a human/product decision (ambiguous intent).
 They are NOT auto-fixed. Review and tell me how to resolve each.
 
+## Epic 32 — eTIMS Writer Swap  ⚠️ NOT WIRED TO PRODUCTION
+
+84. **[BLOCKER · wiring · P5-E02-S03/S01] Turning eTIMS ON does nothing — the whole epic is dead code in
+    production.** Every real receipt is written via `writeReceipt → getDefaultReceiptWriter()`, which
+    ALWAYS returns `LocalReceiptWriter`. The flag-gated `resolveReceiptWriter` (the only reader of
+    `etims.enabled`) and the live `LiveEtimsReceiptWriter` have NO production caller; the POS/handoff
+    routes never construct `EtimsWiring`. Unit tests pass only by calling the selector directly. **Fix:**
+    route `pos/sales.ts` + `reception/handoff.ts` through `resolveReceiptWriter`, and thread an
+    env-sourced `EtimsConfig`/transport into app boot. (This is the single root cause behind the S01
+    dead-code and S04 broken-AC2 findings too.)
+
+85. **[BLOCKER · money/durability · P5-E02-S02] AC1 producer gap — a failed KRA submission is LOST, not
+    queued.** `enqueueEtimsSubmission` has zero production callers; the live writer's failure path throws
+    and persists nothing (its own comment promises a hand-off to the retry queue that was never wired).
+    The story's reason to exist ("if KRA is down I don't lose the receipt") is undelivered. **Fix:** on
+    `EtimsTransportError`, persist the receipt `pending` AND enqueue with the already-allocated
+    `(series, sequence)` so the retry resubmits the same invoice number.
+
+86. **[HIGH · P5-E02-S02] No atomic claim of due queue rows → double-submission to KRA under any
+    horizontal scale-out.** `claimDueEtimsSubmissions` is a plain SELECT (no `FOR UPDATE SKIP LOCKED` /
+    claim-via-UPDATE); the in-process `inFlight` guard protects only ONE worker. With >1 jobs instance
+    both resubmit the same row (only KRA's idempotency key prevents actual double-fiscalization).
+    **Decide:** enforce single-instance for the jobs worker, or add a `claimed` status + lease column.
+
+87. **[BLOCKER · P5-E02-S04] VAT/PIN metadata never reaches the printed receipt (AC2 broken end-to-end),
+    AND the obvious fix creates a fiscal-immutability bug — decide together.** `render.ts`/`reprint.ts`
+    pass no `business` object, so the VAT/PIN/registered-address footer is always blank on real receipts
+    (the passing test hand-builds the object → false confidence). If fixed by loading the live etims
+    settings at render time, then editing the metadata later retroactively re-stamps every historical
+    receipt on reprint — historical fiscal documents must be immutable. **Compliant fix:** snapshot
+    pin/vat/registered-address onto the receipt at issue (additive nullable columns) and render reprints
+    from the snapshot, not live settings.
+
+88. **[HIGH · P5-E02-S04] No KRA PIN / VAT-number format validation + no required-when-enabled gate.**
+    Schema validates only trim/max-length, so garbage ('lorem ipsum', empty) can be stored and stamped
+    on a fiscal doc, and a fiscalized receipt can carry MISSING VAT metadata. Add a PIN regex
+    (e.g. `^P\d{9}[A-Z]$`) + VAT regex and require them when `etims.enabled` (confirm exact KRA grammar).
+    **[HIGH]** the AC1 "Settings → Tax" admin UI for the 3 fields was never built (no page, no API test).
+
+89. **[MED · P5-E02-S01] eTIMS sequence allocation is read-then-insert with no lock** — concurrent
+    same-series writes can collide; the UNIQUE constraint fails the 2nd INSERT but only AFTER KRA
+    registered that invoice → an orphaned KRA invoice + a retry that registers a SECOND invoice for the
+    same sale. Allocate the sequence atomically before the KRA call, or persist 'pending' first.
+    **[LOW · S01]** no `unitPrice*qty == lineTotal` check before registration. **[LOW · S03]** the
+    live-fiscalization toggle is gated only by `manage config` (admin), not a super_admin-only capability.
+
 ## Epic 31 — Mom Coaching & Doula  (sensitive flow)
 
 80. **[MED · privacy · P5-E01-S04] AC2 "named coach can read their OWN notes" is not delivered.** The
