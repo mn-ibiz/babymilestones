@@ -1,0 +1,49 @@
+{
+  "id": "P3-E05-S01",
+  "verdict": "issues",
+  "diff_summary": "Daily ops dashboard: pure reducer (catalog/operations-dashboard.ts), DB read (operations-dashboard-db.ts), admin-gated API (api/.../operations-dashboard.ts), contracts view-model, admin /operations page + lib. Sums today's bookings into revenue (total+per-unit), bookings count, active sessions, centre-wide outstanding, top staff; polls 60s.",
+  "ac_coverage": "AC1 tiles implemented & tested (revenue total+per-unit, bookings, active, outstanding, top staff). AC2 drill-through hrefs wired & tested. AC3 60s poll implemented (DASHBOARD_REFRESH_MS=60000; setInterval). AC4 authz implemented & tested (admin/super_admin/treasury 200; accountant/reception 403; unauth 401). NOTE: spec Technical Notes say 'materialised view refreshed every minute' but implementation is on-demand fresh queries (no MV/migration) — functionally equivalent, not an AC.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "'Today' is keyed to the UTC calendar day, but the business runs in EAT (UTC+3)",
+      "detail": "The API derives the report date as clock().toISOString().slice(0,10) (operations-dashboard.ts:62) and the DB read builds day boundaries as `${date}T00:00:00.000Z` .. +24h (operations-dashboard-db.ts:36-43), i.e. pure UTC days, matched against bookings.checkedInAt. The deployment is Nairobi/EAT (UTC+3) — the codebase already knows this: payments/src/mpesa/stkPush.ts:135-142 explicitly shifts UTC by +3h for EAT, and receipt/SEO addresses are 'Nairobi, Kenya'. Consequences for the 'Today at a glance' dashboard: (1) bookings between 00:00-03:00 EAT (21:00-24:00 UTC the prior day) are counted into YESTERDAY's dashboard, and bookings between 21:00-24:00 EAT fall on the right civil day only by coincidence; (2) the 'today' the API selects flips at 03:00 EAT (midnight UTC), so for the first 3 hours of every EAT business day the dashboard labels and queries the PREVIOUS civil day as 'today'. Revenue/bookings/top-staff tiles will not reconcile to the owner's civil day during those windows. No test covers the off-UTC-day edge (api test fixes now/checkedInAt to ...T15:00:00Z / ...T10:00:00Z, all UTC: operations-dashboard.test.ts:75,84,109).",
+      "location": "apps/api/src/routes/admin/operations-dashboard.ts:62; packages/catalog/src/operations-dashboard-db.ts:36-43",
+      "fix": "Decide the canonical reporting timezone (almost certainly Africa/Nairobi / EAT UTC+3 for this product) and apply it consistently: derive 'today' as the EAT civil date and build day boundaries as the EAT day shifted to UTC (subtract 3h), e.g. from = new Date(`${date}T00:00:00.000+03:00`). This same UTC-day convention is shared with revenue-by-period S02 (revenue-by-period-db.ts:48-55), so the fix should be a shared EAT day-boundary helper applied across the P3-E05 reporting surfaces rather than a one-off here. Needs a product/ops call to confirm EAT before changing, hence decision-needed.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "'Today's revenue' counts invoiced-not-settled (and subscription-paid) bookings, and never nets refunds",
+      "detail": "Revenue is SUM(bookings.staffRateSnapshot) over every non-cancelled booking on the day, regardless of invoice settlement (operations-dashboard.ts:116-119; operations-dashboard-db.ts:53-71). This is documented as intentional ('settled or pending', operations-dashboard.ts:18-25) and matches salon-reporting.ts:12-16. Practical effect: a booking whose invoice is 'outstanding' (parent underfunded, auto-credit off — no cash collected) still adds its full rate to the headline 'Today's revenue' tile; the API test confirms this (operations-dashboard.test.ts:107,122 — a 5000 'outstanding' booking is counted in revenue). A subscription-paid booking (paidVia='subscription', zero settled invoice; bookings.ts:67-72) likewise counts its staffRateSnapshot as revenue. Additionally the dashboard does NOT subtract refunds, whereas the sibling revenue-by-unit-by-period report (S02) DOES net refunds (revenue-by-period-db.ts:21-37) — so the 'Today's revenue' tile and the period report it links to can disagree. For an owner-facing tile literally labelled 'Today's revenue', accrual/billed-value vs cash-collected is a meaningful semantic the spec does not pin down.",
+      "location": "packages/catalog/src/operations-dashboard.ts:116-119; packages/catalog/src/operations-dashboard-db.ts:53-71",
+      "fix": "Product decision: confirm whether 'revenue' means billed/accrued (current behaviour) or cash-collected. If billed is intended, label the tile to disambiguate (e.g. 'Billed today') and document that it excludes refunds and includes outstanding/subscription bookings, so it visibly differs from the cash and period-net-revenue surfaces. If cash is intended, restrict to settled/collected amounts. Deferring the change pending that call.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "'Active sessions' count has no date bound — stale/forgotten check-outs inflate it forever",
+      "detail": "Active sessions = COUNT(attendances WHERE checkedOutAt IS NULL AND completedAt IS NULL) with NO bound on checkedInAt (operations-dashboard-db.ts:83-86). Any attendance ever opened but never checked out (crèche hand-off forgotten) or completed (salon) is counted as an 'active session' today, indefinitely. On a 'Today at a glance' dashboard a single orphaned record from a previous day permanently overstates 'what's happening now'. Every other attendance-keyed reporting read in this epic bounds by checkedInAt range (peak-hours-heatmap-db.ts:63-64; repeat-attendance-db.ts:92-93), so this is the odd one out. No test covers a stale prior-day open attendance.",
+      "location": "packages/catalog/src/operations-dashboard-db.ts:83-86",
+      "fix": "Add a same-day lower bound on the open-attendance count: `.where(and(isNull(attendances.checkedOutAt), isNull(attendances.completedAt), gte(attendances.checkedInAt, from), lt(attendances.checkedInAt, to)))` using the same [from,to] day window already computed for bookings. (Tie the date window to the EAT fix above so 'active' and 'today' agree.)",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Outstanding query omits the `amount_due > 0` guard used by the sibling wallet-aging read",
+      "detail": "Centre-wide outstanding = COALESCE(SUM(amount_due),0) WHERE status NOT IN ('settled','void') (operations-dashboard-db.ts:89-92). The sibling outstanding definition in the same epic adds AND amount_due > 0 (wallet-aging-db.ts:48), and the dashboard's own comment claims it is 'the same definition the wallet/parent surfaces use' (operations-dashboard-db.ts:24) — but it isn't, the > 0 guard is missing. Because amount_due has CHECK >= 0 and void invoices are zeroed (schedules.ts:839), the running SUM is numerically identical today, so this is a robustness/consistency nit rather than a money error. Worth aligning so the two 'outstanding' surfaces provably use one definition and cannot drift if a non-settled/non-void status ever reaches amount_due=0.",
+      "location": "packages/catalog/src/operations-dashboard-db.ts:89-92",
+      "fix": "Match wallet-aging: change the predicate to `sql`${invoices.status} NOT IN ('settled','void') AND ${invoices.amountDue} > 0``.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

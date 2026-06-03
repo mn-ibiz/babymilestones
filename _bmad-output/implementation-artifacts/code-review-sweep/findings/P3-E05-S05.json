@@ -1,0 +1,19 @@
+{
+  "id": "P3-E05-S05",
+  "verdict": "issues",
+  "diff_summary": "Peak-hours heatmap (Story 27.5): packages/catalog peak-hours-heatmap{,-db}.ts (pure 7x24 weekday×hour reducer + DB read joining attendances→bookings→services), packages/contracts heatmap query schema + view-model, apps/api admin route (role-gated read), apps/admin heatmap page + client lib. Buckets active-session check-ins into a weekday×hour grid; filterable by unit; range capped at 12 months.",
+  "ac_coverage": "AC1 (weekday×hour grid, intensity = active sessions) implemented & tested but bucketed in UTC not EAT — see blocker; AC2 (unit filter) implemented & tested; AC3 (12-month cap) implemented & tested. Authz (read-report gate) correct; no PII exposed.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Heatmap buckets hour-of-day & weekday in UTC, not EAT (UTC+3) — every 'peak hour' is shifted 3 hours for an EAT venue",
+      "detail": "aggregatePeakHoursHeatmap buckets each check-in with when.getUTCDay()/getUTCHours() (packages/catalog/src/peak-hours-heatmap.ts:90-91). The business operates in East Africa Time (UTC+3): packages/payments/src/mpesa/stkPush.ts:135-143 explicitly defines 'EAT (UTC+3)' and shifts UTC instants by +3h for wall-clock formatting, and its test asserts '08:30 UTC → 11:30 EAT'. attendances.checkedInAt is a true UTC instant (timestamptz, packages/db/src/schema/attendances.ts:22). Consequences: an 18:00 EAT (busy evening) check-in is stored as 15:00 UTC and lands in heatmap hour 15, not 18; an 01:00 EAT check-in (16:30 prior-day UTC scenario / wrap) can even shift to the wrong WEEKDAY. The contracts view-model then renders this UTC hour as a wall-clock label e.g. 'Wed 10:00' (packages/contracts/src/index.ts:5008-5009,5042) and the admin page surfaces it (apps/admin/app/operations/heatmap/page.tsx:130-131), so the operator reads a peak that is 3 hours wrong. A heatmap of 'peak hours' for staffing is its whole purpose — a systematic 3-hour shift makes the deliverable actively misleading, not merely imprecise. NOTE the false-equivalence in the code comments: 27.1/27.2 'key on UTC' but only at DAY grain (sum-per-day), where a UTC vs EAT boundary causes only edge-of-range drift; 27.5 is HOUR grain, where the offset corrupts every cell. The unit tests lock in the wrong behavior (packages/catalog/src/peak-hours-heatmap.test.ts:48-49 asserts '10:30 UTC → hour 10'), so AC1's required test passes while validating an incorrect convention. The admin page even labels the axis '(UTC)' (page.tsx:19,50) — a deliberate but wrong choice for an EAT operator.",
+      "location": "packages/catalog/src/peak-hours-heatmap.ts:90",
+      "fix": "Bucket in the business timezone (EAT/UTC+3) rather than UTC. Direction is unambiguous (EAT venue, established convention in stkPush.ts); decision-needed only on plumbing: (a) add a fixed +3h shift before getUTC*() in aggregatePeakHoursHeatmap (e.g. const eat = new Date(when.getTime() + 3*60*60*1000); weekday = eat.getUTCDay(); hour = eat.getUTCHours();), matching darajaTimestamp's pattern — simplest; or (b) thread an Intl/zoned conversion (Africa/Nairobi) so it survives any future DST/timezone-config change. Then ideally make the DB-read day boundaries EAT too (peak-hours-heatmap-db.ts dayStart/nextDayStart currently use UTC midnight, so the [from,to] window is a UTC calendar day, off by 3h from an EAT day at the range edges). Update the catalog reducer tests, the contracts label tests, and remove/replace the '(UTC)' UI copy. Confirm the target timezone is hard-coded EAT vs sourced from a center setting.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

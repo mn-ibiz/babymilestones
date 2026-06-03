@@ -73,7 +73,7 @@
     "24": "done",
     "25": "done",
     "26": "done",
-    "27": "todo",
+    "27": "done",
     "28": "todo",
     "29": "todo",
     "30": "todo",
@@ -2162,7 +2162,7 @@
         "23c1a70c33f576b976cd1761a0d488b388e2b72b"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "27-2-revenue-by-unit-by-period",
@@ -2179,7 +2179,7 @@
         "23c1a70c33f576b976cd1761a0d488b388e2b72b"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "27-3-top-staff-leaderboard",
@@ -2196,7 +2196,7 @@
         "23c1a70c33f576b976cd1761a0d488b388e2b72b"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "27-4-wallet-aging-report",
@@ -2213,7 +2213,7 @@
         "23c1a70c33f576b976cd1761a0d488b388e2b72b"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "27-5-peak-hours-heatmap",
@@ -2230,7 +2230,7 @@
         "23c1a70c33f576b976cd1761a0d488b388e2b72b"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "28-1-job-framework-scheduling-observability",
@@ -3228,8 +3228,16 @@
       "decisions_needed": 3,
       "dismissed": 6,
       "commit": ""
+    },
+    "27": {
+      "stories_reviewed": 5,
+      "patches": 3,
+      "deferred": 3,
+      "decisions_needed": 6,
+      "dismissed": 14,
+      "commit": ""
     }
   },
-  "epics_done": 25,
+  "epics_done": 26,
   "epics_total": 35
 }

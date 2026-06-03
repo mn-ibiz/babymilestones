@@ -1,0 +1,49 @@
+{
+  "id": "P3-E05-S02",
+  "verdict": "issues",
+  "diff_summary": "Epic-27 commit; S02 = revenue-by-unit-by-period: packages/catalog/src/revenue-by-period{,-db}.ts (pure reducer + Drizzle read), apps/api/src/routes/admin/revenue-by-period.ts (admin-gated JSON + audited CSV export), packages/contracts/src/index.ts (Zod query schema + CSV + view-model), apps/admin/{lib,app/operations/revenue-trends}/* (client + page). Per-unit NET revenue (gross staffRateSnapshot of non-cancelled bookings minus in-period refunds) over [from,to] with period-over-period delta vs the preceding equal-length period.",
+  "ac_coverage": "AC1 (date picker + per-unit chart/bar + period-over-period delta) implemented & tested (db + api + contracts + page). AC2 (CSV export, same filter, audited) implemented & tested. AC3 (excludes refunded amounts) implemented & tested. All ACs covered; gaps are robustness/semantics, not missing ACs.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "revenueByPeriodQuerySchema has NO max-days cap — unbounded range scans bookings + wallet_ledger twice",
+      "detail": "revenueByPeriodQuerySchema (packages/contracts/src/index.ts:3328) validates only fromDate<=toDate with no upper bound on the span. loadRevenueByPeriod runs loadPeriodRows for BOTH the selected period AND the preceding equal-length period, each doing a bookings+services scan and a wallet_ledger+settlement+invoices+bookings+services join filtered by date. A caller can request fromDate=1900-01-01&toDate=2999-12-31 (passes validation) and trigger two enormous unbounded scans — a resource/DoS vector and noticeably slower than its peers. Every OTHER date-range report in this very epic caps the span: RECONCILIATION_EXPORT_MAX_DAYS=366 (index.ts:1447), PEAK_HOURS_MAX_DAYS=366 (index.ts:4944), FLOAT_VS_REVENUE_MAX_DAYS=366 (index.ts:3522). Revenue-by-period is the lone outlier with no cap, so this is both a real exposure and an internal inconsistency.",
+      "location": "packages/contracts/src/index.ts:3328-3336",
+      "fix": "Add a max-span refine mirroring the reconciliation export: define REVENUE_BY_PERIOD_MAX_DAYS=366 and add `.refine((v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= REVENUE_BY_PERIOD_MAX_DAYS, { message: 'Date range may not exceed 366 days', path: ['toDate'] })` (reuse the existing reconciliationExportDayCount helper). Both /admin/revenue-by-period and /export re-validate with this schema, so the cap is enforced on read and export. Add a contracts test asserting a >366-day range fails.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Refund attributed even when its booking is cancelled/excluded — can drive a unit's NET revenue negative",
+      "detail": "The gross-revenue query excludes cancelled bookings (ne(bookings.status,'cancelled'), revenue-by-period-db.ts:76). The refund query does NOT filter booking status (revenue-by-period-db.ts:89-108): it innerJoins bookings on invoiceId with no status predicate. So if a booking's check-in was debited and later refunded, then the booking was cancelled, its in-period refund is still subtracted from that unit while its gross was never added. The reducer (revenue-by-period.ts:99-102) blindly subtracts, so the unit (and total) can go negative for that contribution. netByUnit has no floor at zero. The cancelled-booking gross-exclusion is tested (revenue-by-period-db.test.ts:128) but the cancelled-booking-with-refund asymmetry is not. Whether a cancelled-then-refunded booking should net to 0 (exclude both sides) or reflect the refund cash-out is a product call.",
+      "location": "packages/catalog/src/revenue-by-period-db.ts:89-108",
+      "fix": "Decide the intended semantics: (a) symmetric — add ne(bookings.status,'cancelled') to the refund join so a cancelled booking contributes neither gross nor refund; or (b) keep refunds unconditional (cash truly left) and document that NET can be negative, plus add a test pinning the chosen behaviour. Either way add a regression test for the refund-on-cancelled-booking case.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Revenue is INVOICED (staffRateSnapshot), not SETTLED — figure cannot reconcile to the wallet ledger",
+      "detail": "Gross revenue = bookings.staffRateSnapshot summed for non-cancelled bookings (revenue-by-period-db.ts:69) — the booked/invoiced rate snapshot, independent of whether the invoice ever settled. Refunds, by contrast, are pulled from the wallet_ledger (settled-side reversals). The report therefore mixes an invoice-side gross with a ledger-side deduction and does not reconcile to ledger float: a booking invoiced but never settled (outstanding invoice) or paid via subscription (schema notes a 'zero settled invoice', bookings.ts:71 paidVia='subscription') still counts its full staffRateSnapshot as revenue, while only refunds touch the ledger. There is no invoiced-vs-settled split or any guard that a refund maps to a real settlement. This matches S01's revenue definition (operations-dashboard-db.ts:57), so it is a deliberate model, but it is exactly the invoiced-vs-settled reconciliation gap to surface: the owner's 'revenue' is accrued/invoiced, not collected cash.",
+      "location": "packages/catalog/src/revenue-by-period-db.ts:67-78",
+      "fix": "Product/finance decision: (1) keep invoiced-accrual revenue but document it explicitly in the report/UI ('invoiced, net of refunds — not collected cash'); or (2) base revenue on settled amounts (wallet_ledger check-in settlements via wallet_ledger_invoice_settlement.kind='checkin') so gross and refunds both come from the ledger and reconcile; or (3) exclude paidVia='subscription' bookings from cash revenue. No code patch without the finance call.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Period boundaries are UTC midnight, but the business operates in EAT (UTC+3)",
+      "detail": "All bucketing keys on UTC calendar days: dayStart/nextDayStart build [date 00:00Z, (date+1) 00:00Z) on bookings.checkedInAt (revenue-by-period-db.ts:48-56) and refunds on walletLedger.createdAt (105-107). For a Kenya (KES) business in EAT (UTC+3) a visit at e.g. 2026-06-02 01:00 EAT = 2026-06-01 22:00 UTC is bucketed into June 1, not June 2 — period boundaries are off by the 3h offset, mis-attributing the first/last 3 hours of each local day to the adjacent period. precedingPeriod arithmetic itself is correct (pure UTC-ms, DST-immune; verified Jun1-Jun7 -> May25-May31). This is a pre-existing convention inherited verbatim from S01 (operations-dashboard-db.ts:35-43) and consistent across all of Epic 27's reporting, so it is out of S02's scope to fix unilaterally — flagging for an epic-wide timezone decision.",
+      "location": "packages/catalog/src/revenue-by-period-db.ts:48-56",
+      "fix": "Defer to an epic-level decision: introduce a single business-timezone (Africa/Nairobi) day-boundary helper shared by all Epic-27 reads, or document UTC bucketing as the accepted convention. Do not change S02 in isolation — it would diverge from S01's dashboard and the rest of the reporting suite.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

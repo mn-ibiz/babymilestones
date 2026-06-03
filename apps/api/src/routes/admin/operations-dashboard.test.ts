@@ -110,8 +110,14 @@ describe("Admin operations-dashboard API (P3-E05-S01)", () => {
     // A SETTLED booking today — counts toward revenue/bookings but NOT outstanding.
     await seedBooking({ ...fam, serviceId: play!.id, staffId: bree.id, staffName: "Bree", revenueCents: 0, invoiceStatus: "settled" });
 
-    // One active session (checked in, not checked out / completed); one already checked out.
-    await dbh.db.insert(attendances).values({ bookingId: pb1.id, checkedInBy: null });
+    // One active session (checked in TODAY, not checked out / completed). Set
+    // checkedInAt explicitly to TODAY — "active sessions" is now scoped to the
+    // day's check-ins (a stale prior-day open attendance no longer inflates it).
+    await dbh.db.insert(attendances).values({
+      bookingId: pb1.id,
+      checkedInBy: null,
+      checkedInAt: new Date(`${TODAY}T10:00:00Z`),
+    });
 
     const res = await get("/admin/operations-dashboard", creds);
     expect(res.statusCode).toBe(200);

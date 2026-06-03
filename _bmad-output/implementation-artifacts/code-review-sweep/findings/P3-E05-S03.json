@@ -1,0 +1,29 @@
+{
+  "id": "P3-E05-S03",
+  "verdict": "issues",
+  "diff_summary": "Top-staff leaderboard: pure aggregations (packages/catalog/src/staff-leaderboard.ts) + DB reads (staff-leaderboard-db.ts), admin-gated API (apps/api/src/routes/admin/staff-leaderboard.ts), contracts DTOs/view-models, and two admin pages. Per-staff revenue/service-count/avg-ticket over a [from,to] range, role filter, and a per-staff commission drill-down.",
+  "ac_coverage": "AC1 (per-staff totals, service count, avg ticket) implemented + tested (zero-fill, divide-by-zero, integer truncation). AC2 (role filter) implemented + tested (filter applied, unknown role 400). AC3 (drill-down with commission totals) implemented + tested (404 unknown id). Authz (403 accountant/reception, 401 unauth, 400 bad range) tested on both endpoints. No explicit reassign-regression test, but reassign-safety holds by construction (see findings).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "No explicit reassign regression test for the leaderboard",
+      "detail": "The brief flagged that the staff-earnings breakdown (P3-E02-S02, computeStaffEarnings/breakdownInWindow in packages/catalog/src/staff-earnings.ts) miscounts reassign by counting 'isVisit' commission-ledger lines, so a reassigned booking can be double-counted as a visit across the original 'booking' accrual and the new 'reassign' line. CONFIRMED the leaderboard does NOT share that defect: loadStaffLeaderboard (packages/catalog/src/staff-leaderboard-db.ts:82-95) reads revenue + service count straight from the bookings table (bookings.staffId / bookings.staffRateSnapshot, non-cancelled), with no commission-ledger join. reassignSalonBooking (packages/catalog/src/salon.ts:1030-1038) only mutates the single booking row's staffId/staffNameSnapshot (NOT staffRateSnapshot), so one booking stays exactly one service / one revenue figure under the CURRENT (new) stylist — reassign-safe by construction, no double-count possible. The drill-down (aggregateStaffCommission) nets ALL ledger lines per staff, so the new stylist's 'reassign' line and the old stylist's zeroing 'refund_reversal' net correctly too. The only gap is the absence of an explicit reassign test in the leaderboard suite (packages/catalog/src/staff-leaderboard*.test.ts and apps/api/.../staff-leaderboard.test.ts have no reassign case). Not a code defect; a test-coverage gap given the platform's history with this exact failure mode.",
+      "location": "packages/catalog/src/staff-leaderboard-db.test.ts",
+      "fix": "Add a regression test: seed one booking, reassign it (update bookings.staffId from A to B), and assert the leaderboard credits B (not A, and not both) with serviceCount=1 and the full revenueCents — locking in the current-attribution / reassign-safe behaviour against future ledger-join refactors.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Leaderboard revenue is GROSS attributed price (refunds not netted), unlike sibling 27.2",
+      "detail": "loadStaffLeaderboard sums bookings.staffRateSnapshot for every non-cancelled booking; a refunded-but-not-cancelled visit still contributes its full revenue to the staff member's total. The sibling revenue-by-period (P3-E05-S02) DTO advertises 'NET revenue (refunds excluded, AC3)'. This is an intentional divergence — the leaderboard documents itself (staff-leaderboard.ts:11-16) as building on 27.1's gross attributed-revenue model, and S03's AC1 only asks for 'per-staff totals, count of services, average ticket' with no refund-netting requirement, framing it as a 'who performed the most services / brought in the most gross' view. Noting the semantic difference so a reader doesn't assume the two reports reconcile to the same per-staff number. No AC is violated.",
+      "location": "packages/catalog/src/staff-leaderboard-db.ts:82",
+      "fix": "If product wants the leaderboard to reconcile with net revenue-by-period, net out refund/reversal-linked bookings. Otherwise leave as-is and (optionally) label the column 'Gross revenue' in the admin UI to avoid ambiguity. Deferred — needs a product decision, out of S03 AC scope.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

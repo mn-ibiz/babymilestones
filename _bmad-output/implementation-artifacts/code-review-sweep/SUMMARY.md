@@ -33,7 +33,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 24 | 2 | ✅ | 1 (public viewer malformed-id 500→404) | 2 | 1 | 8 |
 | 25 | 5 | ✅ | 2 (salon counter IDOR BLOCKER, resync cancelled-slot) | 4 | 5 | 15 |
 | 26 | 4 | ✅ | 1 (adjust reason persisted) | 2 | 3 | 6 |
-| 27 | 5 | ⬜ | | | | |
+| 27 | 5 | ✅ | 3 (active-session bound, outstanding guard, revenue range cap) | 3 | 6 | 14 |
 | 28 | 5 | ⬜ | | | | |
 | 29 | 7 | ⬜ | | | | |
 | 30 | 5 | ⬜ | | | | |

@@ -3325,6 +3325,8 @@ export function adminAlertRows(alerts: readonly AdminAlertDto[]): AdminAlertRowV
  * uses the SAME filter (AC2). Both bounds are validated calendar dates and
  * `fromDate <= toDate`. Reuses the shared {@link exportDateSchema}.
  */
+/** Max span for the revenue-by-period report — matches the other date reports. */
+export const REVENUE_BY_PERIOD_MAX_DAYS = 366;
 export const revenueByPeriodQuerySchema = z
   .object({
     fromDate: exportDateSchema,
@@ -3333,7 +3335,13 @@ export const revenueByPeriodQuerySchema = z
   .refine((v) => v.fromDate <= v.toDate, {
     message: "fromDate must be on or before toDate",
     path: ["toDate"],
-  });
+  })
+  // Cap the span so an unbounded range can't trigger two huge bookings+ledger
+  // scans (the only date report in this epic that previously had no cap).
+  .refine(
+    (v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= REVENUE_BY_PERIOD_MAX_DAYS,
+    { message: `Date range may not exceed ${REVENUE_BY_PERIOD_MAX_DAYS} days`, path: ["toDate"] },
+  );
 export type RevenueByPeriodQuery = z.infer<typeof revenueByPeriodQuerySchema>;
 
 /** Net revenue for one unit over the selected period (always present). */

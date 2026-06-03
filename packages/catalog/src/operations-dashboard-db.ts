@@ -80,16 +80,26 @@ export async function loadOperationsDashboard(
   }));
 
   // Active sessions: checked in, not yet checked out (crèche) or completed (salon).
+  // Bounded to the day's check-ins so a stale/forgotten prior-day open attendance
+  // can't inflate "active" indefinitely (matches the sibling peak-hours read).
   const [{ active } = { active: 0 }] = await db
     .select({ active: sql<number>`COUNT(*)::int` })
     .from(attendances)
-    .where(and(isNull(attendances.checkedOutAt), isNull(attendances.completedAt)));
+    .where(
+      and(
+        isNull(attendances.checkedOutAt),
+        isNull(attendances.completedAt),
+        gte(attendances.checkedInAt, from),
+        lt(attendances.checkedInAt, to),
+      ),
+    );
 
-  // Centre-wide outstanding: sum of open invoices across every parent.
+  // Centre-wide outstanding: sum of open invoices across every parent. The
+  // `amount_due > 0` guard matches the wallet-aging report's definition.
   const [{ owed } = { owed: "0" }] = await db
     .select({ owed: sql<string>`COALESCE(SUM(${invoices.amountDue}), 0)` })
     .from(invoices)
-    .where(sql`${invoices.status} NOT IN ('settled', 'void')`);
+    .where(sql`${invoices.status} NOT IN ('settled', 'void') AND ${invoices.amountDue} > 0`);
 
   const aggOpts: AggregateOperationsDashboardOpts = { topStaffLimit: opts.topStaffLimit };
   return aggregateOperationsDashboard(

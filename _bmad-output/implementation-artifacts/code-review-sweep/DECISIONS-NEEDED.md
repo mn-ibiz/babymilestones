@@ -33,6 +33,21 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 27 — Operational Reporting
+
+67. **[BLOCKER · correctness · P3-E05-S05] Peak-hours heatmap buckets hour/weekday in UTC, not EAT.**
+    Every cell shifted 3h; edge-of-day on the wrong weekday. Hour-grain, so the whole report is wrong
+    (UI axis even says "(UTC)"). The acute instance of the timezone decision (#17) — direction (EAT) is
+    unambiguous; pick the mechanism (+3h shift / Intl zoned / centre setting). `peak-hours-heatmap.ts:90`.
+
+68. **[MED · P3-E05-S01/S02] Reporting "revenue" is invoiced (`staffRateSnapshot`), not settled** — counts
+    unsettled + subscription bookings; S01 doesn't net refunds while S02 does (the two disagree); S02
+    refund-on-cancelled can go negative. Decide billed-vs-collected + label/reconcile consistently.
+
+69. **[HIGH · P3-E05-S04] Wallet-aging includes `settled_on_credit`** — the cross-cutting double-count
+    (#14/#52), worse here because it never clears and ages into 90+. Fix the `settled_on_credit`
+    definition consistently across all outstanding sites.
+
 ## Epic 26 — Loyalty Clawback / Negative Carry  ⚠️ STRUCTURAL
 
 64. **[BLOCKER · money · ARCHITECTURE] The loyalty ledger hosts two disjoint, unbridged engines.**
