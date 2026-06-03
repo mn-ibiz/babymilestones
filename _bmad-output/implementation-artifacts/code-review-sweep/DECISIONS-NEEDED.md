@@ -33,6 +33,30 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 16 — Booking Engine
+
+26. **[HIGH · money · P2-E01-S05] Subscription-paid reschedule can cross the subscription period →
+    entitlement double-dip.** `rescheduleBooking` predates subscriptions (Epic 17) and doesn't
+    re-validate coverage; a unit from period N gets spent on a period N+1 slot. **Choose:** block
+    cross-period reschedule, or re-run bookSlot entitlement on reschedule. File: `packages/catalog/src/schedules.ts:718-780`.
+
+27. **[MED · P2-E01-S04] AC3 attribution unreachable from the reception UI** — `confirm()` never sends
+    `staffId`, so attribution-required services can't be booked end-to-end (server enforcement is
+    correct). Ship without the staff picker, or land it. (+ LOW: validate `staffId` role on
+    non-attribution services to avoid commission mis-attribution.)
+
+28. **[MED · P2-E01-S06] No dedicated cancellation cutoff** — parent self-cancel reuses
+    `rescheduleCutoffHours`. Share one cutoff (document it) or add `cancellation_cutoff_hours`.
+
+29. **[MED · P2-E01-S07] Parent bookings list is unbounded** (no LIMIT/pagination). Choose a fixed
+    bound or cursor pagination. File: `apps/api/src/routes/parents/booking.ts:75`.
+
+30. **[LOW · P2-E01-S02] In-progress slot still bookable** (`isSlotPast` keys on END time). Confirm
+    whether a started-but-not-ended session is joinable.
+
+> Note: the **UTC-vs-EAT timezone** decision (item 17) also covers booking slot wall-clock times
+> (slot generation, availability "today"/"earlier today") — resolve one centre-timezone convention repo-wide.
+
 ## Epic 14 — Design System Foundation
 
 25. **[LOW · X7-S01] `brand`/`ink`/`surface` token aliases don't re-skin on a palette swap** — they're

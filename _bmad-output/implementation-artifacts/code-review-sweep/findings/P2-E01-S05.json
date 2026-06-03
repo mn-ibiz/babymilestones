@@ -1,0 +1,29 @@
+{
+  "id": "P2-E01-S05",
+  "verdict": "issues",
+  "diff_summary": "Adds per-service reschedule_cutoff_hours (migration 0044, schema, contracts default 2, admin serializer), catalog rescheduleBooking + isWithinRescheduleCutoff helpers, POST /parents/me/bookings/:id/reschedule, and the booking.rescheduled audit action; the reschedule locks the target slot, enforces same-service + capacity + duplicate-child, repoints slot_id in one transaction and audits both slot ids.",
+  "ac_coverage": "AC1 (cutoff, default 2h) implemented + tested; AC2 (new slot capacity, single-transaction replace via slot_id repoint) implemented + tested; AC3 (audit both old+new slot ids) implemented + tested; AC4 (post-cutoff 'contact reception') implemented + tested. All 4 ACs covered.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Reschedule of a subscription-paid booking can move it outside the subscription's covered period without re-validating or adjusting entitlement",
+      "detail": "bookSlot (P2-E02-S03, commit 838b1e8 which landed AFTER S05) only consumes a subscription unit when the slot instant falls within the subscription's half-open current period [currentPeriodStart, currentPeriodEnd) (schedules.ts:597), and cancelBooking refunds the unit on cancel (schedules.ts:820-824). rescheduleBooking (schedules.ts:718-780) was never updated for subscriptions: it blindly repoints slot_id and leaves paidVia='subscription'/subscriptionId set, with NO check that the new slot is still inside the subscription's current period and NO entitlement re-validation. A parent can therefore move a subscription-paid booking to a date in a different period (e.g. next month), so a unit granted for period N is consumed for a slot in period N+1 — effectively double-dipping (period N+1's own entitlement is untouched and still spendable). Capacity itself is fine (computed by slot_id), but this is an entitlement/money-accounting leak. Only live because subscriptions merged after S05 without touching reschedule.",
+      "location": "packages/catalog/src/schedules.ts:718-780",
+      "fix": "Product decision required: (a) block a reschedule whose new slot falls outside the booking's subscription current period (treat like ServiceMismatch / 'pick a slot within your plan period'); or (b) re-run the bookSlot entitlement logic on reschedule (refund the old unit, re-resolve coverage for the new slot, decrement again or fall back to a wallet pending invoice). Option (a) is the smallest safe change. Either way add a test for moving a paidVia=subscription booking across the period boundary.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "New-slot past-check is non-transactional (TOCTOU); rescheduleBooking itself never re-checks past",
+      "detail": "The route validates the destination slot with isSlotPast on a non-locked read (booking.ts:266-272), but rescheduleBooking (schedules.ts:718-780) only checks capacity/duplicate/service, never 'is this slot now in the past'. In the millisecond window between the route's check and the transaction, a slot that ends right at 'now' could be moved into. This exactly mirrors the existing bookSlot path (booking.ts:147-155 also pre-checks past outside the slot transaction), so it is a pre-existing, codebase-wide pattern rather than a regression introduced by S05, and the window is sub-second.",
+      "location": "apps/api/src/routes/parents/booking.ts:266-272",
+      "fix": "Pre-existing pattern shared with bookSlot — defer. If hardened later, move the past-slot guard inside the locked transaction (rescheduleBooking already holds the new slot FOR UPDATE; compute past from a passed-in now) so it is evaluated against the committed snapshot.",
+      "ac_ref": ""
+    }
+  ]
+}

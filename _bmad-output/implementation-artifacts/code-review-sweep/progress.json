@@ -62,7 +62,7 @@
     "13": "done",
     "14": "done",
     "15": "done",
-    "16": "todo",
+    "16": "done",
     "17": "todo",
     "18": "todo",
     "19": "todo",
@@ -1325,7 +1325,7 @@
         "dbdb84e28dba721360487624b3590e282b6f32fa"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "16-2-parent-browses-available-slots-for-a-service",
@@ -1342,7 +1342,7 @@
         "28123d4ee8f55382f3361acbd94f9076d2e98f08"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "16-3-parent-books-a-slot-creates-pending-invoice",
@@ -1359,7 +1359,7 @@
         "35c2acececb8e3923f36cf44e7dbc513c87917b6"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "16-4-reception-books-on-behalf-of-a-walk-in",
@@ -1376,7 +1376,7 @@
         "1667799008d3845dc6d07400e361efded8b9ba45"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "16-5-parent-reschedules-a-booking",
@@ -1393,7 +1393,7 @@
         "86e30f1781d29f1fceea07e997deeb0ff480e792"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "16-6-parent-or-reception-cancels-a-booking",
@@ -1410,7 +1410,7 @@
         "931d089114a9e2e789bd68f41d4edb9668e11941"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "16-7-bookings-list-on-parent-dashboard",
@@ -1427,7 +1427,7 @@
         "031cebe9c38d90845658ba3836dc51f09859c889"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "17-1-subscription-plan-catalogue",
@@ -3140,8 +3140,16 @@
       "decisions_needed": 0,
       "dismissed": 3,
       "commit": ""
+    },
+    "16": {
+      "stories_reviewed": 7,
+      "patches": 2,
+      "deferred": 8,
+      "decisions_needed": 6,
+      "dismissed": 28,
+      "commit": ""
     }
   },
-  "epics_done": 14,
+  "epics_done": 15,
   "epics_total": 35
 }

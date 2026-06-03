@@ -23,6 +23,7 @@ import { buildApp } from "../../app.js";
 describe("reception walk-in booking (P2-E01-S04)", () => {
   let dbh: Awaited<ReturnType<typeof createTestDb>>;
   let app: ReturnType<typeof buildApp>;
+  let sessions: InMemorySessionStore;
 
   // A date ~8 days out (always future) and its weekday.
   const FUTURE = new Date(Date.now() + 8 * 86_400_000).toISOString().slice(0, 10);
@@ -81,7 +82,8 @@ describe("reception walk-in booking (P2-E01-S04)", () => {
 
   beforeEach(async () => {
     dbh = await createTestDb();
-    app = buildApp({ db: dbh.db, sessions: new InMemorySessionStore() });
+    sessions = new InMemorySessionStore();
+    app = buildApp({ db: dbh.db, sessions });
   });
   afterEach(async () => {
     await app.close();
@@ -220,6 +222,22 @@ describe("reception walk-in booking (P2-E01-S04)", () => {
       method: "GET",
       url: "/reception/bookable-services",
       headers: { cookie: creds.cookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("403s a logged-in PARENT on the reception surface — parents hold 'create payment' (IDOR guard, review fix)", async () => {
+    const [u] = await dbh.db
+      .insert(users)
+      .values({ phone: "+254712999000", pinHash: "x", role: "parent" })
+      .returning();
+    const token = await sessions.create(u!.id);
+    // GET needs no CSRF; the staff-role gate must reject the parent before any
+    // family's children are enumerated.
+    const res = await app.inject({
+      method: "GET",
+      url: "/reception/bookable-services",
+      headers: { cookie: `bm_session=${token}` },
     });
     expect(res.statusCode).toBe(403);
   });

@@ -806,7 +806,15 @@ export async function cancelBooking(
 ): Promise<CancelResult> {
   const feeCents = input.feeCents ?? 0;
   return db.transaction(async (tx) => {
-    const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId));
+    // Lock the booking row so concurrent cancels (reception double-click, retry,
+    // two terminals) serialise: the loser blocks, re-reads status='cancelled', and
+    // throws below BEFORE inserting a second cancellation-fee invoice / audit row /
+    // subscription-unit refund. Mirrors bookSlot/rescheduleBooking.
+    const [booking] = await tx
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, input.bookingId))
+      .for("update");
     if (!booking) throw new BookingNotFoundError(input.bookingId);
     if (booking.status === "cancelled") throw new BookingAlreadyCancelledError(input.bookingId);
 

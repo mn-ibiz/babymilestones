@@ -1,0 +1,39 @@
+{
+  "id": "P2-E01-S04",
+  "verdict": "issues",
+  "diff_summary": "New apps/api/src/routes/reception/booking.ts (POST /reception/bookings + 3 read endpoints), apps/admin/app/reception/booking/page.tsx + booking-flow lib, additive staffId/staffNameSnapshot on @bm/catalog bookSlot, and receptionBookingCreateSchema in @bm/contracts. Reception books a walk-in via the same atomic bookSlot engine, with optional staff attribution.",
+  "ac_coverage": "AC1 (service/child/slot/confirm flow) implemented + tested; AC2 (atomicity) reuses bookSlot, tested; AC3 (attribution) implemented + tested. BUT the staff-only authorization claimed for the surface is broken (see blocker) and untested for a parent session.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Reception booking endpoints are NOT staff-only: a parent session passes the guard (IDOR / cross-family booking + PII leak)",
+      "detail": "Both requireBookingStaff() (read endpoints) and the POST /reception/bookings handler gate ONLY on validateSession + requirePermission(\"create\",\"payment\"). The parent role holds {action:\"create\",resource:\"payment\"} in PERMISSION_MATRIX (packages/auth/src/rbac.ts:73-77, granted so parents can initiate their own M-Pesa payments), so can(\"parent\",\"create\",\"payment\") returns true and the guard returns ok for any authenticated parent. Parents and staff share one session store and validateSession resolves any user, so a logged-in parent (session minted via /auth/login) can hit every reception booking route. Impact: (1) GET /reception/parents/:parentId/children enumerates ANY family's children incl. names + ages (PII); (2) POST /reception/bookings books a slot for ANY parentId/childId pair, raising a pending invoice (debt) against a stranger's wallet. The route's child.parentId===parentId check only validates the body is internally consistent; it never verifies the acting session owns that parent. The commit message claims this IDOR was 'fixed' by 'create-payment gating' — that gating is ineffective against parents. Every sibling reception route that takes a :parentId/:userId (recent-transactions.ts:54, parent-profile.ts:150, receipt.ts:125, parents/statement.ts:148) adds an explicit isStaffRole(auth.user.role) 403 check BEFORE guard(), with comments stating exactly that 'create payment'/'read wallet' does not exclude parents. booking.ts omits it. The brief flags this and explicitly says to reuse the isStaffRole pattern. Tests cannot catch it: the login() helper only uses staff login (staffUserSeed + /auth/staff/login); the '403 without create-payment' test uses accountant, never a parent session.",
+      "location": "apps/api/src/routes/reception/booking.ts:713-728 (requireBookingStaff) and apps/api/src/routes/reception/booking.ts:810-817 (POST handler)",
+      "fix": "Add an explicit staff-role gate immediately after a successful validateSession and before guard(), in BOTH requireBookingStaff and the POST handler, mirroring recent-transactions.ts:54: `if (!isStaffRole(authResult.user.role)) { reply.code(403).send({ error: \"Forbidden: missing permission\" }); return false; }` (and the equivalent inline return in the POST path). Import isStaffRole from @bm/auth. Add a regression test that logs in via /auth/login as a parent and asserts 403 on GET /reception/parents/:id/children and POST /reception/bookings.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Staff attribution accepted for a non-attribution service is never role-validated (possible mis-attribution)",
+      "detail": "When a service has attributionRoleRequired === null but the caller supplies staffId, requiredRole is null so checkBookingAttribution(null, ...) returns ok regardless of the staff member's role. The route only rejects retired (inactive) staff (booking.ts:859-861); it does not validate that the supplied active staff is appropriate for the service. The booking then snapshots that arbitrary staff member's name/id (staffNameSnapshot, bookings.staffId), which feeds commission/attribution reporting downstream. There is no UI path that sends staffId for a non-attribution service today (the admin page never sends staffId at all), and the schema intentionally allows optional staffId on any service, so this is latent rather than actively exploited.",
+      "location": "apps/api/src/routes/reception/booking.ts:853-867",
+      "fix": "Decision needed: either (a) reject staffId when the service does not require attribution (422 'service does not take attribution'), or (b) accept it intentionally as a manual override and document that any active staff role is permitted. Option (a) is the conservative choice given commission data is derived from this. Defer if product wants free-form attribution.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC3 (attribution capture) is unreachable from the only UI shipped — confirm() never sends staffId",
+      "detail": "AC3 requires attribution to be captured when the service requires it, and the story claims the Reception UI shells the S03 flow. The admin page's confirm() posts only { parentId, childId, slotId } (page.tsx:226) with no staffId, and BookableService omits attributionRoleRequired, so the UI cannot even tell which services need a staff pick. The net effect: any attribution-required service is impossible to book from Reception's actual UI — the POST returns 422 'Attribution required: staff_required' with no way for the user to satisfy it. The story openly defers the named-staff picker to a follow-on, and server enforcement (AC3) is correct, but as shipped AC1's end-to-end 'confirm' cannot complete for attribution-required services. This is a functional gap, not a code defect, but it leaves AC1+AC3 only partially deliverable for that service class.",
+      "location": "apps/admin/app/reception/booking/page.tsx:217-239",
+      "fix": "Decision needed: confirm with PM whether shipping without the staff picker is acceptable for the affected service class (the spec's 'Attribution captured if service requires it' is satisfied server-side but not user-reachable). If acceptable, track the follow-on; if not, the staff picker must land in this story. The server attribution path itself is correct and tested.",
+      "ac_ref": "AC3"
+    }
+  ]
+}

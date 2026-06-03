@@ -22,7 +22,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 13 | 2 | ✅ | 1 (audit() atomicity JSDoc) | 2 | 3 | 7 |
 | 14 | 2 | ✅ | 2 (phantom @bm/config dep ×3, formatChildAge NaN) | 3 | 1 | 8 |
 | 15 | 1 | ✅ | 3 (last-backup BLOCKER, fail-alert, prunedAt) | 1 | 0 | 3 |
-| 16 | 7 | ⬜ | | | | |
+| 16 | 7 | ✅ | 2 (reception-book BLOCKER IDOR, cancel double-fee lock) | 8 | 6 | 28 |
 | 17 | 6 | ⬜ | | | | |
 | 18 | 5 | ⬜ | | | | |
 | 19 | 5 | ⬜ | | | | |

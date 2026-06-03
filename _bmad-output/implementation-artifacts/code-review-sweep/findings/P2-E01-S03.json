@@ -1,0 +1,19 @@
+{
+  "id": "P2-E01-S03",
+  "verdict": "clean",
+  "diff_summary": "Adds @bm/catalog bookSlot (FOR UPDATE slot lock -> duplicate guard -> capacity count -> effective-dated price snapshot -> pending invoice + booking + audit, all in one tx), POST /parents/me/bookings (CSRF, session-resolved ownership, age eligibility, past-slot guard, 409/422 mapping, SMS-stub confirmation), bookingCreateSchema + BookingConfirmation contract, booking.confirmed SMS template, booking.created audit action, and a tappable confirm-to-book platform UI.",
+  "ac_coverage": "AC1 (eligible-child picker: child-ownership + age check, tested 422/404), AC2 (booking row + atomic capacity via slot FOR UPDATE lock, capacity computed not stored, tested), AC3 (pending invoice at resolveServicePriceAt(slot.serviceId, slot.slotDate), tested amountCents=1500/status=pending), AC4 (capacity race: same-row FOR UPDATE serializes all bookers of a slot; loser gets 409 'Slot just filled', tested sequentially), AC5 (SMS-stub with child name + date + time, tested) — all implemented & tested. Booking+invoice+audit commit in one transaction; audit_outbox written; no new migration (reuses additive 0024/0042). No gaps.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Overbooking / double-booking prevented only at the application layer; no DB-level backstop on (slot_id, child_id) or capacity",
+      "detail": "Capacity (AC4) and one-seat-per-child are enforced solely by locking the session_slots row with SELECT ... FOR UPDATE and then COUNT(*)/duplicate-SELECT on bookings (packages/catalog/src/schedules.ts:557-580). This pattern is CORRECT and race-safe today: every write path for a given slot (bookSlot and rescheduleBooking) contends on the same session_slots row lock, so concurrent bookers are fully serialized and the second sees the first's committed rows under READ COMMITTED — there is no overbooking or duplicate hole. The observation is defense-in-depth only: unlike setServicePrice (services.ts:289-290), which explicitly pairs its row-lock with a durable partial-unique-index backstop, bookings has no partial unique index on (slot_id, child_id) WHERE status<>'cancelled' and no capacity invariant in the DB. Any FUTURE write path that inserts a slot booking without first taking the slot's FOR UPDATE lock would silently overbook. Deferred: out of this story's scope and not a defect in the shipped code; flag for the epic to consider a unique partial index as a durable guard.",
+      "location": "packages/catalog/src/schedules.ts:557-580; packages/db/migrations/0042_service_schedules_session_slots.sql:75-79",
+      "fix": "Option (defense-in-depth, not required): add an additive migration creating a partial unique index, e.g. CREATE UNIQUE INDEX bookings_slot_child_active_uniq ON bookings (slot_id, child_id) WHERE slot_id IS NOT NULL AND status <> 'cancelled'; this makes the one-seat-per-child guard a hard DB invariant. A general capacity ceiling cannot be a simple constraint, so keep relying on the FOR UPDATE lock for capacity.",
+      "ac_ref": "AC4"
+    }
+  ]
+}

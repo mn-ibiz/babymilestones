@@ -1,0 +1,29 @@
+{
+  "id": "P2-E01-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds parent slot-browse: services.age_min/max_months (migration 0043 + schema), contracts (slotFitsAge, AvailableSlot/ServiceAvailability/BookableService), catalog browseServiceSlots+isSlotPast, parent API GET /parents/me/services/:id/availability + /bookable-services, admin merged-range PATCH guard, platform /book list + /book/service/[serviceId] 7-day grid.",
+  "ac_coverage": "AC1 grid+remaining-capacity (browseServiceSlots/buildWeekGrid) implemented & tested; AC2 age filter (slotFitsAge + eligible:false) implemented & tested; AC3 past/earlier-today greying (isSlotPast/slotState) implemented & tested, but day-boundary is computed in UTC not centre TZ (see findings); AC4 index-backed (session_slots(service_id,slot_date) + bookings_slot_id_idx), structural only, p95 not load-measured (acknowledged in story).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "AC3 'today' / 'earlier today' computed in UTC, not the centre's local (EAT, UTC+3) timezone",
+      "detail": "The availability route derives the day and minute-of-day used for the past/earlier-today check from UTC: today = now.toISOString().slice(0,10) and nowMinutes = now.getUTCHours()*60 + now.getUTCMinutes() (availability.ts:516-517). Slot startTime/endTime are stored as bare HH:MM wall-clock strings and slotDate as a bare calendar date (schedules.ts createSchedule; session_slots.slotDate), with no timezone. Comparing wall-clock slot times against a UTC clock is only correct when server local == centre local == UTC. For a Nairobi centre (UTC+3), during the 00:00-03:00 EAT window the server's UTC date is still the previous calendar day and nowMinutes is ~1260-1440, so the 7-day window anchor and the 'earlier today' greying drift by a day / by 3 hours: e.g. a 09:00 EAT slot would be judged against a 06:00-shifted clock, and just after local midnight the whole grid can show the wrong starting day. This is a real latent correctness bug for AC3, BUT it is a pre-existing system-wide convention (identical UTC handling in P2-E01-S01 slot generation, apps/api/src/routes/parents/booking.ts:99/152/269, and peak-hours-heatmap.ts) that this story faithfully follows rather than introduces. Deferring per triage rules (out of this story's scope; fixing here in isolation would diverge from the rest of the booking engine).",
+      "location": "apps/api/src/routes/parents/availability.ts:515-517",
+      "fix": "Out of scope for this story. Options for a future cross-cutting fix: (a) introduce a single centre-timezone helper (e.g. Africa/Nairobi via Intl.DateTimeFormat) and use it everywhere 'now' is compared to wall-clock slot times; (b) store slot times as timestamptz. Should be a coordinated change across S01/S03 + this story, not patched here alone.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC3 'today's earlier slots disabled' — an in-progress slot (started but not ended) is still shown bookable",
+      "detail": "isSlotPast returns true only once the slot's END time has passed (hmToMinutes(endTime) <= nowMinutes; schedules.ts:417-419). A slot that has already started but not yet ended is therefore classified available and rendered as bookable. AC3 says 'today's earlier slots disabled'; a strict reading is that a slot whose START time is in the past should be disabled. The dev explicitly dismissed this ('a running session is still joinable — intentional', per the story's Senior Developer Review). It is a defensible product interpretation but contradicts a literal reading of AC3, so it warrants a product confirmation rather than a silent choice.",
+      "location": "packages/catalog/src/schedules.ts:411-420",
+      "fix": "Product decision: confirm whether parents may book a session that has already started. If not, change the boundary to compare against startTime (hmToMinutes(startTime) <= nowMinutes) for the today case, or add a separate 'in-progress' state. If joinable-mid-session is intended, leave as-is and note it in the AC.",
+      "ac_ref": "AC3"
+    }
+  ]
+}

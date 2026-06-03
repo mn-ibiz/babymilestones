@@ -1,0 +1,39 @@
+{
+  "id": "P2-E01-S07",
+  "verdict": "issues",
+  "diff_summary": "Adds GET /parents/me/bookings (joins bookings+sessionSlots+children+services, filters by session parentId, computes isPast/canModify) + ParentBooking contract; platform /bookings page with Upcoming/Today/Past tabs + inline cancel/reschedule, categorizeBookings/attendanceLabel lib, Home link; middleware fix so /book deep-link no longer mis-classifies /bookings as public.",
+  "ac_coverage": "AC1 (tabs + per-row service/child/date/status) implemented; 'attendance' deliberately rendered as Past/Upcoming/Cancelled since no check-in data exists yet (defensible). AC2 (reschedule/cancel CTAs gated on server canModify) implemented. IDOR isolation is correctly implemented (server-derived parentId, no client param) but NOT covered by a test (only the single-parent happy path + 401 are tested).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Bookings list is unbounded — no LIMIT / pagination, unlike every sibling parent list endpoint",
+      "detail": "GET /parents/me/bookings returns the parent's ENTIRE booking history with no .limit() and no pagination (apps/api/src/routes/parents/booking.ts:75-95). Every other parent list route in this codebase caps the result set: loyalty.ts uses { limit: 100 }, observations.ts uses OBSERVATION_FEED_LIMIT, wallet.ts uses RECENT_TRANSACTIONS_LIMIT. A long-tenured parent accumulates bookings across every epic (play, salon slots, coaching, subscriptions), so this query grows without bound and ships the full history to the client on every dashboard load. The brief explicitly flags 'pagination bounds'. Not a security hole (it is the parent's own data) but an unbounded-query / payload-growth defect inconsistent with house convention.",
+      "location": "apps/api/src/routes/parents/booking.ts:75",
+      "fix": "Bound the query. Options: (a) add a fixed .limit() with a date-window (e.g. last N months for Past) consistent with the other parent endpoints; (b) add explicit ?limit/?cursor pagination. Needs a product call on how much history Past should surface, hence decision-needed.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "No test proves cross-parent isolation (the IDOR the brief asks for)",
+      "detail": "The S07 test (apps/api/src/routes/parents/booking.test.ts:304-337) seeds ONE parent with ONE booking and asserts list length 1; the second test only checks the 401-unauthenticated case. The list-isolation guarantee — 'a parent never sees another parent's bookings' — rests entirely on `where(eq(bookings.parentId, profile.id))`. The code is correct (parentId is derived from the session user, no client-supplied param), but there is no regression test that a second parent's booking is excluded from the first parent's list. Per DoD item 2, every AC needs a passing test; the implicit access-control AC is untested.",
+      "location": "apps/api/src/routes/parents/booking.test.ts:304",
+      "fix": "Add a test: create parent A (1 booking) and parent B (1 booking on a different slot), GET /parents/me/bookings as A, assert the response contains only A's bookingId and never B's. This locks in the IDOR guard against future refactors.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Salon / coaching / legacy bookings are silently dropped by the slotId inner-join",
+      "detail": "The list inner-joins on sessionSlots via bookings.slotId (booking.ts:91). The bookings table also carries salonSlotId and coachingSlotId (packages/db/src/schema/bookings.ts:45-60), and legacy P1 arrivals carry NULL slotId. Any booking that is a salon, coaching, or legacy arrival booking has a NULL slotId and is therefore excluded from the parent's 'My bookings' list entirely (no row, no error). This is plausibly intended for this story ('parent slot bookings'), and salon/coaching have their own surfaces, but the JTBD ('see what I've booked') and AC1 wording arguably expect all of a parent's bookings. Flagging as a scope/completeness gap, not a code bug — the slot-only join is internally consistent.",
+      "location": "apps/api/src/routes/parents/booking.ts:91",
+      "fix": "Deferred: confirm with product whether the parent dashboard list should include salon/coaching bookings. If yes, this needs a UNION across slot types in a follow-up story; out of scope for the slot-booking epic.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

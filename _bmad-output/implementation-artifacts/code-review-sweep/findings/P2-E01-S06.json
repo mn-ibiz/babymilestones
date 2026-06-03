@@ -1,0 +1,49 @@
+{
+  "id": "P2-E01-S06",
+  "verdict": "issues",
+  "diff_summary": "Migration 0045 adds bookings.status ('confirmed'|'cancelled'), services.cancellation_fee_cents, and relaxes the invoices status CHECK to allow 'void'. catalog gains cancelBooking() (txn: mark cancelled, void the still-pending invoice + amount_due=0, optional pending fee invoice, audit booking.cancelled) and BookingAlreadyCancelledError; bookingCountsBySlot + both (child,slot) duplicate guards now exclude cancelled rows so a freed seat re-books; rescheduleBooking rejects cancelled. Parent route /parents/me/bookings/:id/cancel (own-only, free before reschedule cut-off, else 409 contact-reception) and reception route /reception/bookings/:id/cancel (any time, applies service fee). Four outstanding-invoice queries switch from <> 'settled' to NOT IN ('settled','void').",
+  "ac_coverage": "AC1 (seat freed via capacity excluding cancelled + pending invoice voided to amount_due=0): implemented & tested. AC2 (after-cut-off parent gets 409 contact-reception; reception cancels any time with per-service fee, zero default): implemented & tested. AC3 (booking.cancelled audit with slot id + voided/fee invoice ids): implemented & tested. Gap: no test exercises concurrent cancel (see finding 1).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "blind",
+      "title": "cancelBooking does not lock the booking row — concurrent cancels double-charge the fee and duplicate the audit",
+      "detail": "cancelBooking() reads the booking with a plain SELECT (no .for('update')) and evaluates the double-cancel guard `if (booking.status === 'cancelled') throw BookingAlreadyCancelledError` against that unlocked snapshot, unlike the project's own bookSlot/rescheduleBooking which take a FOR UPDATE lock before mutating. Under READ COMMITTED (Postgres default, per the bookSlot concurrency note) two concurrent cancels of the same confirmed booking — a reception double-click, a client retry, or two reception terminals — both read status='confirmed' and both pass the guard. The booking UPDATE serializes harmlessly, and the invoice void is idempotent because its WHERE pins eq(invoices.status,'pending') so the loser matches 0 rows. But the cancellation-fee INSERT (reception path, feeCents>0) has NO guard: both transactions insert a pending fee invoice for the same cancellation => the parent is charged the cancellation fee TWICE (real money error; invoices has no UNIQUE that would stop it). Additionally audit() is an unconditional insert, so two booking.cancelled rows are written for one logical cancel (audit-integrity defect). The committed double-cancel test (schedules.test.ts:533) is sequential (await first, then second), so it proves the guard works only when the first txn has already committed and never exercises the race. Verified in working tree: schedules.ts:808-842 selects without .for('update'); the fee insert at 836-842 and audit at 844 are unguarded.",
+      "location": "packages/catalog/src/schedules.ts:808-842",
+      "fix": "Take the booking row lock so the guard and the fee/audit writes serialize: change the initial select to `const [booking] = await tx.select().from(bookings).where(eq(bookings.id, input.bookingId)).for('update');`. The loser then blocks until the winner commits, re-reads status='cancelled', and throws BookingAlreadyCancelledError before inserting a second fee invoice or audit row. (Equivalently, drive the transition off the UPDATE's rowCount: `UPDATE bookings SET status='cancelled' WHERE id=? AND status<>'cancelled'` and treat 0 affected rows as already-cancelled, doing the fee insert + audit only when a row was actually flipped.) Note: the later-added subscription-entitlement refund block (working tree, schedules.ts:818-825) sits inside the same unlocked window and would likewise double-refund a unit under the race — the lock fixes it too.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Parent cancel cut-off reuses rescheduleCutoffHours — no dedicated cancellation cut-off policy",
+      "detail": "AC1 ('cancel before cut-off') and AC2 ('cancel after cut-off -> reception flow') describe a CANCELLATION cut-off, but the parent route gates self-cancel with isWithinRescheduleCutoff(..., service.rescheduleCutoffHours, ...) — it reuses the reschedule cut-off field added in P2-E01-S05. There is no services.cancellation_cutoff_hours; the only cancellation-specific policy field this story adds is the fee (cancellation_fee_cents). Consequently a service whose reschedule window differs from its desired cancellation window cannot be configured, and changing the reschedule cut-off silently moves the cancellation deadline. The spec does not say the two cut-offs are the same policy, so this is an intent decision rather than a clear bug. (The reception route correctly ignores any cut-off — admin discretion, AC2.)",
+      "location": "apps/api/src/routes/parents/booking.ts:252-264",
+      "fix": "Product/eng decision: (a) consciously share one cut-off and document that rescheduleCutoffHours doubles as the self-cancel deadline; or (b) add a separate per-service cancellation_cutoff_hours (additive migration + contracts field + serializer, mirroring the reschedule field) and gate the parent cancel on it. No code change until the policy is confirmed.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Reception cancel raises a fee invoice even when the original booking is already paid/settled (no refund of the paid amount)",
+      "detail": "cancelBooking voids the booking's invoice only while status='pending' (correct — a settled invoice is left intact). But the fee invoice is inserted whenever feeCents>0 regardless of whether the original booking was already paid. So cancelling a SETTLED booking (wallet-paid, or — in the working tree — a subscription 0-invoice) yields voidedInvoiceId=null AND a brand-new pending fee invoice: the parent keeps owing/has paid the original service AND now owes a cancellation fee, with no automatic refund of what they paid. The author documents this in the story file ('a fee on an already-settled booking is an additional charge with no auto-refund; refund is the P1-E03-S06 path; voidedInvoiceId=null signals it'). Recording as a deferred, intentional limitation so it is tracked, not silently lost.",
+      "location": "packages/catalog/src/schedules.ts:827-842",
+      "fix": "Deferred per the story's documented decision: the refund of an already-paid cancelled booking is the P1-E03-S06 refund path, and voidedInvoiceId=null is the caller's signal that no void happened. If product wants reception to be warned/blocked when cancelling a paid booking with a fee, surface voidedInvoiceId=null in the reception UI (lands with 16-7) and prompt for the refund flow.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Parent cancel returns 404 if the booking's slot was reconciled/removed",
+      "detail": "The parent route fetches `oldSlot = getSlotWithRemaining(db, booking.slotId)` and returns 404 'Booking not found' if it is null. A slot can disappear after booking (schedule edit/retire reconciliation, P2-E01-S01), in which case a parent holding a live confirmed booking can no longer self-cancel online — they would be funneled to reception even though they are inside any cut-off. This is a pre-existing pattern shared verbatim with the reschedule route (booking.ts:248-250) and not introduced by this story's core cancel logic, and reception can always cancel, so impact is low. The cut-off/slot lookup is only needed to decide the cut-off; cancellation itself (cancelBooking) does not require the slot to still exist.",
+      "location": "apps/api/src/routes/parents/booking.ts:232-234",
+      "fix": "Deferred (shared with reschedule, out of this story's net-new scope). If desired: when the slot row is gone, treat the cut-off as passed (return the 409 contact-reception path) rather than a misleading 404, or allow the cancel since the seat no longer exists to free.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

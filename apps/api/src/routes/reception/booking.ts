@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { bookings, children, parents, users, type Database } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   ageInMonths,
   receptionBookingCreateSchema,
@@ -74,6 +74,13 @@ export function registerReceptionBooking(app: FastifyInstance, deps: ReceptionDe
     );
     if (!authResult.ok) {
       reply.code(authResult.status).send({ error: authResult.error });
+      return false;
+    }
+    // Staff-only surface. Parents also hold `create payment` (for self-initiated
+    // M-Pesa) and share the session store, so the permission guard alone would let
+    // a parent enumerate other families' children and book against any wallet.
+    if (!isStaffRole(authResult.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return false;
     }
     const perm = guard(authResult.user);
@@ -170,6 +177,12 @@ export function registerReceptionBooking(app: FastifyInstance, deps: ReceptionDe
       { sessions, resolveUser },
     );
     if (!authResult.ok) return reply.code(authResult.status).send({ error: authResult.error });
+    // Staff-only: parents hold `create payment` too, so gate on the staff role
+    // before booking on behalf of a parent (else a parent could book against any
+    // family's wallet). Mirrors the sibling reception routes.
+    if (!isStaffRole(authResult.user.role)) {
+      return reply.code(403).send({ error: "Forbidden: missing permission" });
+    }
     const perm = guard(authResult.user);
     if (!perm.ok) return reply.code(perm.status).send({ error: perm.error });
 

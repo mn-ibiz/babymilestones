@@ -1,0 +1,29 @@
+{
+  "id": "P2-E01-S01",
+  "verdict": "issues",
+  "diff_summary": "New service_schedules + session_slots tables (migration 0042, additive: also adds nullable bookings.slot_id FK + index); @bm/catalog schedules.ts (CRUD, idempotent chunked slot materialisation over 60-day horizon, prune/resync on edit, computed remaining_capacity read model); zod create/update schemas; audited admin CRUD + slots endpoint (manage-service gated); nightly slot-generation cron; catalog.schedule.* audit actions.",
+  "ac_coverage": "AC1-AC5 all implemented and tested. AC1 schema + zod + CHECK constraints (catalog/schedules.test, api/schedules.test). AC2 materialisation over 60-day horizon + nightly cron (slot-generation.test, schedules.test). AC3 computed remaining_capacity = capacity - bookings_in_slot, clamped >=0 (schedules.test, api/schedules.test). AC4 capacity snapshot + reconcile-on-edit/retire preserving booked slots (schedules.test + api/schedules.test). AC5 audit_outbox rows on create/update inside the mutation txn (api/schedules.test).",
+  "dismissed_count": 5,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "All slot-date math is UTC-based; business operates in EAT (UTC+3)",
+      "detail": "today() in the cron and API (clock().toISOString().slice(0,10)) and the helpers addDaysIso/dayOfWeekIso/isoDateToUtc all derive the calendar date and weekday in UTC, while session_slots.start_time/end_time are stored as timezone-naive wall-clock HH:MM and the venue runs in EAT (UTC+3, confirmed in packages/payments/src/mpesa/stkPush.ts). Consequence: when the nightly cron fires during the EAT early-morning window (00:00-02:59 EAT == 21:00-23:59 UTC of the prior day) it computes fromDate as the PREVIOUS UTC calendar day, so the 'today' anchor of the rolling horizon and the day_of_week match (getUTCDay) are pinned to UTC days, not EAT days. No data loss results (generation is idempotent via onConflictDoNothing and the horizon still extends forward) and the model is internally consistent (slot_date and day_of_week both UTC), but it means slot_date + start_time carry no explicit timezone and the downstream booking flow (P2-E01-S03) MUST interpret them as EAT wall-clock, and a schedule on a EAT-day boundary could be enumerated against the wrong UTC weekday at the horizon edge. This is a codebase-wide convention (every report/availability module uses toISOString().slice(0,10) + getUTCDay), not a regression introduced here.",
+      "location": "packages/catalog/src/schedules.ts:96-101, apps/jobs/src/jobs/slot-generation.ts:27, apps/api/src/routes/admin/schedules.ts:94",
+      "fix": "Defer: out of scope for the model story and consistent with the existing project-wide UTC-day convention. The booking-flow story (P2-E01-S03) should explicitly pin a business timezone (EAT) for both 'today' and weekday derivation so slot windows are interpreted as venue wall-clock; if cross-day-boundary cron timing matters, schedule the cron to run mid-EAT-day rather than at UTC/EAT midnight.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "No DB-level guard against overbooking; capacity is read-time only",
+      "detail": "remaining_capacity is computed at read time (capacity - count of non-cancelled bookings) with no stored counter and no DB constraint preventing bookings_in_slot from exceeding capacity. Two concurrent booking writers could each read remaining_capacity > 0 and both insert, overbooking the slot. This is explicitly out of scope for this story (the model/capacity story) and the function docstring (schedules.ts bookingCountsBySlot) documents that the booking WRITE path P2-E01-S03 MUST lock the slot row (SELECT ... FOR UPDATE) before inserting. Verified the schema SUPPORTS race-free enforcement downstream: session_slots has a stable PK (id) that is row-lockable, a unique index on (schedule_id, slot_date, start_time) preventing duplicate slots, and bookings.slot_id FK + index for the count. So the focus-area requirement ('schema supports race-free capacity enforcement downstream') is satisfied; only the enforcement itself is deferred.",
+      "location": "packages/catalog/src/schedules.ts:330-354",
+      "fix": "Defer to P2-E01-S03 (booking flow). Confirm that story performs the capacity check and the booking insert in one transaction that takes a row lock on the session_slots row (e.g. SELECT ... FROM session_slots WHERE id = $1 FOR UPDATE) before counting + inserting, since remaining_capacity is computed, not stored.",
+      "ac_ref": "AC3"
+    }
+  ]
+}
