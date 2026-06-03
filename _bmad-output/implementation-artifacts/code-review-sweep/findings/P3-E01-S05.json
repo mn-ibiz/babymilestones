@@ -1,0 +1,39 @@
+{
+  "id": "P3-E01-S05",
+  "verdict": "issues",
+  "diff_summary": "Adds commission payout CSV export: buildPayoutCsv + csvField/amountField in packages/catalog/src/commission-run.ts, the GET /admin/commission-runs/:id/export.csv + POST .../mark-paid routes in apps/api/src/routes/admin/commission-runs.ts, staff.phone column (migration 0062), and commission.run.export/paid_out audit actions. CSV columns: staff_name, phone, amount, reference; integer-cents amounts; download + mark-paid audited.",
+  "ac_coverage": "AC1 (CSV: name/phone/amount/reference) implemented + tested (unit payout-csv.test.ts + integration commission-export.test.ts incl. blank phone). AC2 (audit on export) implemented + tested. AC3 (mark paid_out_at after admin confirm, idempotent) implemented + tested. Gap: no test exercises the formula-injection neutralisation on the user-controlled staff name (the security control the brief flagged) — only the RFC-4180 comma case is tested.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "Formula-injection guard on the user-controlled staff name is correct but untested",
+      "detail": "The staff display name flows into the CSV via staffNameSnapshot and is fully user-controlled (set via the admin staff form). The csvField helper in commission-run.ts neutralises spreadsheet formula injection correctly (verified: '=1+1', '=HYPERLINK(...)', '@SUM', '+CALL', leading TAB/CR all get a leading single-quote, and the guard runs BEFORE RFC-4180 quoting so a combined '=cmd,boom' becomes \"'=cmd,boom\"; signed numbers/phone like +254... and -500.00 are left intact). However neither the unit test (packages/catalog/src/payout-csv.test.ts only asserts the comma-escape) nor the integration test (commission-export.test.ts) exercises a name beginning with = + - @. A future refactor of csvField could silently regress this security control with no failing test. The brief specifically called this out as the headline risk.",
+      "location": "packages/catalog/src/payout-csv.test.ts:29",
+      "fix": "Add a case to payout-csv.test.ts asserting buildPayoutCsv([{ staffName: \"=HYPERLINK(\\\"http://evil\\\")\", ... }]) emits a cell beginning with a single quote (e.g. expect the row to start with \"'=HYPERLINK\" once unquoted, or assert the literal \\\"'=HYPERLINK...\\\" output), plus a '@cmd' and a '+TEXT' (non-numeric) case. Keeps the security guard pinned.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Payout reference truncates the staff UUID to 8 hex chars — collidable within a run",
+      "detail": "The CSV reference is `COMM-${id.slice(0,8)}-${l.staffId.slice(0,8)}` (commission-runs.ts:184). Only the first 8 hex chars of the staff UUID are used. Two distinct staff in the same run whose UUIDs share their first 8 chars would emit identical references. The reference is documented as the key that ties a payout back to (run, staff) for reconciliation, and an M-Pesa B2C feed keyed on it could reject the duplicate or misattribute. Collision is astronomically unlikely per run (random UUIDv4) but the reference is load-bearing for money reconciliation, so the truncation is worth a conscious choice rather than an implicit assumption.",
+      "location": "apps/api/src/routes/admin/commission-runs.ts:184",
+      "fix": "Options: (a) use the full staffId (and/or full run id) in the reference; (b) use a stable per-line sequence/index; (c) accept the risk and document it. Needs a product/finance decision on the M-Pesa B2C reference format + length limits.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Export CSV row order is non-deterministic (no ORDER BY on the lines query)",
+      "detail": "The export selects commission_run_lines with no ORDER BY (commission-runs.ts:169), so Postgres may return rows in any order and the same run can export rows in different orders across downloads. The preview path sorts by staff name (commission-run.ts:276) but the export does not. Each CSV row is self-contained (carries its own reference/amount), so this is cosmetic for the M-Pesa B2C feed and for reconciliation, not a correctness/money issue — but it makes byte-for-byte re-download diffs and any downstream hashing flaky.",
+      "location": "apps/api/src/routes/admin/commission-runs.ts:169",
+      "fix": "Pre-existing-style minor: add `.orderBy(commissionRunLines.staffNameSnapshot)` (or by staffId) to the export lines query for a stable CSV. Deferred as out-of-scope polish; no AC requires ordering.",
+      "ac_ref": ""
+    }
+  ]
+}

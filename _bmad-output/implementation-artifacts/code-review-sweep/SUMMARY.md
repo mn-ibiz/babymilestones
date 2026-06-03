@@ -29,7 +29,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 20 | 4 | ✅ | 2 (redeem double-spend BLOCKER+replay, rate tiebreaker) | 1 | 8 | 12 |
 | 21 | 2 | ✅ | 0 (data-safety core PASS) | 3 | 4 | 7 |
 | 22 | 3 | ✅ | 0 (code clean) | 3 | 5 | 9 |
-| 23 | 5 | ⬜ | | | | |
+| 23 | 5 | ✅ | 4 (commission double-pay BLOCKER, rate lock, mark-paid idemp, csv-injection test) | 3 | 6 | 15 |
 | 24 | 2 | ⬜ | | | | |
 | 25 | 5 | ⬜ | | | | |
 | 26 | 4 | ⬜ | | | | |

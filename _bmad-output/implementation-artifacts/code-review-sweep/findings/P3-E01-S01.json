@@ -1,0 +1,29 @@
+{
+  "id": "P3-E01-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds staff_commission_rates (migration 0059 + drizzle schema), the catalog effective-dating service (setCommissionRate/resolveRateAt/getOpenCommissionRate/listCommissionRates/commissionCents) re-exported via staff.ts, and the admin CRUD route (GET/POST /admin/staff/:id/commission-rates) gated by `manage service` with audit on every set. Half-open [effectiveFrom, effectiveTo) intervals; commission amounts computed in integer cents.",
+  "ac_coverage": "AC1 table fields present (staff_id, rate_percent numeric(5,2), effective_from, effective_to nullable, reason) - implemented & tested. AC2 admin CRUD + auto-close of prior open row - implemented & tested (incl. same-instant in-place replace + backdate rejection). AC3 half-open booking join via resolveRateAt(staffId, booking.createdAt) - implemented & tested (commission-rates.test.ts + consumed by commission-hook.ts). AC4 audit on every rate change - implemented & tested (auditOutbox assertion), but the audit insert is NOT atomic with the rate write (see finding). AC5 decision refs - documentation only. All ACs have at least one passing test; no concurrency test exists.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "setCommissionRate omits the FOR UPDATE row lock the sibling effective-dated tables use; only the partial unique index serialises concurrent rate changes",
+      "detail": "The brief calls for the SAME guard the service/plan price tables needed: a partial unique index PLUS a row lock. The partial unique index `staff_commission_rates_one_open_per_staff` IS present (migration 0059:38-40, schema staff-commission-rates.ts:40-42), so it does prevent two open rows from committing. But the row lock is MISSING. setCommissionRate (commission-rates.ts:59-90) opens a transaction and does a plain `SELECT ... WHERE staff_id = ? AND effective_to IS NULL` with no `.for(\"update\")` and never locks the parent `staff` row. Contrast the established, correct sibling pattern setServicePrice (catalog/services.ts:285-327) which FIRST locks the parent services row `.for(\"update\")` with the explicit comment 'Serialise all price changes for this service (including the very first, when there is no open row to lock) ... The partial unique index ... is the durable backstop.' This was the exact P1-E07-S01 finding. Consequence here under READ COMMITTED: two concurrent setCommissionRate calls for the same staff are not cleanly serialised — the loser of the race fails on the partial unique index with a raw Postgres `duplicate key value violates unique constraint \"staff_commission_rates_one_open_per_staff\"` error, which the route surfaces verbatim as a confusing 400 (commission-rates.ts:96-99) instead of a clean retry/serialised success. (No two-open-rows corruption occurs, because the index holds — hence high, not blocker.) There is no concurrency test.",
+      "location": "packages/catalog/src/commission-rates.ts:59-90",
+      "fix": "Mirror setServicePrice: inside the transaction in setCommissionRate, first lock the parent staff row before reading the open rate, e.g. `await tx.select({ id: staff.id }).from(staff).where(eq(staff.id, input.staffId)).for(\"update\");` (throw a not-found if absent). This serialises all rate changes for a staff member — including the very first, when there is no open row to lock — so concurrent callers queue cleanly instead of one hitting the unique-index violation. Add a concurrent-set test (Promise.all of two setCommissionRate calls) asserting exactly one open row and a deterministic outcome.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Rate-change audit row is not atomic with the rate write (AC4)",
+      "detail": "setCommissionRate opens and commits its own transaction (commission-rates.ts:94, `db.transaction(apply)`). The route then calls `audit(db, {...})` as a separate statement afterwards (commission-rates.ts:101-112), outside that transaction. If the audit insert fails, the rate change has already committed, so an audited mutation can persist without its audit_outbox row — a soft violation of AC4 'Audit on every rate change'. This is the identical pattern flagged as low/defer in the P1-E07-S01 service-price route; it is a pre-existing codebase convention (route-level audit after a self-committing service call) rather than something this story introduced.",
+      "location": "apps/api/src/routes/admin/commission-rates.ts:95-112",
+      "fix": "Deferred — pre-existing convention shared across admin routes. To fix properly the audit write would need to happen inside the same transaction as the rate change (e.g. setCommissionRate accepts an audit callback, or the route wraps both in one tx). Out of scope for S01; flag for a cross-cutting cleanup.",
+      "ac_ref": "AC4"
+    }
+  ]
+}

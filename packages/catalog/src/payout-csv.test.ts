@@ -34,4 +34,16 @@ describe("buildPayoutCsv (P3-E01-S05 AC1)", () => {
   it("ends with a trailing CRLF", () => {
     expect(buildPayoutCsv([{ staffName: "A", phone: "p", amountCents: 0, reference: "r" }]).endsWith("\r\n")).toBe(true);
   });
+
+  it("neutralises formula injection in the user-controlled staff name (security control)", () => {
+    // A staff name beginning with = + - @ must be prefixed with a quote so it is
+    // not executed as a formula when the payout CSV is opened in Excel/Sheets.
+    const csv = buildPayoutCsv([
+      { staffName: "=HYPERLINK(0)", phone: "p", amountCents: 100, reference: "r" },
+    ]);
+    expect(csv.trimEnd().split("\r\n")[1]).toContain("'=HYPERLINK(0)");
+    // The signed phone/amount are NOT corrupted by the guard.
+    expect(buildPayoutCsv([{ staffName: "A", phone: "+254700", amountCents: -500, reference: "r" }]))
+      .toContain("+254700,-5.00,");
+  });
 });

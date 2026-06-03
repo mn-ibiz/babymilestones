@@ -1,0 +1,29 @@
+{
+  "id": "P3-E01-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds commission_ledger (migration 0060, append-only) + commission-hook.ts (recordBookingCommission/reverseBookingCommission/reassignBookingCommission) wired into record-visit + attendance check-in; commissionCents integer math + resolveRateAt rate snapshot in @bm/catalog.",
+  "ac_coverage": "AC1 partial (subscription-covered bookings accrue 0 — see below); AC2 NOT wired into any production refund path (reverseBookingCommission has zero callers); AC3 violated for subscription-covered bookings (commission base = 0, not service price); AC4 implemented & tested (append-only + idempotent).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Subscription-covered bookings accrue ZERO commission (commission base = staffRateSnapshot = 0)",
+      "detail": "AC1/AC3 require a commission line of `service price x rate` on subscription consumption. recordBookingCommission computes the base from booking.staffRateSnapshot (commission-hook.ts:61). But for a subscription-covered booking, schedules.ts:616+642 sets `amountCents = 0` (no wallet charge, settled 0-invoice) and writes `staffRateSnapshot: amountCents` = 0. The attendance check-in path still calls recordBookingCommission for `paidVia==='subscription'` bookings (attendance.ts:149-151,187), so the hook fires, finds staffRateSnapshot=0, and inserts a commission_ledger row with amountCents=0. The service was actually rendered (and pre-paid by the subscription), so the stylist's commission base should be the real service price, not the zeroed wallet-charge snapshot. Result: every subscription visit records a 0 commission line — the accountant's traceability ledger silently undervalues all subscription work. The implementation story (23-2 line 60) explicitly claims subscription consumption is covered by AC1; it is recorded but at the wrong (zero) amount. No test exercises a subscription-paid booking (commission-hook.test.ts seeds priceCents:10000 wallet-style only), which is why this slipped through.",
+      "location": "packages/wallet/src/commission-hook.ts:61; packages/catalog/src/schedules.ts:616,642",
+      "fix": "Decision needed on the commission base for subscription visits: the snapshot conflates 'amount charged to wallet' with 'service price'. Options: (a) store the true service price on the booking even when subscription-covered (add a separate service_price_snapshot column, additive migration) and have commissionCents use that; or (b) in recordBookingCommission, when staffRateSnapshot is 0 / booking.paidVia==='subscription', re-resolve the service price at booking time via resolveServicePriceAt(serviceId, createdAt). (a) is cleaner and preserves history. Needs product sign-off on whether stylists earn commission on subscription-covered visits at the list price (almost certainly yes).",
+      "ac_ref": "AC1, AC3"
+    },
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "AC2 not implemented in production: reverseBookingCommission has no caller; refund route never reverses commission",
+      "detail": "AC2 requires refunds to reverse the commission via a reversing entry. reverseBookingCommission exists and is unit-tested, but a full repo search shows its only references are in commission-hook.ts (definition), index.ts (barrel export) and commission-hook.test.ts — NO production code calls it. The admin refund route (apps/api/src/routes/admin/refund.ts) calls only the wallet `refund` primitive (operates on wallet_ledger) and never touches commission_ledger; `git log -S reverseBookingCommission -- apps/api/src/routes/admin/refund.ts` is empty, confirming it was never wired. The implementation story (23-2 line 61 + File List line 75) falsely claims 'Wired into the admin refund route'. Booking cancellation/void paths (salon.ts, schedules.ts) also do not reverse commission. Net effect: when a parent is refunded, the stylist's commission accrual stays on the ledger and is paid out in the next commission run — a real money leak. AC2 is effectively unimplemented in any production flow.",
+      "location": "apps/api/src/routes/admin/refund.ts:71-93 (no reverseBookingCommission call); packages/wallet/src/commission-hook.ts:115",
+      "fix": "Wire reverseBookingCommission into the refund path. In refund.ts, after the wallet refund commits, resolve the booking behind the refunded ledger entry (refunded entry -> settlement/invoice -> bookings.invoiceId) and call reverseBookingCommission(db, { bookingId, postedBy: auth.user.id }) inside the same transaction so the reversal is atomic with the refund. Note the partial-refund case: reverseBookingCommission reverses the FULL accrual, so for a partial wallet refund this would over-reverse — confirm whether refunds here are full-only (P1-E03-S06 caps at remaining-refundable) or pro-rate the reversal. Add an integration test asserting a refund posts a refund_reversal row netting commission to 0.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

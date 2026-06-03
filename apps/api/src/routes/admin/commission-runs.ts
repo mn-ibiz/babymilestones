@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   audit,
   commissionRunLines,
@@ -213,16 +213,22 @@ export function registerCommissionRuns(app: FastifyInstance, deps: AdminDeps): v
     const [updated] = await db
       .update(commissionRuns)
       .set({ paidOutAt })
-      // Conditional on still-null so a concurrent mark does not double-audit.
-      .where(eq(commissionRuns.id, id))
+      // Conditional on STILL-null so a concurrent mark (double-click / retry) cannot
+      // double-audit or overwrite paid_out_at: the loser matches 0 rows.
+      .where(and(eq(commissionRuns.id, id), isNull(commissionRuns.paidOutAt)))
       .returning();
+    if (!updated) {
+      // Another request already marked it paid between our read and update.
+      const [current] = await db.select().from(commissionRuns).where(eq(commissionRuns.id, id));
+      return reply.code(200).send({ run: serializeRun(current!), alreadyPaid: true });
+    }
     await audit(db, {
       actor: actor.id,
       action: auditAction("commission.run.paid_out"),
       target: { table: "commission_runs", id },
       payload: { paid_out_at: paidOutAt.toISOString(), total_cents: run.totalCents, ip: req.ip },
     });
-    return reply.code(200).send({ run: serializeRun(updated!), alreadyPaid: false });
+    return reply.code(200).send({ run: serializeRun(updated), alreadyPaid: false });
   });
 }
 

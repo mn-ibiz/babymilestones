@@ -1,0 +1,39 @@
+{
+  "id": "P3-E01-S04",
+  "verdict": "issues",
+  "diff_summary": "Ad-hoc commission runs: packages/catalog/src/commission-run.ts (createCommissionRun/previewCommissionRun), apps/api/src/routes/admin/commission-runs.ts (preview/confirm/list/detail/export/mark-paid), migration 0061 (commission_runs + ledger.run_id claim column), jobs/commission-run.ts (monthly). Anti-double-count is via stamping commission_ledger.run_id when a run claims a period's unclaimed entries; monthly is unique-per-period; ad_hoc is unconstrained.",
+  "ac_coverage": "AC1 (preview, no write) implemented + tested; AC2 (ad_hoc run row + audit) implemented + tested; AC3 (later monthly excludes claimed ad-hoc period) implemented + tested sequentially. Gap: AC3's no-double-count guarantee is NOT concurrency-safe (see finding 1) and has no concurrency test.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Concurrent runs double-pay: run lines/totals are computed from a pre-claim SELECT, not from the rows actually claimed (READ COMMITTED race)",
+      "detail": "createCommissionRun aggregates unclaimed ledger entries into in-memory `grouped` (lines 83-96) BEFORE it stamps run_id via the claim UPDATE (lines 131-141), and then builds commission_run_lines + total from that stale `grouped` snapshot (lines 144-159). The DB runs at the default READ COMMITTED isolation (no isolation set in packages/db/src/client.ts; no FOR UPDATE / SKIP LOCKED on the aggregation SELECT). Scenario: two overlapping runs (two ad-hoc confirms, or an ad-hoc confirm racing the monthly job) over the same period run concurrently. Both SELECTs read entry X as unclaimed, so both `grouped` totals include X. TX-A's UPDATE claims X and commits; TX-B's `WHERE run_id IS NULL` UPDATE then re-reads X as already-claimed and skips it at the ROW level (so no double-stamp) — but TX-B still writes a commission_run_lines row and total that INCLUDE X's amount, because the line amounts come from `grouped`, not from the UPDATE result. Net effect: X's commission is paid out in BOTH run A and run B. This directly violates the core money guarantee of S04 AC3 ('no entry is ever double-counted across runs'). The claim mechanism only prevents row-level re-stamping; it does NOT make the totals consistent with what was actually claimed. The PGlite test harness is single-connection so this race is structurally untested.",
+      "location": "packages/catalog/src/commission-run.ts:83-159",
+      "fix": "Make the totals derive from the rows ACTUALLY claimed by this run, not from a pre-claim read. Either: (a) do the claim UPDATE first with `.returning({ staffId, amountCents })` and aggregate the returned rows per staff into the lines/total; or (b) take row locks before aggregating with `SELECT ... FOR UPDATE SKIP LOCKED` (or FOR UPDATE) on the candidate entries inside the txn so a concurrent run cannot read them as unclaimed; or (c) run createCommissionRun at SERIALIZABLE isolation and retry on 40001. Option (a) is cleanest: claim returns exactly the rows this run owns, eliminating any window. Add a concurrency/overlap regression test (even at the SQL level) since the current suite cannot exercise it.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "blind",
+      "title": "mark-paid is not idempotent under concurrency despite its comment: WHERE clause omits the still-null guard, so a double-submit double-audits and overwrites paidOutAt",
+      "detail": "The POST /admin/commission-runs/:id/mark-paid handler reads the run, returns early if run.paidOutAt is set (line 209), then UPDATEs with a comment claiming 'Conditional on still-null so a concurrent mark does not double-audit' (line 216) — but the actual `.where()` is only `eq(commissionRuns.id, id)` (line 217); there is NO `isNull(commissionRuns.paidOutAt)` predicate, and the UPDATE result is not checked for whether a row transitioned. Two concurrent (or rapid double-click) requests both pass the line-209 read (both see null), both UPDATE (the second overwrites paidOutAt to a later timestamp), and both write a `commission.run.paid_out` audit row. So the run gets two paid_out audit entries and a mutated payout timestamp — a forensic/idempotency defect on a money action. This is S05 (mark-paid) territory rather than S04, but it lives in the same route file touched here and the comment is actively wrong.",
+      "location": "apps/api/src/routes/admin/commission-runs.ts:213-218",
+      "fix": "Add the guard the comment promises: `.where(and(eq(commissionRuns.id, id), isNull(commissionRuns.paidOutAt)))` and audit only when the UPDATE returned a row (`if (updated) { await audit(...) } else return alreadyPaid`). Deferred: belongs to P3-E01-S05's scope; flag to the S05 owner.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Ad-hoc run audit is written outside the run transaction (commit-then-audit window)",
+      "detail": "The confirm handler calls createCommissionRun(db, ...) (its own transaction) and THEN audit(db, ...) as a separate statement (commission-runs.ts:117-130). A crash between the two leaves a committed, paid-out-eligible ad_hoc run with no `commission.run.created` audit row, weakening DoD item 4 (audited actions write to audit_outbox). The monthly job (jobs/commission-run.ts:107-122) has the same shape. This is the established commit-then-audit pattern used across the codebase rather than a regression introduced by this story, so deferring.",
+      "location": "apps/api/src/routes/admin/commission-runs.ts:117-130",
+      "fix": "Deferred (pre-existing pattern). Ideal fix: thread a tx into createCommissionRun so the audit row participates in the same transaction as the run/lines insert (the audit-outbox pattern explicitly supports passing a tx, per packages/db/src/audit.ts). Track as a cross-cutting hardening item, not an S04 blocker.",
+      "ac_ref": ""
+    }
+  ]
+}

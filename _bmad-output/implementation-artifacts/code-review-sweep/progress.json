@@ -69,7 +69,7 @@
     "20": "done",
     "21": "done",
     "22": "done",
-    "23": "todo",
+    "23": "done",
     "24": "todo",
     "25": "todo",
     "26": "todo",
@@ -1881,7 +1881,7 @@
         "e2a59291daa9ef90e69d52b556757ae03abebf19"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "23-2-commission-line-recorded-on-every-attributed-booking",
@@ -1899,7 +1899,7 @@
         "e2a59291daa9ef90e69d52b556757ae03abebf19"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "23-3-monthly-commission-run-scheduled-job",
@@ -1917,7 +1917,7 @@
         "e2a59291daa9ef90e69d52b556757ae03abebf19"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "23-4-ad-hoc-commission-calculation-e-g-on-the-15th",
@@ -1935,7 +1935,7 @@
         "e2a59291daa9ef90e69d52b556757ae03abebf19"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "23-5-commission-payout-export-csv",
@@ -1953,7 +1953,7 @@
         "e2a59291daa9ef90e69d52b556757ae03abebf19"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "24-1-public-but-named-commission-viewer-route",
@@ -3196,8 +3196,16 @@
       "decisions_needed": 5,
       "dismissed": 9,
       "commit": ""
+    },
+    "23": {
+      "stories_reviewed": 5,
+      "patches": 4,
+      "deferred": 3,
+      "decisions_needed": 6,
+      "dismissed": 15,
+      "commit": ""
     }
   },
-  "epics_done": 21,
+  "epics_done": 22,
   "epics_total": 35
 }

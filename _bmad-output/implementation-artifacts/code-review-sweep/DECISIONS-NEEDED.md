@@ -33,6 +33,24 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 23 — Attribution & Commission Ledger
+
+55. **[BLOCKER → finance · P3-E01-S02] Subscription-covered bookings accrue ZERO commission**
+    (`staffRateSnapshot=0`). Same as #32. Decide the per-session value + whether stylists earn on
+    subscription visits, and store/re-resolve the true service price for the commission base.
+
+56. **[HIGH · P3-E01-S02] Commission reversal not wired into refund** — `reverseBookingCommission` has
+    no caller; a refunded booking leaves the stylist's accrual (money leak). Wire it, but DEFINE
+    partial-refund behavior first (it reverses the full accrual → would over-reverse a partial refund).
+
+57. **[HIGH · cross-cutting · P3-E01-S03] Jobs cron not honored** — the scheduler runs on `intervalMs`,
+    not the declared cron (`0 2 1 * *`, etc.); no cron parser exists. Affects the monthly commission run,
+    db-backup, anonymise, mpesa-reconcile, etc. Resolve the jobs-framework cron support in Epic 28.
+
+58. **[MED · cross-cutting] Commission/finance period boundary is UTC, not EAT** — folds into the
+    UTC-vs-EAT timezone decision (item 17). (+ LOW P3-E01-S05: payout reference truncates the staff UUID
+    to 8 chars — collidable, load-bearing for M-Pesa B2C reconciliation.)
+
 ## Epic 22 — Auto-credit & Outstanding
 
 52. **[HIGH · P2-E07-S01] `settled_on_credit` AC3 violation** — the outstanding banner never clears for

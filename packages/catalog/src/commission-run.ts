@@ -78,24 +78,8 @@ export async function createCommissionRun(
       }
     }
 
-    // Net per staff over UNCLAIMED entries in the period. Claiming (run_id NULL)
-    // is what excludes entries already taken by an ad-hoc run (S04 AC3).
-    const grouped = await tx
-      .select({
-        staffId: commissionLedger.staffId,
-        net: sql<string>`COALESCE(SUM(${commissionLedger.amountCents}), 0)`,
-      })
-      .from(commissionLedger)
-      .where(
-        and(
-          isNull(commissionLedger.runId),
-          gte(commissionLedger.occurredAt, input.periodStart),
-          lt(commissionLedger.occurredAt, input.periodEnd),
-        ),
-      )
-      .groupBy(commissionLedger.staffId);
-
-    // Create the run row first (so lines can reference it).
+    // Create the run row first (so claimed entries can reference it). Monthly is
+    // fenced by the partial unique index; a concurrent winner is returned below.
     let run: CommissionRunRow;
     try {
       const [created] = await tx
@@ -128,8 +112,13 @@ export async function createCommissionRun(
       throw err;
     }
 
-    // Stamp every unclaimed entry in the period with this run id (claim them).
-    await tx
+    // Claim every unclaimed entry in the period FIRST, RETURNING exactly the rows
+    // this run now owns (run_id NULL is what excludes entries already taken by an
+    // ad-hoc run, S04 AC3). Building the lines/total from the RETURNING set — not a
+    // separate pre-claim aggregate — keeps them consistent with what was actually
+    // claimed: under READ COMMITTED a concurrent run can no longer both count AND
+    // lose the same entry, so there is no double-pay and no claim-but-not-pay.
+    const claimed = await tx
       .update(commissionLedger)
       .set({ runId: run.id })
       .where(
@@ -138,24 +127,33 @@ export async function createCommissionRun(
           gte(commissionLedger.occurredAt, input.periodStart),
           lt(commissionLedger.occurredAt, input.periodEnd),
         ),
-      );
+      )
+      .returning({
+        staffId: commissionLedger.staffId,
+        amountCents: commissionLedger.amountCents,
+      });
+
+    // Net per staff over the rows this run actually claimed.
+    const netByStaff = new Map<string, number>();
+    for (const row of claimed) {
+      netByStaff.set(row.staffId, (netByStaff.get(row.staffId) ?? 0) + Number(row.amountCents));
+    }
 
     // Names for the lines, snapshotted at run time.
     const lines: Array<{ staffId: string; staffNameSnapshot: string; amountCents: number }> = [];
     let total = 0;
-    for (const g of grouped) {
-      const amount = Number(g.net);
-      if (amount <= 0) continue; // only positive nets are paid out as a line
-      const [s] = await tx.select({ name: staff.displayName }).from(staff).where(eq(staff.id, g.staffId));
+    for (const [staffId, net] of netByStaff) {
+      if (net <= 0) continue; // only positive nets are paid out as a line
+      const [s] = await tx.select({ name: staff.displayName }).from(staff).where(eq(staff.id, staffId));
       const name = s?.name ?? "(unknown)";
       await tx.insert(commissionRunLines).values({
         runId: run.id,
-        staffId: g.staffId,
+        staffId,
         staffNameSnapshot: name,
-        amountCents: amount,
+        amountCents: net,
       });
-      lines.push({ staffId: g.staffId, staffNameSnapshot: name, amountCents: amount });
-      total += amount;
+      lines.push({ staffId, staffNameSnapshot: name, amountCents: net });
+      total += net;
     }
 
     const [updated] = await tx

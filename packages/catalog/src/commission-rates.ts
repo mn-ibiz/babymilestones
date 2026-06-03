@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, lte } from "drizzle-orm";
-import { staffCommissionRates, type StaffCommissionRateRow } from "@bm/db";
+import { staff, staffCommissionRates, type StaffCommissionRateRow } from "@bm/db";
 import type { Executor } from "./staff.js";
 
 /**
@@ -57,6 +57,18 @@ export async function setCommissionRate(
   const reason = input.reason ?? null;
 
   const apply = async (tx: Executor): Promise<StaffCommissionRateRow> => {
+    // Serialise concurrent rate changes for this staff by locking the parent staff
+    // row first (mirrors setServicePrice/setPlanPrice). The partial unique index is
+    // the durable backstop; the lock avoids a raw unique-violation surfacing as a
+    // confusing 400 on a race, and serialises even the first (no open row) insert.
+    const [lockedStaff] = await tx
+      .select({ id: staff.id })
+      .from(staff)
+      .where(eq(staff.id, input.staffId))
+      .for("update");
+    if (!lockedStaff) {
+      throw new Error(`setCommissionRate: staff ${input.staffId} not found`);
+    }
     const [open] = await tx
       .select()
       .from(staffCommissionRates)
