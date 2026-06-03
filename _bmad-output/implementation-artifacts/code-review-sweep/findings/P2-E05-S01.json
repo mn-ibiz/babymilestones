@@ -1,0 +1,39 @@
+{
+  "id": "P2-E05-S01",
+  "verdict": "issues",
+  "diff_summary": "New append-only loyalty earn ledger: packages/db/migrations/0064_loyalty_ledger.sql + schema/loyalty.ts (later merged with P3-E04 cols via 0083/0084/0085/0087), packages/wallet/src/loyalty.ts (earnPointsV2/getLoyaltyBalance/getLoyaltyTotals/getLoyaltyHistory/assertPositivePoints) + loyalty.test.ts. Earn rows are integer-points, idempotent on idempotency_key, snapshot the earn rate, and reference the triggering wallet_ledger entry; balance is derived from the ledger.",
+  "ac_coverage": "AC3 implemented & tested (rate_snapshot). AC1 PARTIAL: the hardened earn primitive exists & is unit-tested in isolation, but is NOT wired into any settled-payment path — earnPointsV2 has zero production callers and the wallet topup route still hardcodes loyaltyPoints:0, so no loyalty_ledger rows are actually written 'for every settled payment'. AC2 PARTIAL: wallet_ledger_entry_id reference is optional (nullable input/FK) and not enforced for earn rows.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC1 not wired: earn ledger has no production caller; no points earned on a real settled payment",
+      "detail": "earnPointsV2 (the S01 earn function) is exported and unit-tested but has NO production call site — grep across apps/* and packages/* (excluding tests/index barrel) finds zero callers. The actual settled-payment surface, GET /parents/me/wallet in apps/api/src/routes/parents/wallet.ts:71-72, still returns hardcoded `loyaltyPoints: 0` with the comment 'Loyalty is earn-only in P1 with no points ledger yet'. So no loyalty_ledger earn row is written when a topup/charge settles, and AC1 ('loyalty_ledger rows for every settled payment per Decision 21') is not met end-to-end. The story's own 'earn computed server-side from the settled charge (not client)' guarantee is unverifiable because nothing server-side computes/inserts an earn from a settlement. The primitive is correct; the integration is missing.",
+      "location": "packages/wallet/src/loyalty.ts:87 (earnPointsV2, no callers); apps/api/src/routes/parents/wallet.ts:71",
+      "fix": "Decide whether settled-payment→earn wiring is in scope for this 'harden' story. If yes: call earnPointsV2 from the payment-settlement path (e.g. topup/charge webhook handler) inside the same flow that writes the wallet_ledger credit, computing points server-side from the settled amount via the effective earn rate, passing the settled wallet_ledger entry id as walletLedgerEntryId and a deterministic idempotencyKey derived from the settlement. If the wiring is intentionally a later story, document that AC1 is only partially satisfied here.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Concurrent earn with same idempotency key throws unique-violation instead of returning the existing row",
+      "detail": "earnPointsV2 does find-by-idempotencyKey then insert inside one transaction (packages/wallet/src/loyalty.ts:96-111). The DB runs at the Postgres default READ COMMITTED (no isolationLevel set anywhere in packages/db). Two concurrent calls with the same idempotencyKey can both see no existing row, then both attempt INSERT; the UNIQUE(idempotency_key) constraint (migration 0064:24) correctly prevents the double-earn, but the loser's INSERT raises a unique_violation that propagates as an unhandled error rather than the documented graceful no-op ('a retried earn with this key is a no-op'). Money is safe (no double-credit), but a concurrent retry returns a 500-class error instead of the existing row. The idempotency test (loyalty.test.ts:83) only covers the sequential case, so this is untested.",
+      "location": "packages/wallet/src/loyalty.ts:95-111",
+      "fix": "Make the insert idempotent at the DB level and recover gracefully: use INSERT ... ON CONFLICT (idempotency_key) DO NOTHING RETURNING, and if no row is returned re-select by idempotencyKey and return that existing row; OR catch the unique_violation (SQLSTATE 23505), re-select, and return the existing row. Add a concurrent-retry test.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC2 (every earn row references its triggering wallet_ledger entry) not enforced",
+      "detail": "AC2 requires each loyalty_ledger row to reference the wallet_ledger entry that triggered it. The FK column wallet_ledger_entry_id is nullable (migration 0064:21) and the input field walletLedgerEntryId is optional, defaulting to null (loyalty.ts:23,105). Several tests deliberately create earn rows with no reference (loyalty.test.ts 'rate-1', 'audit-1'). Nothing in the earn path requires a reference for an earn (vs. an explicitly-allowed manual/system adjustment). Combined with finding #1 (no production caller), there is no code that guarantees real settled-payment earns carry the reference, so AC2 holds only by caller convention.",
+      "location": "packages/wallet/src/loyalty.ts:23,105; packages/db/migrations/0064_loyalty_ledger.sql:21",
+      "fix": "Decide the contract: either require walletLedgerEntryId for direction='earn' rows sourced from a settled payment (validate in earnPointsV2 / add a CHECK that earn rows of payment sourceTypes have a non-null reference), or document that nullable is intentional only for manual/system adjustments. Add a test asserting a settled-payment earn carries the reference.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

@@ -70,7 +70,10 @@ async function effectiveRate(
         lte(loyaltyRates.effectiveFrom, at),
       ),
     )
-    .orderBy(desc(loyaltyRates.effectiveFrom))
+    // Tiebreak on createdAt so two rows sharing the same effective_from resolve
+    // deterministically to the most-recently-inserted (the just-superseded rate
+    // can't win).
+    .orderBy(desc(loyaltyRates.effectiveFrom), desc(loyaltyRates.createdAt))
     .limit(1);
   return row ? row.value : fallback;
 }

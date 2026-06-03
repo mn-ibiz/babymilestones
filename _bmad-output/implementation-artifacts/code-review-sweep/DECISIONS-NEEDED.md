@@ -33,6 +33,23 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 20 — Loyalty Redemption
+
+45. **[HIGH · P2-E05-S01] Loyalty earn not wired to settled payments** — `earnPointsV2` has no
+    production caller; the wallet route hardcodes `loyaltyPoints:0`, so no points are earned. Decide if
+    settled-payment→earn wiring is in this "harden" story's scope. (+ MED: concurrent earn 500; AC2 ref unenforced.)
+
+46. **[HIGH · P2-E05-S02] Two unintegrated loyalty rate-config systems** — the effective-dated engine
+    endpoint has no UI; the existing Settings UI writes a different non-effective-dated store the engine
+    ignores. Pick one source of truth. (+ LOW: forbid back-dating `effectiveFrom`.)
+
+47. **[HIGH · P2-E05-S03] AC3 "no redeem on pending settlement" not enforced** — redeem checks the P2
+    `walletId` balance but the pending-clawback hold is in the P3-E04 `parentId` schema and is never
+    consulted. No live loss until P3 clawbacks ship; reconcile the dual schema then.
+
+48. **[MED · P2-E05-S04] Loyalty history truncated at 100 rows, no pagination/`hasMore`** (+ LOW: AC2
+    "source link" is a plain label, `sourceId` dropped).
+
 ## Epic 19 — POS App (in-store)
 
 40. **[HIGH · money · P2-E04-S03] Flat-KES overall discount over-discounts `vat_exclusive` lines** by

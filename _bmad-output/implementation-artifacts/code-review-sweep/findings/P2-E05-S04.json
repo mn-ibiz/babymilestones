@@ -1,0 +1,39 @@
+{
+  "id": "P2-E05-S04",
+  "verdict": "issues",
+  "diff_summary": "Parent loyalty balance/history surface: GET /parents/me/loyalty (apps/api/src/routes/parents/loyalty.ts) returns balance + lifetime earned/redeemed + history + redemption quote, computed from the append-only loyalty_ledger via @bm/wallet (getLoyaltyTotals/getLoyaltyHistory); platform page + pure view-model helpers (apps/platform/lib/loyalty.ts, loyalty-api.ts, app/(app)/loyalty/page.tsx) render it; contract LoyaltyAccountResponse added.",
+  "ac_coverage": "AC1 (balance + lifetime earned/redeemed) implemented & tested (API + view-model). AC2 (earn/redeem history with SOURCE LINK) partially met: a friendly source label is shown but there is no actual link and sourceId is dropped from the view-model. AC3 (decision ref 11) honoured. No page-component render test (helpers + endpoint tested only).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "History silently truncated at 100 newest rows with no pagination or 'has more' signal",
+      "detail": "GET /parents/me/loyalty hardcodes getLoyaltyHistory(db, walletId, { limit: 100 }) and never exposes offset/cursor pagination to the client; the response has no total/hasMore field and the page renders exactly what it gets. getLoyaltyHistory itself clamps limit to [1,200] and offset to >=0, so the underlying primitive supports paging, but the route never uses it. A long-tenured parent who has earned/redeemed more than 100 times will see only the 100 most recent entries with no indication that older history exists and no way to reach it. AC2 ('History view: earn/redeem entries with source link') does not strictly mandate pagination, but silently dropping older history is a real data-completeness gap on a ledger that is append-only and grows forever. Evidence: apps/api/src/routes/parents/loyalty.ts:82; packages/wallet/src/loyalty.ts:152-166.",
+      "location": "apps/api/src/routes/parents/loyalty.ts:82",
+      "fix": "Decide product intent: either (a) plumb ?limit & ?offset (or a cursor on seq) query params through the route into getLoyaltyHistory and return a hasMore/total in LoyaltyAccountResponse so the page can paginate, or (b) if a fixed window is acceptable, add an explicit 'showing your most recent N entries' affordance. The limit value (100) and clamp (200) are inconsistent and should be reconciled.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC2 'source link' is rendered as a plain text label only — sourceId dropped, no navigation",
+      "detail": "AC2 requires history entries 'with source link (booking, top-up, etc.)'. The contract LoyaltyHistoryItem carries sourceType AND sourceId, and the API returns both, but toLoyaltyHistoryView (apps/platform/lib/loyalty.ts:52-65) maps only sourceType -> a static sourceLabel string and discards sourceId entirely; the page (app/(app)/loyalty/page.tsx:57-64) renders the label as inert <span> text. So a parent cannot click through from a history row to the underlying booking/top-up. Whether 'link' means a literal hyperlink or merely a labeled reference is the ambiguity; if the former, AC2 is not met. Evidence: apps/platform/lib/loyalty.ts:52-65 (sourceId unused), apps/platform/app/(app)/loyalty/page.tsx:57-64.",
+      "location": "apps/platform/lib/loyalty.ts:52",
+      "fix": "Confirm with PM/design whether AC2's 'source link' means a navigable link to the source record. If yes, carry sourceId into LoyaltyHistoryView and render an anchor to the booking/top-up detail (e.g. /bookings/{sourceId}); if a label suffices, update the spec wording to 'source label' to remove the ambiguity.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "No automated test for the loyalty page component (AC1/AC2 rendering untested end-to-end)",
+      "detail": "DoD #2 asks each AC to have a passing test. AC1/AC2 are covered at the unit level (pure view-model helpers in loyalty.test.ts) and the API level (loyalty.test.ts GET returns balance/totals/history), but the actual page render — that balance/lifetime totals and the history list with labels appear on apps/platform/app/(app)/loyalty/page.tsx — has no component/e2e test. Consistent with the project's pattern of testing the API + pure helpers and treating declarative pages as thin, so deferred rather than a blocker. Evidence: apps/platform/lib/loyalty.test.ts (helpers only), apps/api/src/routes/parents/loyalty.test.ts (endpoint only); no test imports page.tsx.",
+      "location": "apps/platform/app/(app)/loyalty/page.tsx:13",
+      "fix": "Optional: add a lightweight render test (React Testing Library) asserting the balance, lifetime earned/redeemed and one history row render from a mocked fetchLoyaltyAccount. Deferred as it matches existing project test conventions for declarative pages.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

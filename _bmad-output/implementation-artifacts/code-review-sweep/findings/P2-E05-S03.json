@@ -1,0 +1,39 @@
+{
+  "id": "P2-E05-S03",
+  "verdict": "issues",
+  "diff_summary": "Adds loyalty redemption: packages/wallet/src/loyalty-redeem.ts (redeemPoints points->wallet credit, atomic+idempotent), loyalty.ts (balance/totals/history), loyalty-rates.ts (integer KES conversions), parents/loyalty.ts route (GET quote + POST redeem), loyalty_ledger + loyalty_rates migrations 0064/0065.",
+  "ac_coverage": "AC1 quote surfaced (route GET, ok). AC2 wallet credit = points*redeemRate*100 integer math (ok, tested). AC4 loyalty debit + wallet credit + audit in one tx (atomic, tested). AC3 PARTIAL: balance ceiling enforced sequentially but NOT race-safe (no row lock), and the 'cannot redeem points on a pending settlement' clause is not consulted by redeemPoints. No concurrency test exists.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Double-spend race: redeemPoints reads the balance with no row lock, unlike the rest of the wallet",
+      "detail": "redeemPoints computes balanceBefore via getLoyaltyBalance — a bare SUM(CASE...) aggregate over loyalty_ledger — then checks `input.points > balanceBefore` and inserts. There is no SELECT ... FOR UPDATE, no advisory lock, no balance-of-record row, and the db transaction runs at the Postgres default READ COMMITTED (no custom isolation set in packages/db/src/client.ts). Under READ COMMITTED a SUM aggregate takes no lock, so two concurrent redeems with DIFFERENT idempotency keys both read the same balanceBefore, both pass the `points <= balance` guard, and both insert a redeem + a wallet credit. Result: loyalty balance goes negative AND the wallet is over-credited real money — a double-spend. There is NO DB-level guard (loyalty_ledger has no balance column and no constraint forbidding a negative computed balance — migration 0064). This directly violates AC3 ('cannot redeem more points than current balance') under concurrency. The codebase already has the correct pattern: wallet debit (packages/wallet/src/debit.ts:120-129) does `SELECT ... FOR UPDATE` on the wallets row to serialise concurrent balance-affecting writes, and documents it as AC2 of that story. redeemPoints does not follow it. The idempotency test (loyalty-redeem.test.ts:94-103) is sequential and proves nothing about concurrency.",
+      "location": "packages/wallet/src/loyalty-redeem.ts:70-73",
+      "fix": "Inside the transaction, before reading the balance, acquire the wallet row lock to serialise concurrent redeems against the same wallet, mirroring debit.ts: `const [w] = await tx.select().from(wallets).where(eq(wallets.id, input.walletId)).for('update'); if (!w) throw ...;`. Then compute getLoyaltyBalance(tx, walletId) and do the `points > balance` check while holding the lock. (Alternatively use pg_advisory_xact_lock keyed by walletId.) Add a concurrency test (two parallel redeems, distinct keys) asserting total redeemed never exceeds the earned balance and the computed balance never goes negative.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Idempotency replay is select-then-insert with no catch for the UNIQUE violation",
+      "detail": "redeemPoints checks for an existing row by idempotencyKey (lines 54-69) and, if absent, inserts. This select-then-insert is not atomic. loyalty_ledger.idempotency_key is UNIQUE (migration 0064:24), so two concurrent retries with the SAME key are correctly prevented from double-inserting — but the loser hits SQLSTATE 23505 and redeemPoints has no catch for it. The unique violation propagates out of the transaction as an uncaught error, surfacing to the parent as a 500 instead of the idempotent success result. debit.ts handles exactly this case: it catches the unique violation (isUniqueViolation, debit.ts:79-86, 254-261) and translates it. Here a legitimate client retry (e.g. network timeout + replay) can return a 500, and the client may then re-submit with a NEW key — which, combined with finding #1, compounds the double-spend exposure.",
+      "location": "packages/wallet/src/loyalty-redeem.ts:54-102",
+      "fix": "Wrap the insert path so a 23505 on loyalty_ledger.idempotency_key is caught and converted into the idempotent replay result (re-select by idempotencyKey and return the stored row's points/discount), matching the isUniqueViolation handling in debit.ts. This is naturally subsumed once the wallet row lock from finding #1 serialises the section, but the catch should still exist as the durable fence.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC3 'cannot redeem points already on a pending settlement' is not enforced by the redeem path",
+      "detail": "AC3 has two clauses; the second ('cannot redeem points already on a pending settlement') is unmet by redeemPoints. The pending-settlement guard lives in availableLoyaltyToRedeem (loyalty-redeem.ts:133-147), which subtracts pendingClawback via availableToRedeem(balance, pendingClawback). But that function reads the P3-E04 parentId/pointsDelta/pendingClawback columns, whereas redeemPoints checks getLoyaltyBalance, which sums only the P2-E05 walletId/direction/points columns (loyalty.ts:129-137). The two coexist on the SAME merged loyalty_ledger table (schema/loyalty.ts comment) but the redeem path never consults pendingClawback. So if a parent has points under a pending refund clawback hold, redeemPoints will still let them spend those points (it sees the raw balance, not available-to-redeem). At the moment this epic shipped no pendingClawback rows exist (they arrive with P3-E04), so there is no live data loss yet — but the AC is contractually unmet and the gap becomes a real money hole the instant P3 clawbacks go live, with nothing wiring the two halves together.",
+      "location": "packages/wallet/src/loyalty-redeem.ts:70-73",
+      "fix": "Decision needed on the dual-schema bridge: either (a) redeemPoints must subtract pending settlement before the ceiling check (compute available = balance - pendingClawback for the wallet's parent, the same notion as availableLoyaltyToRedeem), or (b) explicitly document and ticket that pending-settlement enforcement is deferred to the P3 integration and the P2 AC3 second clause is intentionally a no-op until then. Needs a product/eng call because the P2 walletId schema and P3 parentId schema must be reconciled (a wallet maps to a parent user, but redeemPoints only has walletId).",
+      "ac_ref": "AC3"
+    }
+  ]
+}

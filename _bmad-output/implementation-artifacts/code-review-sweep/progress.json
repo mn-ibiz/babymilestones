@@ -66,7 +66,7 @@
     "17": "done",
     "18": "done",
     "19": "done",
-    "20": "todo",
+    "20": "done",
     "21": "todo",
     "22": "todo",
     "23": "todo",
@@ -1725,7 +1725,7 @@
         "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "20-2-configurable-earn-and-redeem-rates",
@@ -1742,7 +1742,7 @@
         "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "20-3-redemption-at-parent-checkout",
@@ -1759,7 +1759,7 @@
         "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "20-4-loyalty-balance-and-history-in-parent-app",
@@ -1776,7 +1776,7 @@
         "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "21-1-settings-for-backup-retention-policy",
@@ -3172,8 +3172,16 @@
       "decisions_needed": 7,
       "dismissed": 19,
       "commit": ""
+    },
+    "20": {
+      "stories_reviewed": 4,
+      "patches": 2,
+      "deferred": 1,
+      "decisions_needed": 8,
+      "dismissed": 12,
+      "commit": ""
     }
   },
-  "epics_done": 18,
+  "epics_done": 19,
   "epics_total": 35
 }

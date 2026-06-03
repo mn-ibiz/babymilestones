@@ -1,0 +1,39 @@
+{
+  "id": "P2-E05-S02",
+  "verdict": "issues",
+  "diff_summary": "Effective-dated, append-only loyalty rate config: new loyalty_rates table + migration 0065 (seeded earn=100/redeem=1 @ epoch), @bm/wallet loyalty-rates.ts (getEffectiveRates/setRate + pure integer-cents pointsForSpend/kesForPoints), admin POST/GET /admin/loyalty/rates gated by `manage config`, audited loyalty.rate_change.",
+  "ac_coverage": "AC1 (defaults earn 100 / redeem 1): engine + seed correct & tested, BUT the only admin config UI (settings/loyalty) writes a SEPARATE, non-effective-dated settings store the engine never reads — see finding. AC2 (effective-dated, historical unchanged): correctly implemented & tested in the engine (rate snapshotted on each ledger row; setRate is append-only). AC3 (decision refs 11,34): n/a to code.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Admin rate-config UI and S02's effective-dated engine are two separate, unintegrated systems",
+      "detail": "AC1 asks for admin 'Settings: earn_rate, redeem_rate' and AC2 for those changes to be effective-dated. S02 ships an effective-dated, integer, append-only engine (loyalty_rates table + getEffectiveRates) and a matching API (POST/GET /admin/loyalty/rates), but ships NO admin UI for it. The only admin-facing loyalty-rate UI in the working tree (apps/admin/app/(console)/settings/loyalty/page.tsx, from dependency P1-E10-S04) reads/writes a DIFFERENT model: the generic `settings` table via /admin/settings/loyalty, using loyaltySettingsSchema { earnRatePer100, redeemValuePerPoint } (contracts index.ts:4331-4335) — float-allowing (z.number().min(0), no .int()), NOT effective-dated, default {0,0}, and semantically inverted (points-per-KES100 vs KES-per-point). The redemption/quote engine (apps/api/src/routes/parents/loyalty.ts:83, packages/wallet/src/loyalty-redeem.ts:74) reads ONLY loyalty_rates via getEffectiveRates and NEVER the settings value. Net effect: an admin tuning rates through the existing Settings screen has zero effect on actual earn/redeem, and S02's effective-dated endpoint has no UI. Two halves of AC1/AC2 are split across two stores that do not talk to each other. Verified: grep finds no caller of earnRatePer100/redeemValuePerPoint/getSetting in @bm/wallet or parents routes.",
+      "location": "apps/admin/app/(console)/settings/loyalty/page.tsx:22-48 vs apps/api/src/routes/admin/loyalty-rates.ts:30-93",
+      "fix": "Product/eng decision: pick ONE source of truth for loyalty rates. Either (a) point the admin Settings/loyalty screen at S02's POST /admin/loyalty/rates (effective-dated, integer) and retire/redirect loyaltySettingsSchema, or (b) make the engine read the settings value and add effective-dating there. As shipped, the admin-facing acceptance (AC1) is satisfied by a control that does not drive the engine.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "blind",
+      "title": "effectiveRate() has no tiebreaker for rows sharing the same effective_from",
+      "detail": "effectiveRate orders only by desc(loyaltyRates.effectiveFrom).limit(1) with no secondary sort key. If two rate rows of the same type share an identical effective_from (e.g. two admin POSTs in the same request batch / clock resolution, both defaulting effectiveFrom to now(), or any back-dated dupe), which row wins is non-deterministic across query plans — the just-superseded rate could be returned instead of the newest. id is a random UUID (no monotonic ordering) and createdAt/seq are not part of the sort. Low severity because same-millisecond same-type changes are unusual, but it is a real correctness gap for 'the rate applied is the one effective at transaction time'.",
+      "location": "packages/wallet/src/loyalty-rates.ts:64-75",
+      "fix": "Add a deterministic tiebreaker: .orderBy(desc(loyaltyRates.effectiveFrom), desc(loyaltyRates.createdAt)) (and ideally desc(id) or a monotonic seq) so the most-recently-inserted row wins on a tie.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "POST /admin/loyalty/rates accepts an unbounded past/future effectiveFrom with no guard",
+      "detail": "The route accepts any valid date for effectiveFrom (loyalty-rates.ts route:72-79; setRate defaults to now()). Already-written ledger rows are safe because each snapshots its rate (rateSnapshot / earnRate column), so stored history is immutable — AC2 holds for persisted rows. BUT back-dating a rate retroactively changes what getEffectiveRates(at) returns for any historical timestamp, so any code that recomputes a rate from a past 'at' (e.g. a future reconciliation/report keyed to an old date) would observe the rewritten rate. There is no validation rejecting or warning on a back-dated effectiveFrom, and no audit emphasis that this is a retroactive change. Future-dating is benign (engine reads now()).",
+      "location": "apps/api/src/routes/admin/loyalty-rates.ts:72-86",
+      "fix": "Decision: either reject effectiveFrom earlier than now() (forward-dating only), or explicitly allow back-dating but document/flag it in the audit payload. Today it is silently allowed with no signal.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

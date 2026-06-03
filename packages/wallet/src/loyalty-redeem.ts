@@ -5,7 +5,7 @@
  *             respects pending settlement (un-finalised refund hold).
  */
 import type { Database, Transaction } from "@bm/db";
-import { audit, loyaltyLedger, walletLedger } from "@bm/db";
+import { audit, loyaltyLedger, walletLedger, wallets } from "@bm/db";
 import { and, eq, sql } from "drizzle-orm";
 import { assertPositivePoints, getLoyaltyBalance } from "./loyalty.js";
 import { getEffectiveRates, kesForPoints } from "./loyalty-rates.js";
@@ -51,6 +51,20 @@ export async function redeemPoints(
 ): Promise<RedeemPointsResult> {
   assertPositivePoints(input.points);
   return db.transaction(async (tx) => {
+    // Lock the wallet row FIRST so all redeems (and redeem-vs-debit) on this wallet
+    // serialise. This (a) prevents a double-spend — two concurrent redeems with
+    // different keys can no longer both read the same balance and both insert — and
+    // (b) makes the same-key replay safe: the loser blocks, then the replay SELECT
+    // below sees the committed row instead of hitting the idempotency_key UNIQUE
+    // violation (which would surface as a 500). Mirrors debit.ts.
+    const [lockedWallet] = await tx
+      .select({ id: wallets.id })
+      .from(wallets)
+      .where(eq(wallets.id, input.walletId))
+      .for("update");
+    if (!lockedWallet) {
+      throw new Error(`redeemPoints: wallet ${input.walletId} not found`);
+    }
     const [existing] = await tx
       .select()
       .from(loyaltyLedger)

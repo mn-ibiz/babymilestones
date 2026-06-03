@@ -26,7 +26,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 17 | 6 | ✅ | 2 (plan-price BLOCKER, reception sub/cancel IDOR ×2) | 7 | 12 | 15 |
 | 18 | 5 | ✅ | 5 (photoUrl XSS, check-in IDOR, handoff IDOR, date-500, accented anonymise) | 2 | 2 | 16 |
 | 19 | 5 | ✅ | 2 (POS sales + cash-up IDOR BLOCKERs) | 5 | 7 | 19 |
-| 20 | 4 | ⬜ | | | | |
+| 20 | 4 | ✅ | 2 (redeem double-spend BLOCKER+replay, rate tiebreaker) | 1 | 8 | 12 |
 | 21 | 2 | ⬜ | | | | |
 | 22 | 3 | ⬜ | | | | |
 | 23 | 5 | ⬜ | | | | |
