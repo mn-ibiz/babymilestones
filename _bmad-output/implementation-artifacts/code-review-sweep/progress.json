@@ -49,7 +49,7 @@
   "pending_count": 128,
   "epic_state": {
     "1": "done",
-    "2": "todo",
+    "2": "done",
     "3": "todo",
     "4": "todo",
     "5": "todo",
@@ -219,7 +219,7 @@
         "fd088ed2347d5503fa14d9e043565d776fed2f19"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "2-3-add-and-edit-children",
@@ -236,7 +236,7 @@
         "364b5203e5c96920736c22d65434b20510f82d80"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "2-4-photo-and-sms-consent-flags",
@@ -253,7 +253,7 @@
         "fc70a331cd7afa68bbd807609d68fb37aee86d01"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "2-5-data-export-for-a-parent-s-record",
@@ -3036,8 +3036,16 @@
       "decisions_needed": 3,
       "dismissed": 9,
       "commit": ""
+    },
+    "2": {
+      "stories_reviewed": 3,
+      "patches": 4,
+      "deferred": 1,
+      "decisions_needed": 1,
+      "dismissed": 14,
+      "commit": ""
     }
   },
-  "epics_done": 1,
+  "epics_done": 2,
   "epics_total": 35
 }

@@ -9,7 +9,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | Epic | Stories | State | Patches applied | Deferred | Decisions needed | Dismissed |
 |------|---------|-------|-----------------|----------|------------------|-----------|
 | 1  | 3 | ✅ | 1 (argon2id cost) | 7 | 3 | 9 |
-| 2  | 3 | ⬜ | | | | |
+| 2  | 3 | ✅ | 4 (walk-in URL blocker, error handling, ageInMonths, name caps) | 1 | 1 | 14 |
 | 3  | 4 | ⬜ | | | | |
 | 4  | 3 | ⬜ | | | | |
 | 5  | 2 | ⬜ | | | | |

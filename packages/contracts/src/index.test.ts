@@ -344,6 +344,13 @@ describe("ageInMonths (P1-E02-S03 AC2)", () => {
     expect(ageInMonths("2024-07-15", new Date("2024-07-15T00:00:00Z"))).toBe(0);
     expect(ageInMonths("2025-01-01", new Date("2024-07-15T00:00:00Z"))).toBe(0);
   });
+  it("reaches the monthiversary on the last day of a shorter month (day 29-31 births)", () => {
+    // Born Jan 31 is 1 month old on Feb 28 (Feb has no 31st), not 0.
+    expect(ageInMonths("2023-01-31", new Date("2023-02-28T00:00:00Z"))).toBe(1);
+    expect(ageInMonths("2023-03-31", new Date("2023-04-30T00:00:00Z"))).toBe(1);
+    // The day before the (clamped) monthiversary still counts as not-yet-reached.
+    expect(ageInMonths("2023-01-30", new Date("2023-02-28T00:00:00Z"))).toBe(1);
+  });
 });
 
 describe("parentSearchQuerySchema (P1-E05-S01 AC1)", () => {

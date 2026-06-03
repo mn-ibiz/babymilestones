@@ -1,0 +1,8 @@
+{
+  "id": "P1-E02-S04",
+  "verdict": "clean",
+  "diff_summary": "Adds per-child photo_consent + per-parent sms_marketing_opt_in boolean columns (additive migration 0009, default false), contracts schemas/fields, two session+CSRF+ownership-scoped consent PUT endpoints that write timestamped audit_outbox rows, a fail-closed ConsentAwareSmsSender marketing gate in packages/sms, and platform UI toggles.",
+  "ac_coverage": "AC1 (both flags default false / opt-in), AC2 (consent edit audited with timestamp), AC3 (marketing gate reads sms_marketing_opt_in, fail-closed; transactional always sends) — all implemented and tested (api profile.test.ts, children.test.ts, sms index.test.ts).",
+  "dismissed_count": 5,
+  "findings": []
+}

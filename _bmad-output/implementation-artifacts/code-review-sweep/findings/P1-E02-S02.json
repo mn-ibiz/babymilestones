@@ -1,0 +1,49 @@
+{
+  "id": "P1-E02-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds Reception walk-in registration: apps/api/src/routes/parents/walkin.ts (POST /parents/walk-in + GET /parents/phone-check), contracts (receptionWalkInSchema, PhoneCheckResult), migration 0007 (pin_hash nullable, pin_set_at, reception create:user), rbac matrix, and apps/admin one-screen form + walkin-form.ts logic.",
+  "ac_coverage": "AC1 implemented & tested (API+contract). AC3 implemented & tested (no PIN, null pin_hash/pin_set_at, login falls back to DUMMY_PIN_HASH so credential-less accounts can't log in). AC4 implemented & tested (parent.created_by_reception carries staff_user_id). AC2 only PARTIALLY satisfied on the client: phone-collision check + debounce are tested, but the create POST targets the wrong path so submit silently no-ops, the 'Open existing' button links to a non-existent route, and the 'Merge intent' flag is inert. No test exercises the page component's fetch URLs.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Reception form POSTs to /api/parents/walk-in but the API route is /parents/walk-in — create silently fails",
+      "detail": "In apps/admin/app/reception/walk-in/page.tsx the create submit calls fetch(\"/api/parents/walk-in\", ...) (line 79), while the phone-check in the SAME file calls fetch(\"/parents/phone-check\", ...) (line 51). The Fastify route is registered at bare /parents/walk-in (apps/api/src/routes/parents/walkin.ts; registerParentRoutes mounts with no /api prefix), and the canonical admin helper apiFetch uses `${API_BASE}${path}` with API_BASE = NEXT_PUBLIC_API_BASE ?? \"\" and bare paths everywhere else (e.g. /admin/*, /treasury/*, /reception/attendance/*). There is no Next /api route handler (only /health/*) and no rewrites in next.config; the SSO middleware matcher catches /api/* and just passes through to a 404. So the two fetches in this feature cannot both be correct against the same API server, and the POST is the wrong one: it 404s, res.ok is false, and onSubmit's `if (res.ok)` branch is skipped — the form shows NO error and NO success, so Reception cannot register a walk-in at all. The impl story's Completion Notes claim this exact base-path bug was fixed in review ('the Reception form fetched /api/parents/* (wrong base; the established convention is /parents/*)'), but the fix was applied only to the phone-check GET, not the create POST. The integration tests pass because they inject directly against the correct bare URL /parents/walk-in and never exercise the page's fetch URL.",
+      "location": "apps/admin/app/reception/walk-in/page.tsx:79",
+      "fix": "Change the create POST URL from \"/api/parents/walk-in\" to \"/parents/walk-in\" so it matches both the registered Fastify route and the sibling phone-check call (and the API_BASE convention). Equivalently, route both through the apiFetch helper (lib/api.ts) which prefixes ${API_BASE} and already sets x-csrf-token from the bm_csrf cookie.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC2 'Merge intent' flag is inert and 'Open existing' links to a non-existent route",
+      "detail": "AC2 requires that on a duplicate the form offer 'Open existing' or a 'Merge intent' flag. (1) Merge intent: mergeIntent state is set by the checkbox (page.tsx:37,120) but is never read, never sent to the server, and never persisted/audited — grep across apps/ and packages/ finds no merge_intent handling anywhere, so checking the box does nothing. (2) Open existing: the button navigates to `/reception/parents/${dup.userId}` (page.tsx:116), but no such route exists in apps/admin (there is no app/reception/parents/[id] page and no parent-detail page anywhere; parent context in Reception is shown inline on app/reception/page.tsx). So the button 404s. Both duplicate-resolution affordances required by AC2 are non-functional.",
+      "location": "apps/admin/app/reception/walk-in/page.tsx:116",
+      "fix": "Decision needed: (a) the parent-detail destination for 'Open existing' may belong to a later story — confirm the correct target route (or wire it to the inline reception parent view) rather than a hard-coded /reception/parents/:id; (b) decide how 'Merge intent' should be recorded (e.g. POST a merge-intent flag/audit event carrying the existing userId + staff actor) and implement persistence, or drop the checkbox until the merge workflow exists. As-is the UI promises actions it cannot perform.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Create POST has no failure handling — non-201 responses (409 duplicate, 400, 500) give Reception no feedback",
+      "detail": "onSubmit only handles the success branch: `if (res.ok) { ... }` (page.tsx:85-90) with no else. On a 409 duplicate (the server's authoritative duplicate guard / check→insert race), a 400 validation error, or a 500, the form silently does nothing — no message, no state change, button just re-enables. Even once the base-path blocker (finding 1) is fixed, Reception gets zero feedback on the most likely error (the duplicate-phone 409 that AC2 is specifically about). This compounds the AC2 gap.",
+      "location": "apps/admin/app/reception/walk-in/page.tsx:85",
+      "fix": "Add an else branch (or try/catch) that reads the JSON error body and surfaces it. For a 409, read body.existing and transition phoneCheck to { status: 'duplicate', existing } so the existing Open existing / Merge intent UI renders; for 400/500 show body.error in a role=alert region.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "No component-level test covers the form's fetch URLs, so the base-path break went undetected",
+      "detail": "walkin-form.test.ts only tests the pure helpers (validateWalkIn/canSubmit/debounce) and walkin.test.ts injects directly against the API. Nothing asserts the page's create/phone-check URLs, which is exactly why the /api/parents/walk-in vs /parents/phone-check inconsistency (finding 1) shipped despite the claimed review pass. Task 4 / DoD #2 ('all AC have a passing test') is technically met at the API layer but the client integration that AC1/AC2 actually exercise is untested.",
+      "location": "apps/admin/lib/walkin-form.test.ts:1",
+      "fix": "Deferred (test-debt, not a runtime defect on its own). When fixing finding 1, add a small component/integration test (or a thin wrapper that asserts the request URLs) so the wrong base path can't regress. Track separately.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

@@ -700,10 +700,15 @@ export const CHILD_NOTES_MAX = 500;
 export const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** Trim then collapse empty optional text to null. */
+/** Max length for a child's short text fields (name parts, gender). */
+export const CHILD_NAME_MAX = 120;
 const optionalChildText = z
   .union([z.string(), z.null()])
   .optional()
   .transform((v) => (v ?? "").trim())
+  .refine((v) => v.length <= CHILD_NAME_MAX, {
+    message: `Must be ${CHILD_NAME_MAX} characters or fewer`,
+  })
   .transform((v) => (v === "" ? null : v));
 
 /**
@@ -714,7 +719,11 @@ const optionalChildText = z
  * derived from the session.
  */
 export const childSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required"),
+  firstName: z
+    .string()
+    .trim()
+    .min(1, "First name is required")
+    .max(CHILD_NAME_MAX, `First name must be ${CHILD_NAME_MAX} characters or fewer`),
   lastName: optionalChildText,
   dateOfBirth: z
     .string()
@@ -766,7 +775,14 @@ export function ageInMonths(dateOfBirth: string | Date, asOf: Date = new Date())
     (asOf.getUTCFullYear() - dob.getUTCFullYear()) * 12 +
     (asOf.getUTCMonth() - dob.getUTCMonth());
   // Not yet reached the day-of-month → the current month isn't complete.
-  if (asOf.getUTCDate() < dob.getUTCDate()) months -= 1;
+  // Clamp the birth day to the as-of month's length so a birth on day 29-31 still
+  // reaches its monthiversary on the final day of a shorter month (e.g. born
+  // Jan 31 is 1 month old on Feb 28, not 0).
+  const daysInAsOfMonth = new Date(
+    Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const anniversaryDay = Math.min(dob.getUTCDate(), daysInAsOfMonth);
+  if (asOf.getUTCDate() < anniversaryDay) months -= 1;
   return months < 0 ? 0 : months;
 }
 

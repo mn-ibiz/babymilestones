@@ -21,3 +21,14 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    expected rows from seed SQL + add a both-packages cross-check test, or (B) hoist canonical matrix
    into a shared package and generate the seed SQL from it. Files: `packages/auth/src/rbac.test.ts`,
    `packages/db/src/permissions.test.ts`.
+
+## Epic 2 — Parent & Child Registry
+
+4. **[HIGH · P1-E02-S02] Walk-in duplicate-resolution affordances are non-functional (AC2).**
+   The create POST 404 is now fixed, but: "Open existing" navigates to `/reception/parents/:id`
+   which does not exist anywhere in `apps/admin`, and the "Merge intent" checkbox sets state that is
+   never sent, persisted, or audited. **Choose:** (a) the correct destination for "Open existing"
+   (a dedicated parent-detail route, or the inline reception parent view), and (b) how "Merge intent"
+   should be recorded (e.g. POST a merge-intent flag + audit event with the existing userId + staff
+   actor) — or drop the checkbox until a merge workflow exists. File:
+   `apps/admin/app/reception/walk-in/page.tsx:116-122`.

@@ -36,6 +36,7 @@ export default function WalkInPage() {
   const [phoneCheck, setPhoneCheck] = useState<PhoneCheckState>({ status: "idle" });
   const [mergeIntent, setMergeIntent] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const validation = useMemo(() => validateWalkIn(values), [values]);
 
@@ -76,7 +77,8 @@ export default function WalkInPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!canSubmit(validation, phoneCheck)) return;
-      const res = await fetch("/api/parents/walk-in", {
+      setSubmitError(null);
+      const res = await fetch("/parents/walk-in", {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
@@ -87,7 +89,18 @@ export default function WalkInPage() {
         setSubmitted(body.userId);
         setValues(EMPTY);
         setPhoneCheck({ status: "idle" });
+        return;
       }
+      // Server is authoritative: surface its error instead of a silent no-op.
+      // A 409 means the phone already exists — fall back to the duplicate
+      // affordance (AC2); other statuses show the error message.
+      const err = (await res.json().catch(() => null)) as
+        | { error?: string; existing?: PhoneCheckResult["existing"] }
+        | null;
+      if (res.status === 409 && err?.existing) {
+        setPhoneCheck({ status: "duplicate", existing: err.existing });
+      }
+      setSubmitError(err?.error ?? "Could not register the parent. Please try again.");
     },
     [validation, phoneCheck, values],
   );
@@ -98,6 +111,7 @@ export default function WalkInPage() {
     <main>
       <h1>Register walk-in parent</h1>
       {submitted && <p role="status">Parent created. They set a PIN via OTP on first login.</p>}
+      {submitError && <p role="alert">{submitError}</p>}
       <form onSubmit={onSubmit}>
         <label>
           Phone (required)

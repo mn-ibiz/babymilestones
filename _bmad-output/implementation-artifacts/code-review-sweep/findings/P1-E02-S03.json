@@ -1,0 +1,29 @@
+{
+  "id": "P1-E02-S03",
+  "verdict": "issues",
+  "diff_summary": "Adds children registry: children table + additive migration 0008, CRUD+soft-delete API (apps/api/src/routes/parents/children.ts) with session-derived ownership and CSRF, childSchema + ageInMonths in @bm/contracts, parent UI in apps/platform; child.created/updated/archived audit events. Full test coverage.",
+  "ac_coverage": "AC1-AC5 all implemented and tested. AC1 add (fields + 500-char notes cap), AC2 ageInMonths shared helper + surfaced via toChild and reused by reception booking selector, AC3 edit preserves all fields, AC4 soft-delete via archived_at (row retained; bookings/pickups FK children.id with no cascade), AC5 all three audit events written to audit_outbox in-transaction. Ownership/IDOR properly enforced and explicitly tested (cross-parent edit/archive -> 404).",
+  "dismissed_count": 6,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "ageInMonths off-by-one for day-29-31 births on the final day(s) of shorter months",
+      "detail": "The partial-month guard `if (asOf.getUTCDate() < dob.getUTCDate()) months -= 1` is wrong when the comparison month is shorter than the birth day-of-month. Verified by execution: born 2023-01-31 as-of 2023-02-28 returns 0 (should be 1 — Feb has no 31st so the monthiversary is reached on the last day of Feb); born 2023-03-31 as-of 2023-04-30 returns 0 (should be 1). This is not cosmetic: ageInMonths feeds booking age-eligibility gating in apps/api/src/routes/reception/booking.ts (slotFitsAge(ageMonths, ageMinMonths, ageMaxMonths)), so an affected child can be wrongly rejected from (or admitted to) an age-bounded slot for a one-day window each short month. Narrow trigger (births on days 29-31, only on a short month's final day), hence medium not high.",
+      "location": "packages/contracts/src/index.ts:769",
+      "fix": "Clamp the birth day to the as-of month's length before comparing. Replace the guard with: `const daysInAsOfMonth = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() + 1, 0)).getUTCDate(); const anniversaryDay = Math.min(dob.getUTCDate(), daysInAsOfMonth); if (asOf.getUTCDate() < anniversaryDay) months -= 1;`. Add a regression test for born-2023-01-31 as-of-2023-02-28 expecting 1.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "blind",
+      "title": "No maximum length on firstName / lastName / gender in childSchema (unbounded text)",
+      "detail": "childSchema caps allergiesNotes at CHILD_NOTES_MAX (500) but firstName, lastName and gender are validated only with min(1)/optional and no .max(). They persist into unbounded `text` columns, so a client can store arbitrarily large strings (resource abuse, UI breakage). This is inconsistent with the codebase's prevailing convention — sibling schemas in the same file cap text fields (PICKUP_TEXT_MAX, ATTENDANCE label/qty maxes, OBSERVATION_*_MAX, FLOAT_ACCOUNT_NAME_MAX, STAFF_NAME_SNAPSHOT_MAX, productSchema .max(80/100)). The brief explicitly called out name-length validation. Only parentProfileSchema shares the uncapped pattern, so this is a story-introduced gap, not a universal precedent.",
+      "location": "packages/contracts/src/index.ts:86",
+      "fix": "Add `.max(N, ...)` to firstName and lastName (e.g. reuse an 80-char cap as STAFF_NAME_SNAPSHOT_MAX / productSchema firstName do) and to the gender optional text. Mirror the cap in apps/platform/lib/children.ts validateChildDraft and the input maxLength. Add a contract test asserting an over-length first name is rejected.",
+      "ac_ref": "AC1"
+    }
+  ]
+}
