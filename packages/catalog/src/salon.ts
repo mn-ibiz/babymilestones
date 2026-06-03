@@ -307,11 +307,14 @@ export async function deleteFutureUnbookedSalonSlots(
   availabilityId: string,
   fromDate: string,
 ): Promise<number> {
-  // Salon slot ids a booking still references — these must never be deleted.
+  // Salon slot ids a LIVE booking still references — these must never be deleted.
+  // Exclude cancelled bookings (mirror the browse-availability subquery): otherwise
+  // a cancelled-booking slot is wrongly protected from resync and keeps being offered
+  // to parents even after the stylist's availability no longer covers it.
   const bookedSalonSlotIds = db
     .select({ id: bookings.salonSlotId })
     .from(bookings)
-    .where(isNotNull(bookings.salonSlotId));
+    .where(and(isNotNull(bookings.salonSlotId), ne(bookings.status, "cancelled")));
   const deleted = await db
     .delete(salonSlots)
     .where(

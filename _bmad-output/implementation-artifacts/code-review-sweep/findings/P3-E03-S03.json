@@ -1,0 +1,38 @@
+{
+  "id": "P3-E03-S03",
+  "verdict": "issues",
+  "diff_summary": "Epic-level commit 1737207e77 makes salon reassign atomic (catalog reassignSalonBooking now accepts an Executor/tx; route wraps attribution + commission move in ONE db.transaction) and reworks reassignBookingCommission idempotency to key on the net-by-staff transition instead of 'any reassign line exists'. Review focused on the S03 surface (apps/api/src/routes/reception/salon.ts: board/checkin/complete/walk-in) plus the wallet debit + commission paths it composes.",
+  "ac_coverage": "AC1 board (grouped by stylist/hour), AC2 check-in (idempotent wallet debit `attendance:checkin:<bookingId>` + commission accrual), AC3 complete (consent-gated photo + feedback hook + double-completion guard via FOR UPDATE re-check), AC4 walk-in — all implemented and tested. GAP: AC2/AC3 authz tests only cover a packer (no `read wallet`); no test covers a parent, who DOES hold the gating permissions — see blocker finding.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Salon counter routes are missing the isStaffRole gate — a logged-in parent can check in / debit / enumerate any family's salon booking",
+      "detail": "registerReceptionSalon.authStaff (salon.ts:100-119) validates the session and then only calls the requirePermission guard. The board read is gated to `read wallet` and the checkin/complete mutations to `create payment` — but the parent role holds BOTH (packages/auth/src/rbac.ts:73-77: parent = read wallet, read receipt, create payment) and parents share the same session store. So an authenticated parent can POST /reception/salon/checkin with any bookingId (debiting another family's wallet and checking in another family's child), POST /reception/salon/complete on any booking, and GET /reception/salon/board?date=... to enumerate every family's children/bookings for a day. Every sibling reception route guards this exact problem with an explicit isStaffRole check — attendance.ts:243-249 even documents the reason verbatim ('parents hold both `read wallet` and `create payment` ... so the permission guard alone would let a parent check in (and debit the wallet of) any family's booking and enumerate other children'). salon.ts is the only reception surface that omits it. The walk-in route is incidentally safe because it is gated to `create user`, which parents do NOT hold. The existing 403 test (salon.test.ts:149) only exercises a packer (who lacks `read wallet`), so this hole is uncovered.",
+      "location": "apps/api/src/routes/reception/salon.ts:100-119",
+      "fix": "Import isStaffRole from @bm/auth and add the same staff-only check used by every other reception route inside authStaff, after validateSession succeeds and before invoking the permission guard: `if (!isStaffRole(auth.user.role)) { reply.code(403).send({ error: \"Forbidden: missing permission\" }); return null; }`. Add a regression test that logs in a parent (who holds read wallet + create payment) and asserts 403 on board, checkin, and complete.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Reassign commission move silently drops the new stylist's commission when the prior stylist's net is zero (e.g. a 0% rate)",
+      "detail": "reassignBookingCommission now decides 'replay / nothing to move' from priorHolders = staff whose net commission is > 0 and != current stylist (commission-hook.ts:223-227, 230-239). If the original stylist had a 0% commission rate, recordBookingCommission still writes a `source='booking'` accrual row but with amountCents=0 (commissionCents at commission-rates.ts:164-173; 0% is an allowed rate per the `n < 0 || n > 100` guard at line 34). On a reassign A(0%)->B(20%): the accrual exists so the `!accrual` not-settled gate passes; A's net is 0 so A is NOT a priorHolder; priorHolders.length === 0, so the function returns {moved:false, replayed:true} and NEVER posts B's 20% commission. The new (current) stylist is silently under-paid. Same failure if any prior reassign already netted the old holder to exactly zero before another move. Not covered by tests — all reassign tests use non-zero oldRate (10%).",
+      "location": "packages/wallet/src/commission-hook.ts:230-239",
+      "fix": "Don't infer 'already done' purely from priorHolders.length===0. Treat it as a true replay only when the move's effects are already present (a reversal anchored to the accrual AND, when a target rate exists, a `source='reassign'` line for the current stylist). Concretely: when priorHolders is empty, still post the new stylist's `reassign` line if (a) the booking has a settled accrual and (b) no `reassign` line for newStaffId exists yet. Product decision: confirm 0%-commission stylists are a real configuration before sizing — if 0% is never used in practice the impact is theoretical, but the guard is still wrong.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Walk-in leaves orphaned parent/wallet/child rows if booking or check-in fails after parent creation",
+      "detail": "The walk-in flow (salon.ts:283-355) commits the parent+wallet+child in one transaction, then performs createAdHocSalonSlot, bookSalonSlot and checkInBooking as separate, un-rolled-back steps. A failure in bookSalonSlot (e.g. SalonServicePriceMissingError) or checkInBooking after the parent commit strands a parent/wallet/child with no booking. No money is lost (no debit happens until check-in, which is idempotent), but a half-registered parent persists and a retried walk-in then 409s on the duplicate phone. This mirrors the pre-existing standard walk-in registration shape and is not changed by this commit.",
+      "location": "apps/api/src/routes/reception/salon.ts:283-355",
+      "fix": "Out of scope for this commit (pre-existing walk-in design). If addressed: validate service/stylist/slot availability before creating the parent (already partly done at 266-272), or make the failure path clean up the orphaned parent. Track separately."
+    }
+  ]
+}

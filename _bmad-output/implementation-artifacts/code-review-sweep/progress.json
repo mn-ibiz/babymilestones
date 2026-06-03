@@ -71,7 +71,7 @@
     "22": "done",
     "23": "done",
     "24": "done",
-    "25": "todo",
+    "25": "done",
     "26": "todo",
     "27": "todo",
     "28": "todo",
@@ -2005,7 +2005,7 @@
         "ba52cbfbe3de52c23c234b76add6817c422665d5"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "25-2-parent-picks-a-service-then-a-stylist-then-a-slot",
@@ -2023,7 +2023,7 @@
         "ba52cbfbe3de52c23c234b76add6817c422665d5"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "25-3-salon-counter-check-in-and-service-completion",
@@ -2041,7 +2041,7 @@
         "ba52cbfbe3de52c23c234b76add6817c422665d5"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "25-4-reassign-a-salon-booking-between-stylists",
@@ -2059,7 +2059,7 @@
         "ba52cbfbe3de52c23c234b76add6817c422665d5"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "25-5-salon-specific-reporting-tile",
@@ -2077,7 +2077,7 @@
         "ba52cbfbe3de52c23c234b76add6817c422665d5"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "26-1-proportional-loyalty-clawback-on-refund",
@@ -3212,8 +3212,16 @@
       "decisions_needed": 1,
       "dismissed": 8,
       "commit": ""
+    },
+    "25": {
+      "stories_reviewed": 5,
+      "patches": 2,
+      "deferred": 4,
+      "decisions_needed": 5,
+      "dismissed": 15,
+      "commit": ""
     }
   },
-  "epics_done": 23,
+  "epics_done": 24,
   "epics_total": 35
 }

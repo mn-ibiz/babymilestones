@@ -1,0 +1,39 @@
+{
+  "id": "P3-E03-S02",
+  "verdict": "issues",
+  "diff_summary": "Pinned commit 1737207e touches reassign (S04): wraps reassignSalonBooking + reassignBookingCommission in ONE db.transaction and re-keys commission idempotency on net-by-staff (fixes A->B->A / A->B->C mis-replay). The S02 booking flow itself lives in working tree: packages/catalog/src/salon.ts (bookSalonSlot, listAvailableSalonSlots, resolveLeastBusyStylist) + apps/api/src/routes/parents/salon.ts (availability / confirm / least-busy endpoints).",
+  "ac_coverage": "AC1 (service->stylist->date->slots) implemented & tested. AC2 (specific stylist filters slots; pick must match slot) implemented & tested. AC3 (least-busy on Any-available) is CLIENT-orchestrated via a separate GET /least-busy — the confirm endpoint does NOT re-resolve least-busy server-side (see finding). AC4 (booking + pending invoice + attribution + audit) implemented & tested; commission attribution flows through booking.staffId at settle, correct. IDOR (parent books own non-archived child), double-book 409, CSRF/auth all have route tests.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "A past-dated salon slot is bookable — no slotDate >= today guard in bookSalonSlot or the confirm route",
+      "detail": "The nightly generator is future-only and NEVER prunes past slots (regenerateSalonSlots is purely additive; deleteFutureUnbookedSalonSlots only touches slotDate >= fromDate). So elapsed, unbooked salon_slots rows persist indefinitely. The parent availability LISTING is bounded by fromDate=today (apps/api/src/routes/parents/salon.ts:104-123), but the confirm endpoint passes the client-supplied salonSlotId straight into bookSalonSlot (salon.ts:170) and bookSalonSlot (packages/catalog/src/salon.ts:594-677) only locks the row, checks the seat, checks the stylist is active, and resolves a price — it never compares slot.slotDate to today. A stale or crafted POST /parents/me/salon/bookings with an old slotId therefore creates a confirmed booking + a pending invoice for a date that has already passed (the parent gets charged for an appointment that can never happen). AC1 implies a forward-looking date->slots flow; there is no test for past-slot rejection because no guard exists.",
+      "location": "packages/catalog/src/salon.ts:594-622",
+      "fix": "Decide product intent on same-day late bookings, then add a guard: in bookSalonSlot, after loading the locked slot, reject when slot.slotDate < today (and optionally when slotDate==today and endTime < now). 'today' must be passed in / injected via a clock for test determinism (the route already has a clock dep). Throw a dedicated SalonSlotExpiredError -> 409 in the route. Add a test booking a yesterday-dated slot expecting rejection.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC3 least-busy is NOT enforced on confirm; the confirm endpoint books whatever slot the client passes, and its doc-comment claims otherwise",
+      "detail": "AC3: 'If Any available — system picks the least-busy stylist on confirmation.' The implementation splits this across two calls: a GET /parents/me/salon/services/:serviceId/least-busy that returns the least-busy staffId, and the confirm POST. The confirm handler (apps/api/src/routes/parents/salon.ts:149-226) NEVER calls resolveLeastBusyStylist — when staffId is omitted it simply books the salonSlotId the client supplied and attributes that slot's own stylist (bookSalonSlot, staffId ?? null). So a client can omit staffId and pass the BUSIEST stylist's slot and it is accepted; the 'least-busy' guarantee is purely advisory/client-side. The route's own block comment (lines 146-148: 'the server resolves the least-busy stylist on that slot's date and books one of their open slots') describes behavior the code does not implement, which will mislead the next maintainer. The AC3 test (salon.test.ts:166) passes only because the test itself first calls least-busy and then fetches that stylist's slot before confirming.",
+      "location": "apps/api/src/routes/parents/salon.ts:146-179",
+      "fix": "Product decision: (a) accept the client-orchestrated flow as the intended design and FIX the misleading comment to state the confirm books the client-chosen slot and that least-busy resolution is a separate advisory endpoint; or (b) enforce AC3 server-side — when staffId is omitted, ignore/validate the slot's stylist against resolveLeastBusyStylist for that service+date and book a least-busy stylist's open slot. Either way add a test that a no-staffId confirm against a non-least-busy slot behaves as the chosen design dictates.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Reassign commission move has no DB-level idempotency backstop and takes no internal lock — safe only because the wired caller holds the booking FOR UPDATE",
+      "detail": "reassignBookingCommission (packages/wallet/src/commission-hook.ts:209-307, changed in the pinned commit) now decides replay/move by reading all commission_ledger rows for the booking and computing net-by-staff, then inserting refund_reversal + reassign rows. The unique index commission_ledger_one_accrual_per_booking covers only source='booking' (packages/db/src/schema/commission-ledger.ts:58-60), so reassign/refund_reversal rows have NO uniqueness constraint, and this function takes no lock of its own. Two concurrent reassigns of the same booking could each read the same net, both compute priorHolders, and both post reversals/reassign lines (double reversal / double credit). In the CURRENT wired path this cannot happen: the reception route (apps/api/src/routes/reception/salon.ts:205-) runs reassignSalonBooking (which does SELECT booking ... FOR UPDATE) and reassignBookingCommission inside the SAME db.transaction, so the booking-row lock serialises the whole sequence. The risk is latent: reassignBookingCommission is exported and, if ever called standalone (no enclosing booking lock), the idempotency is racy.",
+      "location": "packages/wallet/src/commission-hook.ts:213-240",
+      "fix": "Defer (no live bug on the wired path). To harden: have reassignBookingCommission re-SELECT the booking row FOR UPDATE at the top of its run() so it self-serialises even when called standalone, and/or document that it MUST be invoked inside a transaction that already holds the booking lock. Not required for this story.",
+      "ac_ref": "AC4"
+    }
+  ]
+}

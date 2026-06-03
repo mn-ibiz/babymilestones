@@ -1,0 +1,39 @@
+{
+  "id": "P3-E03-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds staff_availability + salon_slots tables (migration 0088, additive), services.salon_duration_minutes, bookings.salon_slot_id; @bm/catalog salon.ts availability CRUD + future-only/idempotent salon-slot materialisation reusing P2-E01 slotWindows; nightly salon-slot-generation cron in apps/jobs. (Implementation lives in commit ba52cbf; pinned 1737207e77 is a later commission-reassign fix unrelated to S01.)",
+  "ac_coverage": "AC1 (table): data layer + migration implemented & unit-tested, BUT no admin/reception HTTP route exists to create/edit staff_availability, so the story's JTBD ('as admin I declare which stylist is in') has no surface. AC2 (nightly generation): fully implemented (regenerateSalonSlots + cron) & tested. AC3 (no retroactive change to history): implemented (future-only, onConflictDoNothing, booked/past-slot protection) & tested.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "No admin/staff route to create or edit staff_availability — AC1 JTBD has no surface and the authz boundary it implies is never exercised",
+      "detail": "Story JTBD: 'As admin, I want to declare which stylist is in on which day.' The data layer (createStaffAvailability / updateStaffAvailability / resyncStaffAvailabilitySlots) is exported from @bm/catalog but has ZERO callers outside tests — grep across apps/api/src finds no POST/PUT route for staff_availability (only the parent read-only /parents/me/salon/.../availability browse and the cron). The P2-E01 analog has apps/api/src/routes/admin/schedules.ts guarded by can()/requirePermission plus a scheduleCreateSchema contract; the salon availability has neither a route nor a contracts zod schema. Consequence: (a) AC1's product intent is unfulfilled — an admin cannot actually declare availability through the product; (b) the review's authz focus ('staff/admin create slots, not parents') cannot be verified because the privileged endpoint does not exist; (c) input validation (dayOfWeek 0-6, startTime<endTime, effectiveFrom<=effectiveTo) is enforced ONLY by DB CHECK constraints, with no zod layer, so a future route author can easily forget the auth guard / 400-shaping that schedules.ts has.",
+      "location": "packages/catalog/src/salon.ts:83 (createStaffAvailability) / apps/api/src/routes (no availability route)",
+      "fix": "Confirm whether the admin availability surface is intentionally deferred to a later UI story. If S01 is meant to be usable, add an admin/reception route (mirroring apps/api/src/routes/admin/schedules.ts) guarded by requirePermission/can for staff+admin (excluding parents), backed by a new staffAvailabilityCreate/Update zod schema in @bm/contracts, calling createStaffAvailability/updateStaffAvailability + resyncStaffAvailabilitySlots and writing the audit row. If deferred, record that AC1 is data-layer-only for this story.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "deleteFutureUnbookedSalonSlots protects slots referenced by CANCELLED bookings, so resync leaves stale future slots after a cancellation",
+      "detail": "The 'booked slot ids' guard in deleteFutureUnbookedSalonSlots filters only isNotNull(bookings.salonSlotId) and does NOT exclude status='cancelled' (salon.ts:311-314). The browse subquery bookedSalonSlotIdsSubquery correctly adds ne(bookings.status,'cancelled') (salon.ts:407-411). Trigger: a parent books a future salon slot, then the booking is cancelled; the availability rule is later narrowed/retired so resyncStaffAvailabilitySlots runs. The prune treats the cancelled-booking's slot as 'booked' and keeps it, even though it no longer matches the current rule. listAvailableSalonSlots (which excludes cancelled) will continue to OFFER that now-out-of-window slot, so a parent can book a slot the stylist is no longer scheduled for. No data loss, but it defeats the 'edit removes stale future availability' intent of resync. The missing guard is the same one the sibling subquery already uses.",
+      "location": "packages/catalog/src/salon.ts:311-314 (deleteFutureUnbookedSalonSlots bookedSalonSlotIds subquery)",
+      "fix": "Add the cancelled filter to the protection subquery so only LIVE bookings protect a slot: change `.where(isNotNull(bookings.salonSlotId))` to `.where(and(isNotNull(bookings.salonSlotId), ne(bookings.status, \"cancelled\")))` (ne/and already imported). This makes the delete-protection set identical to the browse-availability set.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Nightly cron computes fromDate from UTC date while the business runs in EAT (UTC+3) — leading-edge horizon can be off by one calendar day",
+      "detail": "salon-slot-generation.ts:31 sets fromDate = now().toISOString().slice(0,10), the UTC date. The deployment is Kenya (KES, +254 phones, EAT = UTC+3, no DST). When the nightly cron fires in local night hours (e.g. 02:00 EAT = 23:00 UTC of the prior day) the UTC date is one day behind the local date, so the horizon's leading edge is computed for 'yesterday' relative to Nairobi. Because generation is purely additive with a 60-day horizon and onConflictDoNothing, the next nightly run fills any gap and no existing/booked/past row is ever mutated, so AC3 is not violated — hence low severity / deferred. Note: this matches the existing P2-E01 slot-generation cron's UTC convention, so it is a pre-existing, codebase-wide convention rather than a new S01 defect. Slot start/end are stored as wall-clock HH:MM text with no timezone, which is the intended (and consistent) model.",
+      "location": "apps/jobs/src/jobs/salon-slot-generation.ts:31",
+      "fix": "Pre-existing convention shared with slot-generation.ts; defer. If the org wants the horizon anchored to the local (Nairobi) calendar day, derive fromDate via an EAT (UTC+3) offset for the whole job family in one place rather than per-cron.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

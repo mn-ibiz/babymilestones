@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eq } from "drizzle-orm";
 import { children, parents, users, wallets, type Database } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME, normalizePhone } from "@bm/auth";
+import {
+  validateSession,
+  requirePermission,
+  isStaffRole,
+  CSRF_HEADER_NAME,
+  normalizePhone,
+} from "@bm/auth";
 import {
   bookSalonSlot,
   createAdHocSalonSlot,
@@ -108,6 +114,14 @@ export function registerReceptionSalon(app: FastifyInstance, deps: ReceptionSalo
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    // Salon counter is staff-only. Parents hold `read wallet` + `create payment`
+    // and share the session store, so the permission guard alone would let a parent
+    // check in / debit / enumerate any family's salon booking. Gate on the staff role
+    // (the last reception surface that was missing this — mirrors attendance.ts).
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return null;
     }
     const perm = guard(auth.user);

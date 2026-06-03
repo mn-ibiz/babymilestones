@@ -31,7 +31,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 22 | 3 | ✅ | 0 (code clean) | 3 | 5 | 9 |
 | 23 | 5 | ✅ | 4 (commission double-pay BLOCKER, rate lock, mark-paid idemp, csv-injection test) | 3 | 6 | 15 |
 | 24 | 2 | ✅ | 1 (public viewer malformed-id 500→404) | 2 | 1 | 8 |
-| 25 | 5 | ⬜ | | | | |
+| 25 | 5 | ✅ | 2 (salon counter IDOR BLOCKER, resync cancelled-slot) | 4 | 5 | 15 |
 | 26 | 4 | ⬜ | | | | |
 | 27 | 5 | ⬜ | | | | |
 | 28 | 5 | ⬜ | | | | |

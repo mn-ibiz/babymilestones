@@ -33,6 +33,25 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 25 — Kids-Only Salon Flow
+
+60. **[BLOCKER → money · P3-E03-S04] Re-reassign back to a zero-net stylist silently loses commission.**
+    `reassignBookingCommission` treats `priorHolders.length===0` as a replay without confirming the
+    current target is whole; A(10%)→B(no rate)→A leaves A with 0. **Recommended fix:** gate the replay
+    no-op on `netByStaff.get(newStaffId) === expectedAmount` (resolve target's rate at booking time;
+    null→0), else post the missing reassign line + regression test. NOT auto-applied (a wrong
+    idempotency change risks double-posting; confirm 0%-rate stylists exist). `commission-hook.ts:227-240`.
+
+61. **[HIGH · P3-E03-S01] No admin/staff route to declare stylist availability** — data layer has zero
+    non-test callers; the JTBD + authz boundary have no HTTP surface. Confirm deferred-to-UI or add it.
+
+62. **[MED · P3-E03-S02] Past-dated salon slot is bookable** (no `slotDate >= today` guard); **[MED]**
+    AC3 least-busy not server-enforced on confirm (advisory only, misleading doc comment).
+
+63. **[MED · P3-E03-S05] Salon tile "total revenue" counts no-show/unsettled bookings** (invoiced, not
+    realized) → diverges from the wallet ledger. Matches the ops dashboard. Label as "invoiced" or sum
+    settled-only.
+
 ## Epic 24 — Stylist Commission Viewer
 
 59. **[MED · P3-E02-S02] Earnings breakdown visit-count ignores `source='reassign'`** (later-epic

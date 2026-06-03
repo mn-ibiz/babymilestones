@@ -1,0 +1,29 @@
+{
+  "id": "P3-E03-S05",
+  "verdict": "issues",
+  "diff_summary": "Salon reporting tile: packages/catalog/src/salon-reporting.ts (pure aggregateSalonDayReport reducer) + listSalonReportingRowsForDate DB read in salon.ts; apps/api/src/routes/admin/salon-report.ts (GET /admin/salon-report, read-report gated); apps/admin/lib/salon-report.ts client; SalonDayReportDto + tile/drill-down view-models in packages/contracts. NOTE: the pinned commit 1737207e77 is actually the P3-E03-S04 commission-reassign fix (commission-hook.ts) — the salon-report tile lives in the working tree, reviewed there per the epic-level instruction.",
+  "ac_coverage": "AC1 (tile: today's bookings/no-shows/revenue) implemented + tested (salon-reporting.test.ts, salon-report.test.ts API, salon-report.test.ts admin client). AC2 (per-stylist drill-down) implemented + tested. Both ACs covered.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Tile 'total revenue' counts no-show / never-settled bookings — overstates realized revenue vs the wallet ledger",
+      "detail": "revenue is summed as bookings.staffRateSnapshot for EVERY non-cancelled booking on the day, settled or not (salon-reporting.ts aggregateSalonDayReport lines 114-118; listSalonReportingRowsForDate selects staffRateSnapshot as revenueCents with only a status != 'cancelled' filter, salon.ts:797,808). A salon booking creates a PENDING invoice and the wallet is only debited at check-in (bookSalonSlot inserts invoice status 'pending', salon.ts:625-633; attendances doc: 'Check-in (S02) ... triggers the wallet debit'). A no-show is by definition never checked in, so its invoice stays pending and NO money ever entered the wallet ledger — yet the salon-reporting.test.ts 'no-show' case explicitly asserts revenueCents=2500 for it. So the headline 'total revenue' is invoiced/booked revenue, not realized revenue, and will not reconcile against the append-only wallet ledger. This is a real semantic gap given the review focus 'report figures match the ledger', BUT it is (a) explicitly documented as intentional ('Counted for every non-cancelled booking on the day, settled or not') and (b) the SAME definition the operations dashboard uses (operations-dashboard-db.ts:57 sums the identical staffRateSnapshot for non-cancelled bookings). Whether the salon tile should show invoiced vs settled/realized revenue is a product decision, not an unambiguous bug.",
+      "location": "packages/catalog/src/salon-reporting.ts:114-118; packages/catalog/src/salon.ts:797,808",
+      "fix": "Product decision: keep 'invoiced revenue' (current, consistent with ops dashboard) and label the tile accordingly, OR base revenue on settled invoices only (join invoices/ledger and sum settled amounts) so no-show bookings contribute 0 revenue. If realized revenue is intended, exclude no-shows / non-settled invoices from the revenue sum (but still count them in the bookings/no-shows tallies).",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "UTC slot-time convention may misclassify late-evening no-shows for a UTC+3 (Africa/Nairobi) business",
+      "detail": "No-show 'slot has passed' parses the slot end as UTC (slotEndUtcMs: `${slotDate}T${endTime}:00Z`, salon-reporting.ts:81-82) and the report's default 'today' is now.toISOString().slice(0,10) (UTC date, salon-report.ts:74). The DB keys the day on salonSlots.slotDate. For a Kenya (KES) centre at UTC+3, a slot stored as e.g. 21:00 local would be compared against a UTC clock, and late-evening bookings near the UTC midnight boundary can fall on the wrong report day / be judged 'not yet passed' for ~3h. This is NOT introduced by this story: the entire codebase treats slot HH:MM as UTC wall-clock (schedules.ts:680-682 slotStartUtcMs comment 'UTC wall-clock, matching the codebase'; operations-dashboard-db.ts:35-43 uses UTC day bounds). It is a pre-existing, systemic timezone-modeling choice, consistently applied here.",
+      "location": "packages/catalog/src/salon-reporting.ts:81-93; apps/api/src/routes/admin/salon-report.ts:74",
+      "fix": "Out of scope for this story — a platform-wide timezone decision. If the business operates a non-UTC local day, introduce a single centre-timezone helper and apply it uniformly across all reporting day-boundary + slot-passed math; do not patch only the salon tile.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

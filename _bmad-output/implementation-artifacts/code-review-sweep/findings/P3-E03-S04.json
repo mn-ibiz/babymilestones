@@ -1,0 +1,19 @@
+{
+  "id": "P3-E03-S04",
+  "verdict": "issues",
+  "diff_summary": "apps/api/src/routes/reception/salon.ts (wrap reassign attribution + commission move in ONE db.transaction), packages/catalog/src/salon.ts (reassignSalonBooking accepts Executor so caller can thread its tx), packages/wallet/src/commission-hook.ts (reassignBookingCommission re-keyed idempotency on net-by-staff transition instead of 'any reassign line exists'), +3 wallet tests. Moves a settled salon booking's commission old->new atomically.",
+  "ac_coverage": "AC1 (drag/select reassign) is API-side only (no UI in diff) — out of scope here. AC2 (availability/double-book) implemented via lock-then-check on target slot + booking FOR UPDATE; tested in catalog salon suite. AC3 (attribution snapshot + audit) implemented & audited (salon.booking.reassigned). AC4 (settled commission moves) implemented & tested for A->B, A->B->A, A->B->C, and same-state no-op — BUT has a money-losing gap when the round-trip passes through a no-rate stylist (see finding).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Re-reassigning a settled booking BACK to a stylist whose current net is zero is wrongly treated as a replay — that stylist's commission is silently lost",
+      "detail": "reassignBookingCommission detects a 'true replay' purely by exclusion: if NO staff OTHER than the current target holds a net-positive commission (priorHolders.length === 0), it returns {moved:false, replayed:true} and posts nothing (commission-hook.ts:227-240). It never verifies the CURRENT target actually holds the commission it is owed. This breaks AC4 whenever the booking returns to a stylist whose net is currently zero and no other staff holds a positive net. Reachable path, confirmed empirically with a DB-backed repro: A (rate 10%) settles -> accrual A +1000. Reassign A->B where B has NO commission rate: A is reversed (-1000) and nothing is posted to B (skipped:'no_target_rate'); net A=0, B=0. Reassign B->A (A is now doing the work again): ledger nets A=0 with no positive holder, so priorHolders is empty -> the code reports replayed:true and posts NOTHING. Final net for A = 0. A performed the service but receives zero commission. (A reassign target only needs to be active, not rated, per catalog reassignSalonBooking, so a no-rate stylist is a valid intermediate.) Repro output: A->B {moved:true,skipped:'no_target_rate'}; B->A {moved:false,replayed:true}; FINAL NET A=0 (expected 1000). No existing test covers a round-trip through a no-rate stylist.",
+      "location": "packages/wallet/src/commission-hook.ts:227-240",
+      "fix": "Do not equate 'no other staff holds a positive net' with 'already settled on the current stylist'. Before returning the replay no-op, confirm the current target is actually whole: resolve the target's expected reassign amount (rate at booking.createdAt; null/0 rate => owed 0) and treat it as a replay ONLY when netByStaff.get(newStaffId) already equals that expected amount (and priorHolders is empty). Otherwise fall through to post the missing 'reassign' line for the current stylist. Concretely, compute `const targetRate = newStaffId ? await resolveRateAt(tx, newStaffId, booking.createdAt) : null; const expected = targetRate ? commissionCents(booking.staffRateSnapshot, targetRate.ratePercent) : 0;` and gate the replay early-return on `priorHolders.length === 0 && (netByStaff.get(newStaffId) ?? 0) === expected`. When priorHolders is empty but the target is short, skip the reversal loop (nothing to reverse) and proceed to post the target's reassign line so net lands correctly. Add a regression test: A(rated)->B(no rate)->A expects net A = full commission, B = 0.",
+      "ac_ref": "AC4"
+    }
+  ]
+}
