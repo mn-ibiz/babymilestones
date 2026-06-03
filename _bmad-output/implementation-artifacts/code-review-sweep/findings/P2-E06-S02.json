@@ -1,0 +1,39 @@
+{
+  "id": "P2-E06-S02",
+  "verdict": "issues",
+  "diff_summary": "apps/jobs/src/jobs/backup-prune.ts (I/O shell daily cron) + backup-retention.ts (pure selectBackupsToPrune) implement the policy-driven pruner; reads backup.retention from settings (falls back to defaults), selects un-protected eligible backups, calls store.remove(), stamps backup_runs.prunedAt, writes backup.run.pruned audit. Contracts add backupRetentionPolicySchema; api adds GET/PUT /admin/backup-retention.",
+  "ac_coverage": "AC1 implemented & tested (daily job reads policy, deletes expired). AC2 implemented & tested (prunedAt stamped in backup_runs + backup.run.pruned audit row). AC3 PARTIAL: 'grace period before physical delete' is implemented as age-of-backup protection (backups younger than graceDays are never pruned), NOT a two-phase soft-delete that delays physical removal after a deletion decision — see finding.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "AC3 'soft deletion with grace before physical delete' implemented as creation-age protection, not a two-phase soft delete",
+      "detail": "AC3: 'Deletion is a soft action: 7-day grace period before physical delete (configurable).' The plain reading is a soft-delete lifecycle: when the pruner decides a backup is expired, it should mark it (soft) and only physically remove the off-host object after the grace period, so a mis-configured policy can be caught/reversed before the bytes are gone. The implementation instead treats graceDays as protection on backupRuns.startedAt (Rule 2: any backup younger than now-graceDays is never pruned; backup-retention.ts:56-60), and when a backup IS selected it is physically deleted IMMEDIATELY and prunedAt is stamped at the moment of physical deletion (backup-prune.ts:78-82). prunedAt is therefore a 'physically-deleted-at' marker, not a 'soft-marked-at' marker — there is zero window between the prune decision and irreversible off-host deletion. This is the recoverability guarantee AC3 was asking for. The team may have deliberately reinterpreted 'grace' as age-based (the contracts schema comment and tests consistently describe it that way), hence decision-needed rather than patch.",
+      "location": "apps/jobs/src/jobs/backup-prune.ts:76-89",
+      "fix": "Confirm intended AC3 semantics. If a true soft delete is required: split into two phases — phase 1 stamps a new soft-delete marker (e.g. markedForDeleteAt) without removing the object; phase 2, on a later run, calls store.remove() + stamps prunedAt only for rows whose markedForDeleteAt is older than graceDays. If the age-based interpretation is accepted, update the AC/spec wording so 'soft action / before physical delete' is not misleading.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Partial-failure ordering: physical delete precedes prunedAt stamp with no transaction — a mid-step DB failure orphans a live location pointing at a deleted object",
+      "detail": "In the per-backup loop the order is store.remove(location) -> db.update(prunedAt) -> audit, with no transaction and no try/catch (backup-prune.ts:78-88). If store.remove() succeeds but the db.update() throws (DB blip, connection drop), the loop aborts: the off-host object is already physically gone, yet the row still has prunedAt == null and location != null. On the next daily run the selector re-includes that row (eligible filter is status===success && location!=null && prunedAt==null, backup-retention.ts:44-46) and calls store.remove() on the already-deleted object again — relying on an undocumented assumption that the store treats delete-missing as a no-op. The audit row for that deletion is also never written, so the backup.run.pruned trail is incomplete for a backup whose bytes are gone. No data-loss of a protected backup, but it produces an inconsistent backup_runs record and a missing audit entry.",
+      "location": "apps/jobs/src/jobs/backup-prune.ts:78-88",
+      "fix": "Stamp prunedAt (mark intent) BEFORE the irreversible store.remove(), or wrap stamp+audit so the row reflects the deletion even if a later step fails; and/or wrap each backup's update+audit in a transaction. Stamping before remove turns the failure mode into a harmless orphaned object (storage waste, detectable) instead of a row that claims the object still exists. Also document that BackupStore.remove() must be idempotent for missing keys, since the design relies on it.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "high",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Legacy db-backup.ts prune() uses a hardcoded 30-day window and ignores the configurable policy — if both pruners run, it can physically delete backups the new policy intends to keep",
+      "detail": "The pre-existing createDbBackupJob (X8-S03) still contains its own prune() that hard-deletes every un-pruned successful snapshot older than a hardcoded RETENTION_DAYS=30, protecting only the single most-recent one (db-backup.ts:36,115-145). The new configurable pruner (this story) supports monthlyKeep (keep the latest backup of the last N calendar months) and dailyKeep up to any value, which by design retains backups OLDER than 30 days. If both jobs are wired in production, the legacy db-backup prune will physically remove monthly-tier / long-window backups after 30 days regardless of the admin policy, silently violating P2-E06's entire purpose (configurability) — and doing so via an irreversible off-host delete. This is the same family as the Epic 15 X8-S03 retention bug. Both jobs currently only protect Rule 1, so the LAST good backup is still safe, but everything the new policy promises to keep beyond 30 days is at risk. Deferred because neither job is wired into a production scheduler yet (the register* functions are library exports; comments say 'production wires the real one when infra lands') and the legacy job predates this story.",
+      "location": "apps/jobs/src/jobs/db-backup.ts:115-145",
+      "fix": "Before wiring jobs in production: either remove the inline prune() from db-backup.ts so the policy-driven backup-prune.ts is the single source of retention truth, or have db-backup's prune() read the same getEffectiveBackupRetentionPolicy/selectBackupsToPrune logic instead of a hardcoded 30-day cutoff. Do not register both pruners against the same backup_runs table.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

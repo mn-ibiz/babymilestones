@@ -33,6 +33,18 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 21 — Backup Retention
+
+49. **[HIGH · data-safety · P2-E06-S02] Two backup pruners with different policies coexist** — the
+    legacy `db-backup.ts` prune (X8-S03) hardcodes 30 days and ignores the configurable policy; if both
+    are wired to the scheduler it could delete monthly-tier backups the new policy keeps. Pick the
+    canonical pruner and retire the other's prune.
+50. **[MED · P2-E06-S01] Backup-retention admin page is a static shell** (no form/fetch) — AC2 met at
+    the API only; ship the client or confirm intentional. (+ LOW: add sane `.max()` caps so a huge
+    `graceDays` can't disable the pruner.)
+51. **[MED · P2-E06-S02] AC3 "soft delete with grace before physical delete"** is creation-age
+    protection, not a two-phase soft delete. Confirm intent.
+
 ## Epic 20 — Loyalty Redemption
 
 45. **[HIGH · P2-E05-S01] Loyalty earn not wired to settled payments** — `earnPointsV2` has no

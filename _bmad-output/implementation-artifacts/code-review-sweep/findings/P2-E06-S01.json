@@ -1,0 +1,49 @@
+{
+  "id": "P2-E06-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds an admin-configurable backup retention policy: contracts schema/defaults (backupRetentionPolicySchema, dailyKeep>=1 / monthlyKeep>=0 / graceDays>=0, key backup.retention, defaults 30/12/7), api lib (getEffective/saveBackupRetentionPolicy upserting one settings row), api routes GET/PUT /admin/backup-retention guarded by `manage config` + audited via backup.retention.updated, backup.retention.updated audit action, and an 11-line admin settings page shell plus React-free form-parse/summary helpers in apps/admin/lib.",
+  "ac_coverage": "AC1 (defaults + persisted policy) implemented & tested; field names restated dailyKeep/monthlyKeep/graceDays per dev notes. AC2 (admin-editable + audit logged) — audit + authz fully implemented & tested at the API; the admin UI is only a static shell that does not render a form, fetch, submit, or use the parse/summary helpers, so an admin cannot actually edit via the shipped UI (the helpers ship untested-against-the-page / dead from the page's view). AC3 (Decision 35 unlocked) implemented (policy now configurable vs fixed 30-day). Min-retention guard (can't set 0 daily) is enforced and tested; sane upper bounds are NOT enforced.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Admin backup-retention page is a static shell — no UI to actually edit the policy (AC2 \"admin-editable\")",
+      "detail": "apps/admin/app/admin/backup-retention/page.tsx is an 11-line static component: it renders a heading + descriptive paragraph only. It does not fetch the current policy from GET /admin/backup-retention, render number inputs, call parseRetentionForm/describeRetentionPolicy from apps/admin/lib/backup-retention.ts, or submit to PUT /admin/backup-retention. The form-parse/summary helpers are unit-tested in isolation but are never imported by any page/component (grep shows no importer other than the test), so they are effectively dead code from the UI's perspective. Every sibling admin settings surface (commission-rates-client.tsx, expenses/page.tsx, sms-config/page.tsx, users/page.tsx) ships a real interactive client; this one does not. AC2 says \"admin-editable\": it is editable via the API, but a human admin cannot change the policy through the shipped admin UI. The dev notes (impl story line 68) call it a \"settings page shell\", so this appears intentional/deferred rather than accidental — flagging for a product call on whether AC2 is met without a usable UI.",
+      "location": "apps/admin/app/admin/backup-retention/page.tsx:1",
+      "fix": "Decide whether AC2 requires a working admin UI in this story. If yes: wire the page to fetch the effective policy, render dailyKeep/monthlyKeep/graceDays inputs, validate via parseRetentionForm, PUT on save, and show describeRetentionPolicy — and add a page test like the other settings pages. If the API-only surface is acceptable for this story, record that explicitly and move the UI to a follow-up so the orphaned helpers are not mistaken for live code.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "No sane upper bound on retention counts — schema accepts arbitrarily large dailyKeep/monthlyKeep/graceDays",
+      "detail": "backupRetentionPolicySchema (packages/contracts/src/index.ts:4735-4745) enforces only lower bounds: dailyKeep.int().min(1), monthlyKeep.int().min(0), graceDays.int().min(0). There is no .max(). The brief explicitly calls out \"validation (min retention / sane bounds)\". The min side is correct and tested (dailyKeep:0 rejected, negatives rejected, non-integers rejected). But an admin (or a compromised admin token) can persist dailyKeep: 2000000000 or graceDays: 999999999; the policy is stored verbatim and the S02 pruner consumes it, so an absurd graceDays effectively disables pruning forever (backups accumulate without bound) and absurd keep-counts are silently meaningless. This is not data loss and the lower bound (the data-destruction case) is handled, hence low severity — but the requested sane upper bounds are missing.",
+      "location": "packages/contracts/src/index.ts:4738",
+      "fix": "Add reasonable .max() caps to each field in backupRetentionPolicySchema (e.g. dailyKeep .min(1).max(3650), monthlyKeep .min(0).max(120), graceDays .min(0).max(365)) and extend the contracts test with boundary cases for the new max. Caps belong in the shared schema so both the API edge and the admin form reject the same values.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Policy save and its audit row are written on bare db, not in one transaction (non-atomic audit)",
+      "detail": "In PUT /admin/backup-retention the handler calls saveBackupRetentionPolicy(db, parsed.data, actor.id) and then audit(db, {...}) as two separate awaits on the top-level db (apps/api/src/routes/admin/backup-retention.ts:90-96). packages/db/src/audit.ts documents an explicit ATOMICITY CONTRACT: a paired business write + audit should share the same tx, otherwise the write can persist without its audit row (or vice versa) if the second call fails. Here the policy could be updated while the audit.retention.updated row is lost on a crash between the two statements, weakening the AC2 audit guarantee. However this exactly mirrors the established settings-key precedent in apps/api/src/routes/admin/sms-live.ts:82-88 (setSetting then audit on bare db), so it is a pre-existing pattern this story conformed to rather than a regression introduced here. Note that other admin writes (auto-credit.ts, schedules.ts, events.ts) DO use db.transaction with audit(tx, ...).",
+      "location": "apps/api/src/routes/admin/backup-retention.ts:90",
+      "fix": "Deferred (pre-existing pattern matching sms-live.ts). Ideal fix: wrap the upsert + audit in db.transaction(async (tx) => { await saveBackupRetentionPolicy(tx, ...); await audit(tx, ...); }) so the policy change and its audit row commit atomically. Address consistently across all settings-key writes rather than only here.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Audit payload records the new policy only, not the previous values (no before/after)",
+      "detail": "audit() for backup.retention.updated stores payload { ...parsed.data, ip } — i.e. only the new policy plus IP (apps/api/src/routes/admin/backup-retention.ts:91-96). Comparable settings audits in this codebase record both sides (sms-live.ts uses { before, after }; auto-credit.ts uses { before, after }). For a config that governs data retention/deletion, an auditor reconstructing who shrank the window cannot see what it changed from without diffing adjacent rows. AC2 only requires that the change is audit-logged (which it is), so this is a quality/forensics gap, not an AC violation.",
+      "location": "apps/api/src/routes/admin/backup-retention.ts:95",
+      "fix": "Deferred. To improve forensic value: read the current effective policy before saving and include it as `before` in the audit payload (payload: { before, after: parsed.data, ip }), matching the before/after convention used by sms-live.ts and auto-credit.ts.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

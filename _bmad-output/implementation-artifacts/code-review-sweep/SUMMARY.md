@@ -27,7 +27,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 18 | 5 | ✅ | 5 (photoUrl XSS, check-in IDOR, handoff IDOR, date-500, accented anonymise) | 2 | 2 | 16 |
 | 19 | 5 | ✅ | 2 (POS sales + cash-up IDOR BLOCKERs) | 5 | 7 | 19 |
 | 20 | 4 | ✅ | 2 (redeem double-spend BLOCKER+replay, rate tiebreaker) | 1 | 8 | 12 |
-| 21 | 2 | ⬜ | | | | |
+| 21 | 2 | ✅ | 0 (data-safety core PASS) | 3 | 4 | 7 |
 | 22 | 3 | ⬜ | | | | |
 | 23 | 5 | ⬜ | | | | |
 | 24 | 2 | ⬜ | | | | |
