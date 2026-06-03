@@ -1103,6 +1103,9 @@ export type SalonFeedbackHook = (event: {
   childId: string;
   parentId: string;
   serviceId: string | null;
+  /** The stylist the booking is attributed to — drives the per-staff feedback
+   *  dashboard + staff-attributed negative-feedback alerts (P5-E04-S02/S03). */
+  staffId: string | null;
   completedAt: string;
 }) => void | Promise<void>;
 
@@ -1206,6 +1209,7 @@ export async function completeSalonService(
       childId: booking.childId,
       parentId: booking.parentId,
       serviceId: booking.serviceId,
+      staffId: booking.staffId,
       completedAt: completedAt.toISOString(),
     });
   } catch {

@@ -1,4 +1,4 @@
-import { and, eq, isNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import {
   adminAlerts,
   audit,
@@ -100,6 +100,7 @@ export function createNegativeFeedbackAlertJob(deps: NegativeFeedbackAlertJobDep
         .leftJoin(staff, eq(feedback.attributedStaffId, staff.id))
         .where(
           and(
+            isNotNull(feedback.submittedAt),
             isNull(feedback.alertedAt),
             lte(feedback.rating, NEGATIVE_FEEDBACK_RATING_MAX),
           ),
@@ -114,6 +115,18 @@ export function createNegativeFeedbackAlertJob(deps: NegativeFeedbackAlertJobDep
       let smsFailed = 0;
 
       for (const row of rows) {
+        // CLAIM the row FIRST: stamp alerted_at from NULL under a compare-and-set.
+        // Only the run that wins the claim proceeds — so the paid SMS and the audit
+        // fire AT-MOST-ONCE per feedback even if a second worker tick scans the same
+        // row (the onConflictDoNothing below guards only the in-app row, not the
+        // side effects). A 0-row result means someone else already alerted it.
+        const claimed = await db
+          .update(feedback)
+          .set({ alertedAt: at })
+          .where(and(eq(feedback.id, row.id), isNull(feedback.alertedAt)))
+          .returning({ id: feedback.id });
+        if (claimed.length === 0) continue;
+
         const rating = row.rating ?? 0;
         const unitLabel = feedbackUnitLabel(feedbackUnitForSourceType(row.sourceType));
         const link = feedbackDetailLink(row.id);
@@ -139,13 +152,7 @@ export function createNegativeFeedbackAlertJob(deps: NegativeFeedbackAlertJobDep
             target: [adminAlerts.type, adminAlerts.sourceType, adminAlerts.sourceId],
           });
 
-        // Stamp the feedback so a re-run skips it (the primary idempotency guard).
-        await db
-          .update(feedback)
-          .set({ alertedAt: at })
-          .where(and(eq(feedback.id, row.id), isNull(feedback.alertedAt)));
-
-        // Audit the alert (once per alerted feedback — the stamp guards the rest).
+        // Audit the alert (once per alerted feedback — the claim above guards the rest).
         await audit(db, {
           actor: null,
           action: "feedback.negative_alert",

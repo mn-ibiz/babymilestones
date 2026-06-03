@@ -3036,6 +3036,8 @@ export function operationsTopStaffRows(dto: OperationsDashboardDto): OperationsT
  * over `[fromDate, toDate]`. Both bounds are validated calendar dates and
  * `fromDate <= toDate`. Reuses the shared {@link exportDateSchema}.
  */
+/** Max span for the feedback dashboard — matches the other date reports. */
+export const FEEDBACK_DASHBOARD_MAX_DAYS = 366;
 export const feedbackDashboardQuerySchema = z
   .object({
     fromDate: exportDateSchema,
@@ -3043,6 +3045,12 @@ export const feedbackDashboardQuerySchema = z
   })
   .refine((v) => v.fromDate <= v.toDate, {
     message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  })
+  // Cap the span so an unbounded range can't trigger a full-table feedback scan
+  // (mirrors revenue-by-period / reconciliation export).
+  .refine((v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= FEEDBACK_DASHBOARD_MAX_DAYS, {
+    message: `Date range may not exceed ${FEEDBACK_DASHBOARD_MAX_DAYS} days`,
     path: ["toDate"],
   });
 export type FeedbackDashboardQuery = z.infer<typeof feedbackDashboardQuerySchema>;
@@ -3065,6 +3073,10 @@ export const feedbackResponsesQuerySchema = z
   })
   .refine((v) => v.fromDate <= v.toDate, {
     message: "fromDate must be on or before toDate",
+    path: ["toDate"],
+  })
+  .refine((v) => reconciliationExportDayCount(v.fromDate, v.toDate) <= FEEDBACK_DASHBOARD_MAX_DAYS, {
+    message: `Date range may not exceed ${FEEDBACK_DASHBOARD_MAX_DAYS} days`,
     path: ["toDate"],
   });
 export type FeedbackResponsesQuery = z.infer<typeof feedbackResponsesQuerySchema>;

@@ -81,10 +81,21 @@ export function makeFeedbackInvitationCreator(
       let serviceName = "your visit";
       if (ctx.serviceId) {
         const [svc] = await db
-          .select({ name: services.name })
+          .select({
+            name: services.name,
+            discreetBillingEnabled: services.discreetBillingEnabled,
+            discreetBillingLabel: services.discreetBillingLabel,
+          })
           .from(services)
           .where(eq(services.id, ctx.serviceId));
-        if (svc?.name) serviceName = svc.name;
+        // Honour discreet billing (Epic 31 / P5-E01-S05): a sensitive service
+        // must show its neutral label on the parent's phone, never the real name.
+        // Same substitution the coaching booking + reminder SMS apply.
+        if (svc) {
+          const label = (svc.discreetBillingLabel ?? "").trim();
+          serviceName =
+            svc.discreetBillingEnabled && label !== "" ? label : (svc.name ?? serviceName);
+        }
       }
       if (u?.phone) {
         await smsSender.send({
@@ -118,6 +129,7 @@ export function makeSalonFeedbackHook(
       sourceType: "salon",
       sourceId: event.bookingId,
       parentProfileId: event.parentId,
+      attributedStaffId: event.staffId,
       serviceId: event.serviceId,
       completedAt: new Date(event.completedAt),
     });

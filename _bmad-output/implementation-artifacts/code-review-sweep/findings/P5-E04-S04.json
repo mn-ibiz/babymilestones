@@ -1,0 +1,7 @@
+{"id":"P5-E04-S04","verdict":"issues","patches_applied":0,"decisions":3,"deferred":1,"dismissed":3,
+ "findings":[
+  {"severity":"medium","category":"decision-needed","title":"Retracted snippet served from CDN/browser cache up to 1h after unpublish (consent withdrawal)","location":"apps/api/src/routes/public/review-snippets.ts:80"},
+  {"severity":"medium","category":"decision-needed","title":"Quote published verbatim from free-text comment, no redaction/post-curation edit (PII vector)","location":"packages/catalog/src/review-snippets.ts:152"},
+  {"severity":"low","category":"decision-needed","title":"No parent consent/opt-in recorded before publishing their words","location":"packages/catalog/src/review-snippets.ts:139"},
+  {"severity":"low","category":"defer","title":"Per-IP rate limiter collapses to one bucket behind proxy (trustProxy unset) — app-wide","location":"apps/api/src/routes/public/review-snippets.ts:87"}
+ ]}

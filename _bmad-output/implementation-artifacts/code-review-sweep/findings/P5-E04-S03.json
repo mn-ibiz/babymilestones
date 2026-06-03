@@ -1,0 +1,8 @@
+{"id":"P5-E04-S03","verdict":"issues","patches_applied":2,"decisions":2,"deferred":1,"dismissed":2,
+ "findings":[
+  {"severity":"medium","category":"patch","title":"SMS+audit not gated on the alerted_at claim — claim-then-act so side effects fire at-most-once","location":"apps/jobs/src/jobs/negative-feedback-alert.ts:143-173","status":"FIXED"},
+  {"severity":"low","category":"patch","title":"Scan didn't filter submitted_at IS NOT NULL — added defensive guard","location":"apps/jobs/src/jobs/negative-feedback-alert.ts:101-106","status":"FIXED"},
+  {"severity":"medium","category":"decision-needed","title":"Negative-feedback SMS unbatched/unthrottled — one paid SMS per low rating","location":"apps/jobs/src/jobs/negative-feedback-alert.ts:116-176"},
+  {"severity":"low","category":"decision-needed","title":"'Within 5 minutes' is cron cadence not realized latency","location":"apps/jobs/src/jobs/negative-feedback-alert.ts:16-17"},
+  {"severity":"low","category":"defer","title":"alerts.admin_phone not E.164-validated before send","location":"apps/jobs/src/jobs/negative-feedback-alert.ts:108-110"}
+ ]}

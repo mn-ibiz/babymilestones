@@ -40,7 +40,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 31 | 5 | ✅ | 2 (public coach-summary UUID guard, discreet-label PATCH 400-not-500) | 5 | 6 | 16 |
 | 32 | 4 | ✅ | 5 (VAT-fabrication BLOCKER, KRA blind-trust, queue CAS, retry cron, flag before/after audit) | 3 | 10 (incl. not-wired BLOCKER, producer-gap BLOCKER, AC2-not-rendered BLOCKER) | 12 |
 | 33 | 4 | ✅ | 1 (admin go-live toggle credentials:include) | 5 | 13 (incl. switch-dead-code + cap-not-enforced + deferred-lost BLOCKERs) | 11 |
-| 34 | 4 | ⬜ | | | | |
+| 34 | 4 | ✅ | 6 (feedback-invite discreet leak, staff attribution, dashboard 366d cap, alert claim-then-act, submitted guard, index parity) | 4 | 6 | 15 |
 | 35 | 6 | ⬜ | | | | |
 | 36 | 5 | ⬜ | | | | |
 

@@ -173,9 +173,15 @@ describe("parent feedback (P6-E04-S01 / Story 34.1)", () => {
   // --- AC1: salon completion fires the REAL invitation creator + SMS-stub ----
 
   describe("salon completion → real feedback invitation (AC1)", () => {
-    async function seedSalonBooking(opts: { credit: number }) {
+    async function seedSalonBooking(opts: { credit: number; discreetLabel?: string }) {
       const svc = await createService(dbh.db, { name: "Kids Cut", unit: "salon" });
       await updateService(dbh.db, svc.id, { salonDurationMinutes: 60 });
+      if (opts.discreetLabel) {
+        await updateService(dbh.db, svc.id, {
+          discreetBillingEnabled: true,
+          discreetBillingLabel: opts.discreetLabel,
+        });
+      }
       await setServicePrice(dbh.db, { serviceId: svc.id, amountCents: 2500, effectiveFrom: "2026-01-01" });
       const stylist = await createStaff(dbh.db, { displayName: "Asha", role: "stylist" });
       await setCommissionRate(dbh.db, { staffId: stylist.id, ratePercent: 20, effectiveFrom: new Date("2026-01-01") });
@@ -200,23 +206,25 @@ describe("parent feedback (P6-E04-S01 / Story 34.1)", () => {
       await post(dbh.db, { walletId: w!.id, amount: opts.credit, kind: "topup", idempotencyKey: `seed:${w!.id}`, source: "seed", postedBy: me.userId });
       const [slot] = await listAvailableSalonSlots(dbh.db, { serviceId: svc.id, staffId: stylist.id, fromDate: TODAY, toDate: TODAY });
       const booked = await bookSalonSlot(dbh.db, { salonSlotId: slot!.id, parentId: me.parentId, childId: c!.id, staffId: stylist.id });
-      return { me, svc, bookingId: booked.bookingId };
+      return { me, svc, stylistId: stylist.id, bookingId: booked.bookingId };
     }
 
     it("creates exactly one invitation + queues a feedback.invite SMS-stub on completion", async () => {
       await dbh.db.insert(users).values(await staffUserSeed("+254712000001", "7421", "reception"));
       const staff = await loginStaff("+254712000001", "7421");
-      const { me, bookingId } = await seedSalonBooking({ credit: 10000 });
+      const { me, bookingId, stylistId } = await seedSalonBooking({ credit: 10000 });
       const staffHeaders = { cookie: `${staff.cookie}; ${staff.csrfCookie}`, "x-csrf-token": staff.csrfToken };
 
       await app.inject({ method: "POST", url: "/reception/salon/checkin", headers: staffHeaders, payload: { bookingId } });
       const res = await app.inject({ method: "POST", url: "/reception/salon/complete", headers: staffHeaders, payload: { bookingId } });
       expect(res.statusCode).toBe(201);
 
-      // One invitation row, keyed by booking, attributed to the parent (users.id).
+      // One invitation row, keyed by booking, attributed to the parent (users.id)
+      // AND to the stylist who did the work (drives the per-staff dashboard / alerts).
       const rows = await dbh.db.select().from(feedback).where(and(eq(feedback.sourceType, "salon"), eq(feedback.sourceId, bookingId)));
       expect(rows).toHaveLength(1);
       expect(rows[0]!.parentId).toBe(me.userId);
+      expect(rows[0]!.attributedStaffId).toBe(stylistId);
       expect(rows[0]!.submittedAt).toBeNull();
 
       // A feedback.invite SMS-stub was queued to the parent carrying the token link.
@@ -249,6 +257,22 @@ describe("parent feedback (P6-E04-S01 / Story 34.1)", () => {
       expect(rows).toHaveLength(1);
       const sms = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "feedback.invite"));
       expect(sms).toHaveLength(1);
+    });
+
+    it("honours discreet billing — the invite SMS uses the neutral label, NOT the real service name", async () => {
+      await dbh.db.insert(users).values(await staffUserSeed("+254712000001", "7421", "reception"));
+      const staff = await loginStaff("+254712000001", "7421");
+      const { bookingId } = await seedSalonBooking({ credit: 10000, discreetLabel: "Wellness Visit" });
+      const staffHeaders = { cookie: `${staff.cookie}; ${staff.csrfCookie}`, "x-csrf-token": staff.csrfToken };
+
+      await app.inject({ method: "POST", url: "/reception/salon/checkin", headers: staffHeaders, payload: { bookingId } });
+      await app.inject({ method: "POST", url: "/reception/salon/complete", headers: staffHeaders, payload: { bookingId } });
+
+      const sms = await dbh.db.select().from(smsOutbox).where(eq(smsOutbox.template, "feedback.invite"));
+      expect(sms).toHaveLength(1);
+      // The sensitive real name must NEVER reach the parent's phone (Epic 31 leak).
+      expect(sms[0]!.body).not.toContain("Kids Cut");
+      expect(sms[0]!.body).toContain("Wellness Visit");
     });
   });
 

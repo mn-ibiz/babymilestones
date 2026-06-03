@@ -3,6 +3,38 @@
 These are real findings where the correct fix requires a human/product decision (ambiguous intent).
 They are NOT auto-fixed. Review and tell me how to resolve each.
 
+## Epic 34 — Feedback Engine
+
+95. **[MED · P5-E04-S04] Retracted public review snippet keeps serving from CDN/browser cache for up to
+    1h after unpublish.** The public read sends `Cache-Control: public, max-age=3600` with no
+    `must-revalidate` / surrogate-key purge, so a takedown (parent withdrawing consent) only propagates
+    after the TTL — contradicting the route's own "no stale cache" docstring. Shorten max-age +
+    `must-revalidate`, or emit a surrogate key and purge on unpublish.
+
+96. **[MED · P5-E04-S04] Public review snippet quote is published VERBATIM from the parent's free-text
+    comment** — no redaction, and only the attribution (not the quote) is editable post-curation. A
+    5-star comment containing a child's name / the parent's name / a phone number goes public verbatim;
+    the sole safeguard is the admin reading it. Add a quote-edit field (scrub PII without re-curating)
+    and/or a phone/email heuristic warning at curation. **[LOW]** no parent consent/opt-in is recorded
+    before publishing their words (Kenya-DPA consideration — confirm the feedback terms or add a consent
+    flag).
+
+97. **[MED · P5-E04-S03] Negative-feedback ops SMS is unbatched/unthrottled** — a wave of ≤2 ratings
+    sends one paid SMS per rating to the single ops number (cost + alert fatigue). Choose a per-run
+    digest / SMS cap (keep in-app one-per-feedback) / per-window throttle. **[LOW]** "within 5 minutes"
+    is only the cron cadence (worst case ≈ a full 5-min interval) — tighten the cadence, alert at
+    submit-time, or document "by the next tick".
+
+98. **[MED · P5-E04-S01] Feedback invitations are only created for the salon checkout touchpoint.** AC1
+    enumerates five paid touchpoints (salon, play pickup, talent class end, coaching/doula session end,
+    order fulfilled); the reusable creator exists but is wired only into the salon hook, so parents never
+    get a feedback prompt for the other four. Descope AC1 to "salon first + follow-ups", or wire the
+    pickup / coaching-session-end / order-fulfilment completion paths.
+
+(Patched directly this review, no decision needed: the feedback.invite discreet-billing leak,
+salon `attributed_staff_id` population, the dashboard 366-day range cap, and the negative-alert
+claim-then-act + submitted-only scan.)
+
 ## Epic 33 — SMS Go-Live  ⚠️ NOT WIRED TO PRODUCTION (same pattern as Epic 32)
 
 90. **[BLOCKER · wiring · P5-E03-S02] Flipping the live/stub flag does NOTHING.** `resolveSmsSender` (the

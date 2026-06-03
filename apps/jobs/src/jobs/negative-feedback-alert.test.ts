@@ -145,6 +145,17 @@ describe("negative-feedback alert cron (P6-E04-S03)", () => {
     expect(await negativeSms()).toHaveLength(0);
   });
 
+  it("does NOT alert an UNSUBMITTED low-rated row (defensive submitted-only scan)", async () => {
+    // An open invitation has rating NULL today; this guards a future rating-before-
+    // submit path — a row with a low rating but no submittedAt must be skipped.
+    const f = await seedFeedback({ rating: 1, submittedAt: undefined });
+    // Force submitted_at back to NULL to simulate the unsubmitted state.
+    await dbh.db.update(feedback).set({ submittedAt: null }).where(eq(feedback.id, f.id));
+    await run();
+    expect(await alertsFor(f.id)).toHaveLength(0);
+    expect(await negativeSms()).toHaveLength(0);
+  });
+
   it("audits feedback.negative_alert once per alerted feedback (AC1)", async () => {
     await seedFeedback({ rating: 1 });
     await run();

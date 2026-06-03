@@ -1,0 +1,5 @@
+{"id":"P5-E04-S02","verdict":"issues","patches_applied":1,"decisions":0,"deferred":1,"dismissed":6,
+ "findings":[
+  {"severity":"medium","category":"patch","title":"Feedback dashboard query schemas had no max-range cap — added 366-day cap (both)","location":"packages/contracts/src/index.ts:3039","status":"FIXED"},
+  {"severity":"low","category":"defer","title":"Dashboard buckets by UTC day not EAT — codebase-wide convention","location":"packages/catalog/src/feedback-dashboard-db.ts:30"}
+ ]}

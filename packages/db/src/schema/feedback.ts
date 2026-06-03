@@ -69,7 +69,12 @@ export const feedback = pgTable(
   (t) => ({
     sourceUniq: uniqueIndex("feedback_source_uniq").on(t.sourceType, t.sourceId),
     tokenUniq: uniqueIndex("feedback_token_uniq").on(t.token),
-    parentPendingIdx: index("feedback_parent_pending_idx").on(t.parentId),
+    // Partial index matching the migration (0101): only PENDING rows are indexed,
+    // since the pending-list query is `WHERE parent_id = ? AND submitted_at IS NULL`.
+    // Keep the predicate here so a drizzle-kit diff doesn't try to recreate it as full.
+    parentPendingIdx: index("feedback_parent_pending_idx")
+      .on(t.parentId)
+      .where(sql`${t.submittedAt} IS NULL`),
   }),
 );
 
