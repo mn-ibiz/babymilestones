@@ -1,0 +1,19 @@
+{
+  "id": "P1-E09-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds sms_config table (sender_id/api_url/api_key_ref/is_active) + partial unique single-active index (migration 0035), @bm/sms SSRF/HTTPS URL validator + secret-free CRUD helpers, admin-only Fastify CRUD routes guarded by new `manage config` RBAC perm with per-mutation audit, contracts Zod schemas, and an admin UI page+form.",
+  "ac_coverage": "AC1 implemented & tested (table + RBAC seed mirrored in migration 0035, rbac snapshot, permissions drift test). AC2 implemented & tested (no key column exists at all; only api_key_ref; toPublicSmsConfig projection; audit logs ref+url only; session+CSRF+can('manage','config') authz; reception 403, unauth 401, no apiKey in body/audit). AC3 implemented & tested but has one SSRF gap (IPv4-compatible IPv6 ::a.b.c.d not caught). AC4 implemented & tested (partial unique index + transactional deactivate-others).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "SSRF validator misses IPv4-compatible IPv6 (::a.b.c.d), incl. ::169.254.169.254 metadata and ::127.0.0.1 loopback",
+      "detail": "checkProviderUrlSafety only un-maps IPv4-in-IPv6 for the IPv4-MAPPED prefix `::ffff:` (both dotted and hex hextet forms). It does NOT handle the IPv4-COMPATIBLE form `::a.b.c.d` (RFC 4291 2.5.5.1), which Node's URL parser compresses to bare hex hextets with no ffff marker. Verified against the working tree: `new URL('https://[::a9fe:a9fe]/')` -> host `::a9fe:a9fe` and `new URL('https://[::7f00:1]/')` -> host `::7f00:1`; running both through the file's isPrivateIpv6 returns false, so checkProviderUrlSafety returns ok:true. These embed the cloud-metadata IP (169.254.169.254) and loopback (127.0.0.1) respectively, i.e. exactly the targets AC3 is meant to block. Real-world exploitability is limited: IPv4-compatible addresses are deprecated and not routed to the embedded IPv4 by modern kernels, and the file documents that DNS-resolving hostnames are intentionally out of scope (the P5 live integration pins the host) — so this is a defense-in-depth hardening gap, not an active hole. Reported because the fix is unambiguous and cheap. The same gap exists in apps/admin/lib/sms-config-form.ts isLikelySafeUrl, but that is only client-side advisory feedback (server is authoritative).",
+      "location": "packages/sms/src/url-safety.ts:81-110",
+      "fix": "In isPrivateIpv6, before the final `return false`, also un-map the IPv4-compatible form. After the existing `::ffff:` block add: handle a host of the form `::` followed by either dotted-quad (parseIpv4 the tail and isPrivateIpv4 it) or two hex hextets (reconstruct the v4 from the last two hextets exactly as the ffff branch does, then isPrivateIpv4). Simplest robust approach: extract the embedded-v4 reconstruction into a helper and call it for both `::ffff:<tail>` and a bare `::<two-hextets>` / `::<dotted>` tail. Add url-safety.test.ts cases for 'https://[::a9fe:a9fe]/send' and 'https://[::7f00:1]/send' expecting reason 'private_host'. Mirror in isLikelySafeUrl for parity.",
+      "ac_ref": "AC3"
+    }
+  ]
+}

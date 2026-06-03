@@ -56,7 +56,7 @@
     "6": "done",
     "7": "done",
     "8": "done",
-    "9": "todo",
+    "9": "done",
     "11": "todo",
     "12": "todo",
     "13": "todo",
@@ -865,7 +865,7 @@
         "b70f51f146459f167c00f03acbc9fb142f6b72c2"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "9-2-admin-config-table-for-sender-id-url",
@@ -882,7 +882,7 @@
         "93059bd399b430aa1dbf245e28fb0dd274f95076"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "9-3-templates-registered-versioned",
@@ -3092,8 +3092,16 @@
       "decisions_needed": 2,
       "dismissed": 6,
       "commit": ""
+    },
+    "9": {
+      "stories_reviewed": 2,
+      "patches": 1,
+      "deferred": 0,
+      "decisions_needed": 0,
+      "dismissed": 9,
+      "commit": ""
     }
   },
-  "epics_done": 8,
+  "epics_done": 9,
   "epics_total": 35
 }

@@ -1,0 +1,8 @@
+{
+  "id": "P1-E09-S01",
+  "verdict": "clean",
+  "diff_summary": "Defines provider-agnostic SmsSender.send({to,template,data})->{id} seam + StubSmsSender (renders body via template registry in templates.ts, inserts sms_outbox row, no external call), createSmsSender config flag for P5-E03 swap; additive migration 0034 adds sms_outbox.data(jsonb) + status; migrates all callers (OTP, receipts, reprint, top-ups, refund, mpesa-reconcile, data-export) to the canonical shape.",
+  "ac_coverage": "AC1 (send returns queued id) — implemented in StubSmsSender.send returning {id}, tested ('send() returns a queued id...'). AC2 (writes rendered body to sms_outbox, no external API) — implemented, tested (body/template/data/status asserted, no network). AC3 (all product code uses interface; provider switch is one config flag) — createSmsSender seam implemented + tested; git grep confirms zero remaining old {phone,body} call sites; all callers use {to,template,data}. All ACs implemented & tested.",
+  "dismissed_count": 5,
+  "findings": []
+}

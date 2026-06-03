@@ -75,6 +75,33 @@ function isPrivateIpv4(octets: [number, number, number, number]): boolean {
 }
 
 /**
+ * Judge an IPv4 embedded in an IPv6 address. Node may present the tail as a
+ * dotted-quad (`a.b.c.d`) or, more commonly, compressed to two hex hextets
+ * (e.g. `a9fe:a9fe` for 169.254.169.254). Reconstruct and run the v4 SSRF set.
+ */
+function embeddedV4IsPrivate(tail: string): boolean {
+  const dotted = parseIpv4(tail);
+  if (dotted) return isPrivateIpv4(dotted);
+  const hextets = tail.split(":");
+  if (
+    hextets.length === 2 &&
+    /^[0-9a-f]{1,4}$/u.test(hextets[0]!) &&
+    /^[0-9a-f]{1,4}$/u.test(hextets[1]!)
+  ) {
+    const hi = parseInt(hextets[0]!, 16);
+    const lo = parseInt(hextets[1]!, 16);
+    const v4: [number, number, number, number] = [
+      (hi >> 8) & 0xff,
+      hi & 0xff,
+      (lo >> 8) & 0xff,
+      lo & 0xff,
+    ];
+    return isPrivateIpv4(v4);
+  }
+  return false;
+}
+
+/**
  * True when a normalized IPv6 host is private/loopback/link-local/unique-local,
  * the unspecified address, or an IPv4-mapped/compatible address of a private v4.
  */
@@ -86,25 +113,15 @@ function isPrivateIpv6(host: string): boolean {
     return true; // link-local fe80::/10
   if (host.startsWith("fc") || host.startsWith("fd")) return true; // unique-local fc00::/7
   if (host.startsWith("ff")) return true; // multicast
-  // IPv4-mapped addresses. Node compresses ::ffff:a.b.c.d to hex hextets
-  // (e.g. ::ffff:a9fe:a9fe for 169.254.169.254) — reconstruct the embedded v4
-  // from the final two hextets and judge it. Also handle the dotted form.
+  // IPv4-MAPPED (::ffff:a.b.c.d): Node compresses to ::ffff:<hextets>.
   if (host.startsWith("::ffff:")) {
-    const tail = host.slice("::ffff:".length);
-    const dotted = parseIpv4(tail);
-    if (dotted) return isPrivateIpv4(dotted);
-    const hextets = tail.split(":");
-    if (hextets.length === 2 && /^[0-9a-f]{1,4}$/u.test(hextets[0]!) && /^[0-9a-f]{1,4}$/u.test(hextets[1]!)) {
-      const hi = parseInt(hextets[0]!, 16);
-      const lo = parseInt(hextets[1]!, 16);
-      const v4: [number, number, number, number] = [
-        (hi >> 8) & 0xff,
-        hi & 0xff,
-        (lo >> 8) & 0xff,
-        lo & 0xff,
-      ];
-      return isPrivateIpv4(v4);
-    }
+    return embeddedV4IsPrivate(host.slice("::ffff:".length));
+  }
+  // IPv4-COMPATIBLE (::a.b.c.d, deprecated per RFC 4291): Node compresses to
+  // ::<two hextets> (e.g. ::a9fe:a9fe = 169.254.169.254, ::7f00:1 = 127.0.0.1).
+  // Judge the embedded v4 too so metadata/loopback can't slip through this form.
+  if (host.startsWith("::")) {
+    return embeddedV4IsPrivate(host.slice("::".length));
   }
   return false;
 }

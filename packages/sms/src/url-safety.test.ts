@@ -80,4 +80,17 @@ describe("checkProviderUrlSafety (P1-E09-S02 AC3)", () => {
       expect(checkProviderUrlSafety(u).reason).toBe("private_host");
     }
   });
+
+  it("rejects IPv4-COMPATIBLE IPv6 embedding metadata/loopback (review fix)", () => {
+    // ::169.254.169.254 and ::127.0.0.1 — Node compresses these to ::a9fe:a9fe
+    // and ::7f00:1, which previously slipped past the validator.
+    for (const u of [
+      "https://[::169.254.169.254]/send",
+      "https://[::127.0.0.1]/send",
+      "https://[::a9fe:a9fe]/send",
+      "https://[::7f00:1]/send",
+    ]) {
+      expect(checkProviderUrlSafety(u).reason).toBe("private_host");
+    }
+  });
 });

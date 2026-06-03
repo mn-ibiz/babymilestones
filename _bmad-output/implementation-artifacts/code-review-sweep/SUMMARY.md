@@ -16,7 +16,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 6  | 1 | ✅ | 1 (CSV formula-injection guard, repo-wide ×3) | 1 | 2 | 4 |
 | 7  | 3 | ✅ | 2 (price one-open-row index+lock, staff no-op audit) | 3 | 0 | 11 |
 | 8  | 2 | ✅ | 2 (receipt parentId FK, void 409) | 3 | 2 | 6 |
-| 9  | 2 | ⬜ | | | | |
+| 9  | 2 | ✅ | 1 (SSRF IPv4-compat IPv6 guard) | 0 | 0 | 9 |
 | 11 | 1 | ⬜ | | | | |
 | 12 | 1 | ⬜ | | | | |
 | 13 | 2 | ⬜ | | | | |
