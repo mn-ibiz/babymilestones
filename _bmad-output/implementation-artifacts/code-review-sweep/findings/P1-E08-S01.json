@@ -1,0 +1,39 @@
+{
+  "id": "P1-E08-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds packages/db receipts + receipt_lines (migration 0032_receipts.sql, Drizzle schema receipts.ts, barrel export, 10 vitest tests): KRA/eTIMS fields nullable, money as bigint integer cents with >=0 CHECKs, per-series UNIQUE(series, sequence_number), and a one-of service_id/product_id CHECK on lines.",
+  "ac_coverage": "AC1-AC3 all implemented and tested. AC1: receipts has all core + nullable KRA fields (pin, control_unit_number, cu_invoice_number, qr_data, etims_status with CHECK pending|sent|accepted|rejected) — tested. AC2: receipt_lines with one-of service_id/product_id CHECK — tested. AC3: UNIQUE(series, sequence_number) — tested. Confirmed: P5 eTIMS writer only writes etims_status in {null,pending,sent,accepted,rejected}, so the 0032 CHECK does NOT block the P5-E02 writer swap. All 10 tests pass against the working tree (migration chain 0001-0107 applies cleanly).",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "blind",
+      "title": "receipts.parentId self-FK omits .references(), deviating from the repo's own self-FK convention",
+      "detail": "Migration 0032 declares `parent_id uuid REFERENCES receipts(id)` and the comment calls it a self-FK, but the Drizzle column `parentId: uuid(\"parent_id\")` has no `.references()`. Every other FK in this very file declares it (`parentAccountId` -> parents.id, `receiptId` -> receipts.id, `serviceId` -> services.id), and the repo has an established self-FK pattern: wallet-ledger.ts uses `reversesEntryId: uuid(\"reverses_entry_id\").references((): AnyPgColumn => walletLedger.id)` and loyalty.ts does the same. So parentId is the only FK column that drifts from both the local and repo-wide convention. Impact is bounded (the DB still enforces the constraint, migrations are hand-authored not drizzle-kit-generated, and there are no relations() helpers yet), but it leaves the Drizzle model out of sync with the DB and breaks the convention. Confirmed in working tree packages/db/src/schema/receipts.ts:44.",
+      "location": "packages/db/src/schema/receipts.ts:44",
+      "fix": "Add the self-reference to match the repo pattern: import `type AnyPgColumn` from drizzle-orm/pg-core and change line 44 to `parentId: uuid(\"parent_id\").references((): AnyPgColumn => receipts.id),`.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Per-series sequence allocation is read-then-write (MAX+1), race-prone under concurrency; relies solely on this story's UNIQUE constraint and produces gaps on retry",
+      "detail": "This story's schema deliberately uses an app-allocated `sequence_number` (no Postgres SEQUENCE/serial, no DEFAULT) guarded by UNIQUE(series, sequence_number). The schema itself is correct and the UNIQUE constraint is the right safety net. But the consumer LocalReceiptWriter (P1-E08-S02, packages/payments/src/receipts/local-receipt-writer.ts:62-68) allocates via `SELECT max(sequence_number)+1` then INSERT: two concurrent posts in the same series read the same max and one INSERT fails on the unique violation (data integrity preserved, but the failed transaction must retry). KRA/eTIMS expect a monotonic, ideally gapless series; conflict-retry produces gaps and there is no advisory-lock / SEQUENCE / SELECT ... FOR UPDATE serialization. Out of THIS story's scope (migration-only, no writer), so deferred — but the schema decision to allocate app-side is what fixes the constraint here, and the writer story should serialize allocation (advisory lock per series, or per-series counter row with row lock) to avoid gaps/retries.",
+      "location": "packages/db/migrations/0032_receipts.sql:17 (allocation: packages/payments/src/receipts/local-receipt-writer.ts:62)",
+      "fix": "Defer to the writer story (P1-E08-S02). Options: (a) serialize per-series allocation with pg_advisory_xact_lock(hashtext(series)) before the MAX+1 read; (b) keep a per-series counter row updated with `RETURNING` under row lock; (c) accept gaps explicitly and document that the series is monotonic-but-not-gapless for KRA. The 0032 UNIQUE constraint already guarantees no duplicates, so this is a robustness/gaps concern, not a data-corruption one.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Later P5 migration 0071_etims_receipts.sql re-adds etims_status as a no-op (column already shipped in 0032)",
+      "detail": "Migration 0071 (P5-E02-S01, the eTIMS writer swap) runs `ALTER TABLE receipts ADD COLUMN IF NOT EXISTS etims_status text;` — but 0032 already created `etims_status text CHECK (etims_status IN ('pending','sent','accepted','rejected'))`. Because of IF NOT EXISTS, 0071 is a silent no-op: the P5 column never lands and silently inherits 0032's CHECK. This is harmless (the only values P5 writes — 'accepted', plus 'pending'/'sent'/'rejected' via the queue/retry path — are all permitted by the 0032 CHECK, verified in etims-receipt-writer.ts:243 and index.ts:73), and it actually confirms this story's goal that the schema does not block the writer swap. Flagged only because the P5 author evidently did not realize 0032 already shipped the field; the duplication should be cleaned up in the P5 migration (not here). Not in this story's diff -> defer.",
+      "location": "packages/db/migrations/0071_etims_receipts.sql:3 (collides with packages/db/migrations/0032_receipts.sql:35)",
+      "fix": "Out of scope for P1-E08-S01. In the P5-E02 migration, drop the redundant ADD COLUMN (or convert it to a comment noting the column was provisioned by 0032). No change needed to 0032 — its column + CHECK already cover the P5 values, which is exactly the intended writer-swap-not-migration outcome.",
+      "ac_ref": ""
+    }
+  ]
+}

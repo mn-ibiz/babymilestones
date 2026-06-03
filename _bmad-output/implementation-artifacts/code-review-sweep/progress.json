@@ -55,7 +55,7 @@
     "5": "done",
     "6": "done",
     "7": "done",
-    "8": "todo",
+    "8": "done",
     "9": "todo",
     "11": "todo",
     "12": "todo",
@@ -780,7 +780,7 @@
         "546e1a0aef4ae6692e28036c4c5b99307f083c36"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "8-2-receipt-writer-interface",
@@ -848,7 +848,7 @@
         "5ccb0ea65447dd902217156e92b7f7a351667f50"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "9-1-adapter-interface-stub-implementation",
@@ -3084,8 +3084,16 @@
       "decisions_needed": 0,
       "dismissed": 11,
       "commit": ""
+    },
+    "8": {
+      "stories_reviewed": 2,
+      "patches": 2,
+      "deferred": 3,
+      "decisions_needed": 2,
+      "dismissed": 6,
+      "commit": ""
     }
   },
-  "epics_done": 7,
+  "epics_done": 8,
   "epics_total": 35
 }

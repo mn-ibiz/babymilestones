@@ -9,6 +9,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { parents } from "./parents.js";
 import { services } from "./services.js";
@@ -41,7 +42,7 @@ export const receipts = pgTable(
      * Optional pointer to a parent receipt — e.g. a credit-note / reversal that
      * references the original. Nullable self-FK.
      */
-    parentId: uuid("parent_id"),
+    parentId: uuid("parent_id").references((): AnyPgColumn => receipts.id),
     /**
      * Receipt kind (P1-E08-S05): `normal` (default) or `void`. A `void` row is a
      * reversing entry carrying the negated totals/lines of the receipt it

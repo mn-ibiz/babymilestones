@@ -1,0 +1,39 @@
+{
+  "id": "P1-E08-S05",
+  "verdict": "issues",
+  "diff_summary": "Adds receipt void as an append-only reversing entry: migration 0033 (kind + reverses_receipt_id self-FK, partial unique index, drops non-negative money CHECKs), schema cols, payments voidReceipt() (negates header+lines, double-void/void-of-void guards, audit), and admin-only CSRF-guarded POST /receipts/:id/void; unit + route tests.",
+  "ac_coverage": "AC1 (kind='void' + reverses_receipt_id FK) implemented & tested; AC2 (original+void net to 0 across header/tax/per-line + receipt.voided audit referencing both) implemented & tested; AC3 (cannot re-void; cannot void a void) implemented two ways (in-tx guard + partial unique index) & tested. Migration additive-only, audit writes to audit_outbox in-tx. All ACs covered.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Concurrent double-void returns 500 instead of 409",
+      "detail": "The double-void guard is a SELECT-then-INSERT inside the tx. Under concurrency both requests can pass the SELECT (no existing void yet) and reach the INSERT; the partial unique index receipts_reverses_receipt_id_unique then makes the second INSERT fail with a Postgres unique-violation. That error is NOT an AlreadyVoidedError, so the route's catch falls through to `throw err` and the global handler returns a generic 500. Data integrity is preserved (the second tx rolls back, exactly one void row), and no detail leaks (handler masks 5xx), but the caller gets a confusing 500 for what is semantically a 409 'already voided'. The story's own Completion Notes claim the index is the backstop 'so a concurrent double-void loses at the database level' — it does, but the HTTP contract degrades.",
+      "location": "apps/api/src/routes/receipts/void.ts:65-76, packages/payments/src/receipts/void.ts:107-127",
+      "fix": "In voidReceipt's insert path, catch the unique-violation (Postgres code 23505 on constraint receipts_reverses_receipt_id_unique) and rethrow it as AlreadyVoidedError(input.receiptId) so the existing route mapping returns 409. The route catch already handles AlreadyVoidedError correctly; no route change needed.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "A voided original receipt can still be reprinted/rendered as a valid positive receipt",
+      "detail": "After a successful void, the original receipt row is (correctly) left untouched, but the render route (apps/api/src/routes/receipts/render.ts) and reprint route (loadReceipt in reprint.ts) read the header verbatim and never check `kind` or whether a void row reverses it. So an admin/cashier can POST /receipts/:id/reprint on a voided original and re-issue it — and re-SMS it to the customer via {resend:true} — showing the original positive total with no VOID marking. This is the 'a voided receipt can't be re-used' concern. It is a real gap, but the render/reprint routes are S03/S04 surfaces and S05's ACs (AC1-AC3) only cover void creation, net-zero, and double-void; nothing in S05 scope was regressed.",
+      "location": "apps/api/src/routes/receipts/reprint.ts:55-118, apps/api/src/routes/receipts/render.ts",
+      "fix": "Out of S05 scope — flag for product. Options: (a) reprint/render of a voided original returns 409 or stamps a VOID watermark; (b) a follow-up story to surface void status on receipt read surfaces. Do not change here.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Per-series sequence allocated via MAX(sequence_number)+1 is racy (pre-existing pattern)",
+      "detail": "voidReceipt allocates sequenceNumber = MAX+1 selected inside the tx (void.ts:98-104), identical to LocalReceiptWriter (local-receipt-writer.ts:62-68). Two concurrent inserts in the same series (a void + a normal write, or two voids of different originals) can read the same MAX and collide on the receipts_series_sequence_number_key unique constraint, raising and rolling one tx back. This is a pre-existing characteristic of the receipt writer that S05 mirrors, not a new defect — and the unique constraint guarantees no duplicate sequence is ever persisted.",
+      "location": "packages/payments/src/receipts/void.ts:96-104",
+      "fix": "Pre-existing across the receipt engine — out of this story's scope. If addressed system-wide, use a per-series counter table or SELECT ... FOR UPDATE / advisory lock and retry on 23505. Don't fix in S05 alone.",
+      "ac_ref": ""
+    }
+  ]
+}

@@ -67,11 +67,42 @@ export class VoidTargetIsVoidError extends Error {
 }
 
 /**
+ * True for the Postgres unique-violation on `receipts_reverses_receipt_id_unique`
+ * — i.e. a concurrent double-void where both transactions passed the in-tx SELECT
+ * guard and the partial unique index rejected the second insert. Scoped to that
+ * constraint so the unrelated per-series sequence collision is NOT misclassified.
+ */
+function isConcurrentDoubleVoid(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  return (
+    e?.code === "23505" &&
+    typeof e?.message === "string" &&
+    /receipts_reverses_receipt_id_unique/iu.test(e.message)
+  );
+}
+
+/**
  * Void a receipt by appending a reversing `kind='void'` receipt. See the module
  * doc for the append-only / net-zero / double-void semantics. Returns the new
  * void receipt id plus the original it reverses. Audited as `receipt.voided`.
  */
 export async function voidReceipt(
+  db: Database,
+  input: VoidReceiptInput,
+): Promise<VoidReceiptResult> {
+  try {
+    return await voidReceiptTx(db, input);
+  } catch (err) {
+    // Concurrent double-void: surface the DB unique-violation as AlreadyVoidedError
+    // so the route returns 409 (already voided) rather than a generic 500.
+    if (isConcurrentDoubleVoid(err)) {
+      throw new AlreadyVoidedError(input.receiptId);
+    }
+    throw err;
+  }
+}
+
+async function voidReceiptTx(
   db: Database,
   input: VoidReceiptInput,
 ): Promise<VoidReceiptResult> {

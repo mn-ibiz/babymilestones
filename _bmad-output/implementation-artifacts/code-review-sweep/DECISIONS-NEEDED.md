@@ -33,6 +33,19 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 8 — Receipt Engine
+
+18. **[MED · fraud · P1-E08-S05] A voided receipt can still be reprinted/rendered (and re-SMS'd) as a
+    valid positive receipt.** The render/reprint routes (S03/S04) don't check whether a `void` row
+    reverses the original. **Choose:** block reprint/render of a voided original (409) or stamp a VOID
+    watermark. Files: `apps/api/src/routes/receipts/reprint.ts`, `.../render.ts`.
+
+19. **[MED · cross-cutting] Receipt per-series numbering uses `MAX(sequence_number)+1`** in both the
+    local writer (S02) and the void path (S05) — race-prone under concurrency (UNIQUE prevents
+    duplicates, but transactions retry and the series gains gaps). KRA/eTIMS prefer monotonic/gapless.
+    **Choose:** per-series counter row under row lock, `pg_advisory_xact_lock(series)`, a SEQUENCE, or
+    accept+document gaps. Files: `packages/payments/src/receipts/local-receipt-writer.ts`, `.../void.ts`.
+
 ## Epic 6 — Treasury & Float
 
 15. **[MED · P1-E06-S04] Reconciliation export `real_balance`/`drift` are reconstructed from approved
