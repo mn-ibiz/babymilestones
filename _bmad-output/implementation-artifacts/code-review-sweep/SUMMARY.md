@@ -44,5 +44,36 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 35 | 6 | ✅ | 5 (tax-report month-breakdown bug, recurring-expense double-post, repeat+tax 366d caps, P&L audit tag) | 6 | 8 (incl. P&L shop-revenue BLOCKER, expense hard-delete) | 22 |
 | 36 | 5 | ✅ | 1 (CMS slug encodeURIComponent) — all stored-XSS surfaces verified SAFE; 36-1/36-5 clean | 4 | 4 (CMS hero remote-image, Lighthouse gate, cache-takedown) | 19 |
 
+## ✅ SWEEP COMPLETE — 35/35 epics, 128/128 pending stories reviewed (2026-06-03)
+
+| Outcome | Total |
+|---------|------:|
+| Patches applied (with tests, committed per epic) | **77** |
+| Decisions collected (in DECISIONS-NEEDED.md) | **149** |
+| Deferred / tracked follow-ups | **114** |
+| Dismissed (verified non-issues) | **401** |
+
+**Headline BLOCKERs collected as decisions (NOT auto-fixed — product/security/finance calls):**
+- **Events (30):** public ticket-confirm issues PAID tickets with NO payment rail; capacity oversell race.
+- **eTIMS (32):** the writer-swap is unwired (flag ON does nothing); failed KRA submissions are LOST
+  (producer gap); VAT/PIN metadata never renders + reprint immutability fork. *(VAT over-declaration on
+  exempt lines, KRA blind-trust, and queue lost-update were PATCHED.)*
+- **SMS Go-Live (33):** the live/stub flag and the spend cap are both unwired dead code; deferred
+  messages are queued but never re-sent.
+- **P&L (35):** consolidated P&L omits shop (POS) revenue while carrying shop expenses.
+
+**Highest-value bugs PATCHED this sweep (examples):** wallet top-up / commission / loyalty double-pay
+TOCTOUs; door check-in double-admit; Woo stock lost-update + SSRF; anonymise-PII Unicode gap; eTIMS
+exempt-VAT over-declaration; tax-report mid-month breakdown (broke the default view); recurring-expense
+double-post; feedback-invite discreet-billing leak + staff attribution; numerous IDOR/`isStaffRole`
+gates, CSV formula-injection guards, and missing 366-day report caps.
+
+**Method:** each story reviewed against its pinned commit SHA via parallel adversarial agents (Blind
+Hunter / Edge Case Hunter / Acceptance Auditor). Unambiguous code-defect patches auto-applied WITH tests
+and verified (typecheck + vitest) before the per-epic commit; ambiguous/architectural/product/compliance
+items collected as numbered decisions; missing-test + systemic items deferred. Durable state for
+resumability: `progress.json` + `findings/*.json` (125 files) + per-epic commits.
+
 ## Notes / observations
 - Repo advanced mid-session (HEAD `19d412b` → `35272a5`); a concurrent process completed Epics 35–36. Reviewing by pinned SHA isolates us from further movement.
+- Recurring patterns found: (1) several P5 "go-live/swap" features (eTIMS, SMS) ship fully-built but UNWIRED to production — unit tests pass by calling the selector directly; (2) report date-ranges repeatedly missed the 366-day cap convention; (3) UTC-vs-EAT day bucketing is a codebase-wide deferred decision; (4) single-worker scheduler means cron strings are decorative + claim-before-side-effect is the right idempotency pattern (applied across eTIMS/feedback/expenses).
