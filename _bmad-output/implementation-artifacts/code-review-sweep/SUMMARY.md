@@ -21,7 +21,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 12 | 1 | ✅ | 0 (security clean) | 1 | 2 | 4 |
 | 13 | 2 | ✅ | 1 (audit() atomicity JSDoc) | 2 | 3 | 7 |
 | 14 | 2 | ✅ | 2 (phantom @bm/config dep ×3, formatChildAge NaN) | 3 | 1 | 8 |
-| 15 | 1 | ⬜ | | | | |
+| 15 | 1 | ✅ | 3 (last-backup BLOCKER, fail-alert, prunedAt) | 1 | 0 | 3 |
 | 16 | 7 | ⬜ | | | | |
 | 17 | 6 | ⬜ | | | | |
 | 18 | 5 | ⬜ | | | | |

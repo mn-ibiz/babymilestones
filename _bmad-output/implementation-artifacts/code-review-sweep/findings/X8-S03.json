@@ -1,0 +1,49 @@
+{
+  "id": "X8-S03",
+  "verdict": "issues",
+  "diff_summary": "Adds daily db-backup cron (apps/jobs/src/jobs/db-backup.ts) with injected pg_dump/upload + off-host store, records each run in a new additive backup_runs table (running->success/failed) writing audit_outbox rows, prunes successful snapshots older than a fixed 30 days, plus a manual restore runbook (infra/backup-restore-runbook.md) and migration 0041.",
+  "ac_coverage": "AC1 implemented & tested (injected dump records location/size). AC2 implemented & tested (>30-day prune, clock-injected, idempotent) but missing a 'never delete the last good backup' guard. AC3 implemented & tested (backup_runs row per run + audit). AC4 satisfied via documented manual runbook (no test, as specified).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Retention prune can delete the last surviving backup if dumps fail for 30+ days",
+      "detail": "prune() (db-backup.ts:104-133) deletes EVERY successful run whose started_at is older than the 30-day cutoff, with no protection for the most-recent successful snapshot. If the injected dump starts failing (bad creds, off-host outage, pg_dump error) and keeps failing, each daily run still records 'failed' but the prune keeps deleting aged-out successes. Once the newest success crosses the 30-day boundary it too is pruned, leaving ZERO recoverable backups while the cron keeps reporting it ran. This is the classic 'retention ate my only backup' data-loss hazard for a data-safety-critical job. Evidence: the WHERE clause is only (status='success' AND prunedAt IS NULL AND startedAt < cutoff) — nothing keeps a baseline. The repo's own later pruner (apps/jobs/src/jobs/backup-retention.ts selectBackupsToPrune, Rule 1) explicitly 'always keep the most-recent successful backup ... regardless of keep counts', confirming this guard is the intended invariant and is absent here.",
+      "location": "apps/jobs/src/jobs/db-backup.ts:104-133",
+      "fix": "Before deleting, always protect the single most-recent successful backup (by started_at) regardless of age — mirror selectBackupsToPrune Rule 1: fetch all eligible successful runs, exclude the newest from the stale set, prune the rest. Add a test seeding only one (40-day-old) success and assert it is NOT pruned.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Failed backups never alert: dump error is swallowed so the run-framework marks the job 'success'",
+      "detail": "The handler catches dump failures internally, stamps backup_runs.status='failed' + writes a 'backup.run.failed' audit row, and intentionally does NOT rethrow ('recorded, not thrown, so the cron keeps running tomorrow', db-backup.ts:85-97). But the surrounding framework (apps/jobs/src/runner.ts runJob) is exactly what turns a failed run into an alert: it only calls tracker.captureException / logs job.run.failed when job.run() REJECTS (runner.ts:107-111), and otherwise marks job_runs.status='success'. Because db-backup resolves on dump failure, every failed backup is recorded as a SUCCESS in job_runs and no Sentry-style alert ever fires. The only failure signal is a backup_runs row nobody is paged on — so a quietly broken backup pipeline can run unnoticed until the prune (finding 1) destroys the last good snapshot. The story claims 'failure handling/alerting if a backup fails' but there is no alerting path. No test asserts an alert is raised on failure.",
+      "location": "apps/jobs/src/jobs/db-backup.ts:85-100",
+      "fix": "Decide the alerting contract: either (a) re-throw after recording the failed backup_runs row so runJob reports it to the tracker (set job.onFailure='alert-only' since retry-next-tick is fine for a daily cron), or (b) inject an alert/tracker dependency into the job and call it in the catch block. Add a test asserting a failed dump surfaces an alert (e.g. tracker.captureException called, or run() rejects under runJob).",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "pg_dump in runbook passes DATABASE_URL as an argv, exposing credentials via process listing",
+      "detail": "The production dump sketch in infra/backup-restore-runbook.md runs `pg_dump --format=custom --no-owner \"$DATABASE_URL\"`. A connection URL on the command line is visible to any local process via `ps`/`/proc`, leaking DB credentials. The job code itself leaks nothing (it logs no creds and stores only an object key in `location`), and this is a wiring sketch for a future deploy story, so it is out of X8-S03's code scope — but worth flagging since the story explicitly calls out 'no secrets leaked'.",
+      "location": "infra/backup-restore-runbook.md:23-26",
+      "fix": "When the real dump lands, pass connection details via PGPASSWORD/PG* env or a .pgpass file rather than embedding credentials in the argv. Defer to the deploy/infra story that wires the concrete dump implementation.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "blind",
+      "title": "prune stamps pruned_at with run-start time instead of the actual prune time",
+      "detail": "prune() stamps prunedAt with `at` (the value captured at run start, db-backup.ts:60/99/123) rather than now(). The success/failed updates correctly use now() for finished_at, but the prune deviates. For a long-running daily job the skew is tiny and harmless, but it makes the audit/observability timestamp slightly inaccurate and is inconsistent with the rest of the handler's clock usage.",
+      "location": "apps/jobs/src/jobs/db-backup.ts:123",
+      "fix": "Stamp prunedAt with now() at deletion time: pass the `now` accessor into prune() and set `{ prunedAt: now() }`. Low priority / cosmetic.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

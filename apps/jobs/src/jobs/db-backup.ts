@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { audit, backupRuns, type Database } from "@bm/db";
 import type { Job } from "../registry.js";
 
@@ -94,34 +94,46 @@ export function createDbBackupJob(deps: DbBackupJobDeps): Job {
           target: { table: "backup_runs", id: runId },
           payload: { error: message },
         });
+        // Re-throw so the jobs runner reports this to the error tracker (it only
+        // alerts when run() rejects). onFailure defaults to retry-next-tick, so the
+        // daily cron still re-attempts tomorrow — and the prune below is SKIPPED, so
+        // retention never runs on a day the backup failed.
+        throw err;
       }
 
-      await prune(deps, at);
+      await prune(deps, at, now);
     },
   };
 }
 
-/** AC2 — delete off-host snapshots older than 30 days, stamp `prunedAt`. */
-async function prune(deps: DbBackupJobDeps, at: Date): Promise<void> {
+/**
+ * AC2 — delete off-host snapshots older than 30 days, stamp `prunedAt`. ALWAYS
+ * keeps the single most-recent successful snapshot regardless of age, so a
+ * prolonged dump-failure streak can never let retention destroy the last good
+ * backup (mirrors backup-retention.ts Rule 1).
+ */
+async function prune(deps: DbBackupJobDeps, at: Date, now: () => Date): Promise<void> {
   const cutoff = new Date(at.getTime() - RETENTION_DAYS * DAY_MS);
 
-  const stale = await deps.db
-    .select({ id: backupRuns.id, location: backupRuns.location })
+  // All un-pruned successful snapshots, newest first.
+  const successes = await deps.db
+    .select({
+      id: backupRuns.id,
+      location: backupRuns.location,
+      startedAt: backupRuns.startedAt,
+    })
     .from(backupRuns)
-    .where(
-      and(
-        eq(backupRuns.status, "success"),
-        isNull(backupRuns.prunedAt),
-        lt(backupRuns.startedAt, cutoff),
-      ),
-    );
+    .where(and(eq(backupRuns.status, "success"), isNull(backupRuns.prunedAt)))
+    .orderBy(desc(backupRuns.startedAt));
 
-  for (const row of stale) {
+  // Protect the most-recent successful snapshot; only the rest are prune-eligible.
+  for (const row of successes.slice(1)) {
     if (!row.location) continue;
+    if (row.startedAt >= cutoff) continue; // still within the retention window
     await deps.store.remove(row.location);
     await deps.db
       .update(backupRuns)
-      .set({ prunedAt: at })
+      .set({ prunedAt: now() })
       .where(eq(backupRuns.id, row.id));
     await audit(deps.db, {
       actor: null,

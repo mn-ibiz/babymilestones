@@ -54,19 +54,47 @@ describe("db-backup job (X8-S03)", () => {
     expect(row!.error).toBeNull();
   });
 
-  it("records a failed run when the dump throws (AC3)", async () => {
+  it("records a failed run AND re-throws so the runner alerts (AC3)", async () => {
     const store = new FakeStore();
     const dump: BackupDump = vi.fn(async () => {
       throw new Error("pg_dump exploded");
     });
 
-    await createDbBackupJob({ db: dbh.db, store, dump }).run();
+    // The handler records the failure THEN re-throws — the jobs runner only
+    // reports to the error tracker when run() rejects.
+    await expect(createDbBackupJob({ db: dbh.db, store, dump }).run()).rejects.toThrow(
+      "pg_dump exploded",
+    );
 
     const [row] = await dbh.db.select().from(backupRuns);
     expect(row!.status).toBe("failed");
     expect(row!.error).toContain("pg_dump exploded");
     expect(row!.location).toBeNull();
     expect(row!.finishedAt).not.toBeNull();
+  });
+
+  it("never destroys the last good backup when dumps fail past retention (review fix)", async () => {
+    const store = new FakeStore();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const at = new Date("2026-05-25T02:00:00Z");
+    // The ONLY successful backup is 40 days old (past the 30-day window).
+    const old = new Date(at.getTime() - 40 * dayMs);
+    store.put("off-host/only.dump", 10);
+    await dbh.db.insert(backupRuns).values([
+      { status: "success", startedAt: old, finishedAt: old, location: "off-host/only.dump", sizeBytes: 10 },
+    ]);
+    // Today's dump fails — so no fresh success is created and the prune must not run.
+    const dump: BackupDump = async () => {
+      throw new Error("dump down");
+    };
+
+    await expect(
+      createDbBackupJob({ db: dbh.db, store, dump, now: () => at }).run(),
+    ).rejects.toThrow("dump down");
+
+    // The sole 40-day-old backup survives despite being past retention.
+    expect(store.deleted).toEqual([]);
+    expect(store.objects.has("off-host/only.dump")).toBe(true);
   });
 
   it("prunes snapshots older than 30 days and keeps newer ones (AC2)", async () => {
