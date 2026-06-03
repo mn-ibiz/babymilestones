@@ -33,6 +33,13 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 24 — Stylist Commission Viewer
+
+59. **[MED · P3-E02-S02] Earnings breakdown visit-count ignores `source='reassign'`** (later-epic
+    source) → new stylist's visit undercounted; old stylist shows "1 visit / ~0 revenue". Revenue +
+    headline totals correct. Decide counting semantics (count reassign for the new stylist, or count by
+    current `bookings.staffId`) + a regression test.
+
 ## Epic 23 — Attribution & Commission Ledger
 
 55. **[BLOCKER → finance · P3-E01-S02] Subscription-covered bookings accrue ZERO commission**

@@ -198,6 +198,13 @@ export function registerPublicStaffEarnings(
     async (req: FastifyRequest, reply: FastifyReply) => {
       if (!gate(req, reply)) return reply;
       const { staffId } = req.params as { staffId: string };
+      // Validate the UUID shape BEFORE querying: staff.id is a uuid column, so a
+      // malformed id would make Postgres throw 22P02 → a 500 + an errorTracker
+      // capture on every junk request to this public anti-scrape endpoint. Treat a
+      // non-UUID as not-found so it's indistinguishable from an unknown/inactive id.
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(staffId);
+      if (!isUuid) return reply.code(404).send({ error: "Staff member not found" });
       const dto = await loadEarnings(db, staffId, now());
       if (!dto) return reply.code(404).send({ error: "Staff member not found" });
       reply.header("cache-control", CACHE_CONTROL);

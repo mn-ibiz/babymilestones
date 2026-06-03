@@ -1,0 +1,39 @@
+{
+  "id": "P3-E02-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds public (no-login) staff-earnings viewer: apps/admin/app/staff-earnings/page.tsx + lib, middleware isPublicPath exemption, and unauthenticated apps/api/src/routes/public/staff-earnings.ts (active-staff dropdown + per-staff MTD/last-month/last-payout figures over the commission ledger) with a per-IP fixed-window rate limiter and 60s cache.",
+  "ac_coverage": "AC1-AC5 all implemented & tested (AC1 middleware.test.ts, AC2/AC3/AC4/AC5 staff-earnings.test.ts, math in catalog/staff-earnings.test.ts). AC6 is a decision ref, no code. Read-only route (no audit_outbox needed); no migrations. Security model: staff.id is a random v4 UUID (defaultRandom), NOT sequential/enumerable, and the full active-staff list is intentionally public per AC2 — so there is no cross-stylist leakage or enumeration vuln beyond the spec's deliberate design (decision-ref 14).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Malformed :staffId path param causes a 500 (Postgres 22P02), not a clean 404, on the public endpoint",
+      "detail": "GET /public/staff-earnings/:staffId passes the raw path segment straight into eq(staff.id, staffId) (loadEarnings, no validation). staff.id is a uuid column, so any non-UUID id (e.g. /public/staff-earnings/foo) makes Postgres throw 'invalid input syntax for type uuid' (22P02). The global error handler in apps/api/src/app.ts then returns HTTP 500 {error:'Internal Server Error'} AND fires errorTracker.captureException for every malformed request. On an internet-reachable, deliberately anti-scrape endpoint this is both an operational noise/DoS-amplification vector (a scraper hammering garbage ids floods error tracking) and a robustness gap. The sibling public route in the same directory (apps/api/src/routes/public/events.ts:113) deliberately guards with an isUuid regex before doing an id-typed query precisely to avoid this — staff-earnings.ts does not. Tests only cover a valid randomUUID() for the not-found case (staff-earnings.test.ts:269), so the malformed-input path is untested.",
+      "location": "apps/api/src/routes/public/staff-earnings.ts:200",
+      "fix": "In the :staffId handler, validate staffId against a UUID regex (reuse the same /^[0-9a-f]{8}-...$/i check as events.ts:113-114, or z.string().uuid().safeParse) before calling loadEarnings, and return reply.code(404).send({ error: 'Staff member not found' }) on a non-match — yielding the same indistinguishable 404 as an unknown/inactive id (also avoids any error-tracker noise). Add a test for GET /public/staff-earnings/not-a-uuid expecting 404.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Per-IP rate limiter keys on req.ip without trustProxy — behind a reverse proxy all clients share one bucket",
+      "detail": "StaffEarningsRateLimiter is keyed on req.ip (gate(), staff-earnings.ts:185). The Fastify instance in apps/api/src/app.ts:203 is built without trustProxy, so req.ip is the socket remote address. On admin.babymilestones.co.ke (served behind a proxy/LB per AC1) req.ip is the proxy's address for every client, so the anti-scrape budget (AC5) is shared across ALL visitors — over-aggressive (legitimate kiosk users can 429 each other) and ineffective at distinguishing real per-IP scrapers. Note this is NOT a bypass: because trustProxy is off, a spoofed X-Forwarded-For cannot reset the bucket. This is a pre-existing project-wide convention — req.ip is used identically by the login limiter (apps/api/src/routes/auth/login.ts:36) and ~30 other call sites — so it is out of this story's scope to change.",
+      "location": "apps/api/src/routes/public/staff-earnings.ts:185",
+      "fix": "Deferred (pre-existing, codebase-wide). Right fix is a platform-level decision: configure Fastify trustProxy to a trusted hop count/CIDR and derive the real client IP once, applied consistently to all req.ip rate limiters (login, review-snippets, staff-earnings). Do not patch in isolation here.",
+      "ac_ref": "AC5"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "isPublicPath uses startsWith prefix match — any future route under the /staff-earnings prefix would silently become public",
+      "detail": "middleware.ts isPublicPath() (line 39) matches via PUBLIC_PATHS.some(p => pathname.startsWith(p)). Adding '/staff-earnings' to PUBLIC_PATHS therefore exempts not just /staff-earnings but any path beginning with that string (e.g. a hypothetical /staff-earnings-admin or /staff-earnings/export) from the SSO/role gate. No such route exists today, so there is no live exposure, but it is a latent auth-bypass footgun. This is the pre-existing matching pattern (it already applied to '/login', which would likewise match '/login-anything'); this story extends it rather than introducing it.",
+      "location": "apps/admin/middleware.ts:39",
+      "fix": "Deferred (pre-existing pattern). If hardened later: match public routes exactly or with a trailing-boundary check (pathname === p || pathname.startsWith(p + '/')) instead of bare startsWith, for all entries in PUBLIC_PATHS.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

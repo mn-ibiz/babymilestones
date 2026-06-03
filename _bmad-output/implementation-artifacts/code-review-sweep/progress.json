@@ -70,7 +70,7 @@
     "21": "done",
     "22": "done",
     "23": "done",
-    "24": "todo",
+    "24": "done",
     "25": "todo",
     "26": "todo",
     "27": "todo",
@@ -1970,7 +1970,7 @@
         "c59545758708124b8fc84f9a81e967a960677b3f"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "24-2-earnings-breakdown-count-of-visits-top-services",
@@ -1987,7 +1987,7 @@
         "c59545758708124b8fc84f9a81e967a960677b3f"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "25-1-stylist-availability-and-slot-creation",
@@ -3204,8 +3204,16 @@
       "decisions_needed": 6,
       "dismissed": 15,
       "commit": ""
+    },
+    "24": {
+      "stories_reviewed": 2,
+      "patches": 1,
+      "deferred": 2,
+      "decisions_needed": 1,
+      "dismissed": 8,
+      "commit": ""
     }
   },
-  "epics_done": 22,
+  "epics_done": 23,
   "epics_total": 35
 }

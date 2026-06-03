@@ -1,0 +1,19 @@
+{
+  "id": "P3-E02-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds the earnings breakdown (completed-visit count + top-3 services by count/revenue) to the public /staff-earnings viewer: pure aggregation in packages/catalog/src/staff-earnings.ts (breakdownInWindow), the API join+reduce in apps/api/src/routes/public/staff-earnings.ts (loadEarnings), and the admin render seams in apps/admin/lib/staff-earnings.ts + page.tsx; PublicStaffEarningsDto extended in contracts.",
+  "ac_coverage": "AC1 (completed-visit count + top 3 by count + top 3 by revenue, scoped to the MTD window) implemented and tested in catalog + api + admin tests. AC2 (no customer-specific info) implemented (only service NAME + numbers cross the boundary; left-join keeps parent/child/booking ids out) and tested (api test asserts payload contains no parent/child/booking/invoice strings). Both ACs covered.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Breakdown visit-count ignores reassigned bookings (source='reassign'), diverging count from revenue and from the headline total",
+      "detail": "The breakdown classifies a completed visit as the ledger row's source === 'booking' (isVisit, set in loadEarnings at apps/api/src/routes/public/staff-earnings.ts where isVisit: r.source === 'booking', consumed by breakdownInWindow in packages/catalog/src/staff-earnings.ts). A third source, 'reassign', exists in the working tree (migration 0090, reassignBookingCommission in packages/wallet/src/commission-hook.ts) for salon-booking reassignment between stylists. Effect once a settled booking is reassigned: (a) the NEW stylist receives a positive source='reassign' row — its amount nets correctly into topServicesByRevenue and into the headline monthToDateCents, but isVisit is false, so the visit they actually performed is NOT counted in completedVisits or topServicesByCount (undercount); (b) the OLD stylist keeps the original source='booking' row (still counted as a visit) plus a source='refund_reversal' row that nets their revenue for that service to ~0, so their count says '1 visit' while revenue says ~0 (overcount + count/revenue mismatch). The headline earnings totals remain correct (they sum all signed amounts); only the visit-COUNT metric is wrong. Note the staff leaderboard (packages/catalog/src/staff-leaderboard.ts) deliberately counts service-count from the bookings table by CURRENT attribution rather than from source='booking' ledger rows, precisely to be reassign-safe — the earnings breakdown does not. No test exercises a 'reassign' row in the staff-earnings breakdown (grep across the three test files returns nothing). Verified against the working tree (files unchanged since commit c595457587).",
+      "location": "apps/api/src/routes/public/staff-earnings.ts (loadEarnings: isVisit: r.source === \"booking\"); packages/catalog/src/staff-earnings.ts (breakdownInWindow)",
+      "fix": "Cross-epic interaction: Epic 25 (reassign) landed after Epic 24 (this story), and reassign is documented as rare, so this was correct when written. Product decision needed on how a reassigned visit should be counted: (1) count it for the NEW stylist — treat isVisit as source IN ('booking','reassign') AND not net-reversed, and suppress the old stylist's now-net-zero visit; or (2) count by current bookings.staffId like the leaderboard does. Whichever is chosen, add a test seeding a 'reassign' row and asserting completedVisits/topServicesByCount for both the old and new stylist.",
+      "ac_ref": "AC1"
+    }
+  ]
+}
