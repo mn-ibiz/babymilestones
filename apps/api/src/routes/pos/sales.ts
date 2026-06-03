@@ -16,6 +16,7 @@ import {
 import {
   validateSession,
   requirePermission,
+  isStaffRole,
   CSRF_HEADER_NAME,
   normalizePhone,
 } from "@bm/auth";
@@ -165,6 +166,14 @@ export function registerPosSales(app: FastifyInstance, deps: PosDeps): void {
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    // Till-facing, staff-only. Parents also hold `create payment` (for self-initiated
+    // M-Pesa) and share the session store, so the permission guard alone would let a
+    // parent drive the till — create sales, decrement stock, mint receipts, and debit
+    // any phone-matched wallet. Gate on the staff role.
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return null;
     }
     const perm = guard(auth.user);

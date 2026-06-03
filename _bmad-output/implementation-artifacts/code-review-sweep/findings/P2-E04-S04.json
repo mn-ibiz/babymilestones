@@ -1,0 +1,49 @@
+{
+  "id": "P2-E04-S04",
+  "verdict": "issues",
+  "diff_summary": "cec2787 is an epic-level review-fix commit touching apps/api/src/routes/pos/sales.ts (failed sales clear idempotency_key so the replay guard ignores them and a wallet decline can be retried after top-up), apps/pos PayPanel/SaleScreen/Cart/page (regenerate idempotency key on method switch; server-resolved role gate disables Pay for read-only packer) + tests. The underlying payment route (cash/wallet settle synchronously; M-Pesa STK + Paystack stay pending until confirm) lands in 1bd80d8; this commit hardens its idempotency + role gating.",
+  "ac_coverage": "AC1 (four methods) impl+tested; AC2 (cash change/drawer) impl+tested; AC3 (M-Pesa STK + live poll) impl+tested; AC4 (Paystack hosted checkout) impl+tested; AC5 (wallet, parent phone lookup, in-tx balance recheck + debit) impl+tested; AC6 (receipt + SMS + stock decrement + cart clear, all atomic) impl+tested; AC7 (distinct failure paths) impl+tested. Money correctness is strong: server-computed totals only (never client prices), wallet debit keyed pos:<saleId> (no double-debit), settleSale CLAIMs pending->paid before writing receipt/decrementing stock so a double-confirm is a no-op, guarded WHERE stock_qty>=qty so no oversell, whole sale is one transaction. No test covers the idempotency-key reuse RACE or the M-Pesa pending-orphan retry block (see findings).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Concurrent duplicate create with the same idempotency key surfaces a 500 instead of replaying (TOCTOU between the replay SELECT and the INSERT)",
+      "detail": "The replay guard does a SELECT on posSales.idempotencyKey (sales.ts:194-196) and, only if no live row is found, proceeds to INSERT a new sale carrying that same key (baseInsert.idempotencyKey, sales.ts:252; inserted at :263 cash / :297 wallet / :339 mpesa / :362 paystack). The SELECT and the INSERT are not in one atomic step, so two genuinely-concurrent requests with the same key (double-tap, client auto-retry on a slow first response) both pass the SELECT, then both INSERT. The partial unique index pos_sales_idempotency_key_uniq (migration 0057_pos_sales.sql:41-42) lets exactly one win; the loser's INSERT raises a Postgres unique-violation (23505). That error is not an InsufficientStockError/InsufficientFundsError, so it is re-thrown (sales.ts:277/:328) and becomes a 500. IMPORTANT: this is NOT a double-charge — the loser's whole transaction rolls back (no receipt, no stock decrement, no wallet debit), and the winner settles exactly once. The defect is purely UX/robustness: the retry that SHOULD have idempotently returned the existing sale instead gets a 500. Does not reproduce in the test suite because the PGlite harness is single-connection. The commit's own goal (make retries safe) is undermined for the concurrent case.",
+      "location": "apps/api/src/routes/pos/sales.ts:194-197",
+      "fix": "Catch the unique-violation on the sale INSERT (Postgres code 23505 on constraint pos_sales_idempotency_key_uniq) and, instead of throwing, re-SELECT the row for that idempotencyKey and return toResponse(existing) with 200 — mirroring the wallet.post ON CONFLICT DO NOTHING + re-fetch pattern already used in packages/wallet/src/index.ts:204-242. Alternatively rely on onConflictDoNothing on the sale insert and short-circuit when nothing was inserted. Flagged decision-needed because the right surface (200 replay vs 409 'duplicate in flight') is a product call and the fix spans all four method branches.",
+      "ac_ref": "AC7"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "M-Pesa/Paystack sale orphaned in 'pending' with no payment_ref permanently blocks retry under the same key",
+      "detail": "For M-Pesa the sale row is inserted as pending WITH the idempotency key BEFORE the STK push (sales.ts:339), and payment_ref is only written after a successful push (:349). If mpesaAdapter.stkPush() THROWS (network error / token failure / non-OK HTTP) rather than returning {status:'failed'}, the error propagates as a 500 and the pending row survives with idempotencyKey set but payment_ref = null. A retry with the same key now hits the replay guard (existing.status === 'pending', which is NOT 'failed') and returns that orphaned pending sale (sales.ts:196). Calling confirm on it returns 409 'Sale has no payment to confirm' (sales.ts:389). The sale is wedged: cannot be confirmed (no ref) and cannot be re-initiated (replay shadows it). Same shape for Paystack (:362-368). The failed-key-clearing fix in this commit only covers adapter calls that RETURN a failure (routed through failSale), not ones that THROW before payment_ref is set. Pre-existing in 1bd80d8 (the insert-before-push ordering and the replay logic), so deferred — but it is the inverse of the bug this commit was trying to fix.",
+      "location": "apps/api/src/routes/pos/sales.ts:339-349",
+      "fix": "Defer (out of this commit's scope). Options for a follow-up: (a) wrap the adapter call in try/catch and route a thrown error through failSale (which now clears the key) so the attempt is retryable; or (b) only persist the sale row after the push succeeds; or (c) treat a pending sale with null payment_ref as retryable in the replay guard. No fix applied — read-only review.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Paystack overpayment/underpayment fails the sale but the customer has already been charged — no refund/capture handling",
+      "detail": "On confirm, a verified Paystack success whose amount does not equal the recorded total is turned into a failed sale: failSale(... 'Paid amount did not match the sale total') (sales.ts:424-426). This correctly prevents fulfilling a sale that wasn't paid in full, and Paystack amount units (minor units) match the cents comparison, so the check itself is sound. But by this point the customer's card has already been charged the (mismatched) amount on the hosted checkout. The code marks the sale failed and stops — there is no refund/void of the captured payment and no operator alert, so an over- or under-paid Paystack transaction silently strands the customer's money with no in-app remediation. (Over-payment can't normally happen since init fixes the amount, but a partial-capture / re-used reference / Paystack-side amount edit can produce a mismatch.)",
+      "location": "apps/api/src/routes/pos/sales.ts:423-426",
+      "fix": "Decision-needed: product must choose remediation — auto-issue a Paystack refund for the captured amount on mismatch, or flag the sale for manual reconciliation with an audit/alert payload carrying the captured vs expected amount, rather than only marking the sale failed. No code change made.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Receipt SMS failure is silently swallowed with no audit/observability",
+      "detail": "sendReceiptSms catches and discards any send error (.catch(() => {}), sales.ts:147). This is deliberate (the sale must not roll back because an SMS failed) and is acceptable for AC6's 'SMS-stub', but a dropped customer receipt SMS leaves no audit/outbox trail to detect or reconcile later. Low impact (money is already correct; the StubSmsSender path persists to sms_outbox), pre-existing in 1bd80d8, out of this commit's scope.",
+      "location": "apps/api/src/routes/pos/sales.ts:147",
+      "fix": "Defer. If desired later, log/emit a metric (or write a best-effort audit row) on SMS send failure rather than swallowing the rejection entirely.",
+      "ac_ref": "AC6"
+    }
+  ]
+}

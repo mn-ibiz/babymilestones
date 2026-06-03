@@ -1,0 +1,29 @@
+{
+  "id": "P2-E04-S01",
+  "verdict": "issues",
+  "diff_summary": "cec2787394 (epic-level P2-E04) touches apps/api/src/routes/pos/sales.ts (idempotency-on-failure fix), apps/pos/(pos)/page.tsx + SaleScreen/Cart/PayPanel (server-resolve principal, disable Pay for read-only packer), apps/pos/lib/pos-access.ts (canTakePayment). S01 scope = POS app scaffold, SSO/edge middleware, role landing, session/CSRF, and which roles may use the POS.",
+  "ac_coverage": "AC1 (apps/pos Next app) present. AC2 (SSO + cashier lands on sale screen at '/') implemented via middleware.ts + posLanding/guardPosAccess + (pos)/layout.tsx. AC3 (tablet-first/ViewportGuard) present. Gap: the server-side POS API authorization does NOT restrict the surface to staff roles — a parent (who holds 'create payment') is not excluded, contradicting the stated 'roles allowed here are the till-facing staff roles' contract in middleware.ts/pos-access.ts.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "POS sales route gates only on 'create payment' — a parent can drive the till (systemic parent-holds-create-payment IDOR)",
+      "detail": "apps/api/src/routes/pos/sales.ts authorize() runs validateSession() then guard = requirePermission('create','payment') and nothing else. The PERMISSION_MATRIX (packages/auth/src/rbac.ts:73-77) grants `parent` { create, payment }. A parent obtains a real SSO `bm_session` cookie via POST /auth/login (apps/api/src/routes/auth/login.ts:86-90) scoped to .babymilestones.co.ke (shared across the api/pos subdomains), plus a CSRF token. That session passes validateSession, and `parent` passes the create-payment guard, so a parent can call POST /pos/sales (and POST /pos/sales/:id/confirm) directly. Impact: a parent can create in-store sales, settle stock decrements, mint receipts, and — via the attacker-supplied `customerPhone` on the wallet path (sales.ts:282-310) — debit ANY parent wallet matched by phone, not just their own. This is the exact systemic pattern the sibling routes explicitly defend against: apps/api/src/routes/reception/receipt.ts:122-128 documents 'Parents also hold read wallet / create payment, so the permission guard alone would let any authenticated parent... Gate on staff.' and adds `if (!isStaffRole(auth.user.role)) 403`. parents/statement.ts, reception/recent-transactions.ts and reception/handoff.ts do the same. The POS routes do not (grep: no isStaffRole in apps/api/src/routes/pos/*.ts). The only negative test is 'forbids a packer' (sales.test.ts:114) which passes solely because packer lacks create-payment; no test exercises a parent. The POS app's own docs (middleware.ts:14-16, pos-access.ts) assert the surface is restricted to till-facing staff roles, so the API leaving parents in is a real authz hole, not intended behaviour.",
+      "location": "apps/api/src/routes/pos/sales.ts:161-176",
+      "fix": "In authorize() (sales.ts), after the validateSession ok-check and before/around the permission guard, add the staff gate used by the sibling routes: `if (!isStaffRole(auth.user.role)) { reply.code(403).send({ error: 'Forbidden: missing permission' }); return null; }` and import isStaffRole from '@bm/auth'. Add a regression test asserting a logged-in parent session gets 403 from POST /pos/sales. Mirror the same gate in cashup.ts (see related finding).",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "POS cash-up route has the same parent exposure (gates only on 'create payment')",
+      "detail": "apps/api/src/routes/pos/cashup.ts:90 builds guard = requirePermission('create','payment') and its authorize path (cashup.ts:101) checks only validateSession + that guard, with no isStaffRole check. Because `parent` holds create-payment, a parent SSO session can reach the POS cash-up endpoint(s) — reading/closing the till drawer reconciliation that should be staff-only. Same root cause and same domain (shared bm_session SSO cookie) as the sales finding. By contrast products.ts:54 and online-orders.ts:36 gate on requirePermission('read','product'), which `parent` does NOT hold, so those two POS routes are not exposed (verified against PERMISSION_MATRIX).",
+      "location": "apps/api/src/routes/pos/cashup.ts:90-101",
+      "fix": "Add `if (!isStaffRole(auth.user.role)) { reply.code(403)...; return null; }` to the cashup authorize path and import isStaffRole from '@bm/auth'. Add a parent-rejection test. Consider hoisting the validateSession+isStaffRole+requirePermission combo into a shared POS authorize helper so every pos/*.ts route inherits the staff gate and the pattern cannot regress per-route.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

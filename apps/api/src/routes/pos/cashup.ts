@@ -10,7 +10,7 @@ import {
   type Database,
   type Transaction,
 } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import {
   cashupReasonRequired,
   posCashupRequestSchema,
@@ -96,6 +96,12 @@ export function registerPosCashup(app: FastifyInstance, deps: PosDeps): void {
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    // Till-facing, staff-only — parents hold `create payment` and share the session
+    // store, so gate on the staff role before exposing the cash-up endpoint.
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return null;
     }
     const perm = guard(auth.user);

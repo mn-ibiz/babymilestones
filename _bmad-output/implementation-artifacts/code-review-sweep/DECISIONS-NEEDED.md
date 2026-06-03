@@ -33,6 +33,28 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 19 — POS App (in-store)
+
+40. **[HIGH · money · P2-E04-S03] Flat-KES overall discount over-discounts `vat_exclusive` lines** by
+    the VAT fraction (inconsistent net/gross frames). "KES 100 off" removes 116c on a vat_exclusive
+    line; entered/displayed/actual diverge on mixed carts. % discounts are fine. Decide the intended
+    (likely gross) frame. `packages/contracts/src/pricing.ts:96-157`.
+
+41. **[HIGH · money · P2-E04-S05] `POST /pos/cashup` is not idempotent** — a retry/second tab claims
+    zero sales and silently posts a second Treasury reconciliation adjustment with a fabricated
+    variance. Add an idempotency key or reject a zero-sales close with a non-zero count. `pos/cashup.ts`.
+
+42. **[MED · P2-E04-S03] No POS discount cap/authorization; discount not audited** — any cashier can
+    zero a sale, `pos.sale.paid` records only `total_cents`. Add a cap/approval (product call) +
+    record the discount in the audit payload.
+
+43. **[MED · P2-E04-S05] Cash-up variance posts to a single global cash float**, not the cashier's till
+    → multi-till conflation. Scope to single-till (document) or attribute per till.
+
+44. **[MED · P2-E04-S04] POS concurrent duplicate-create surfaces 500 instead of replaying** (TOCTOU on
+    the idempotency key); **[LOW]** Paystack amount-mismatch fails the sale but the customer was charged
+    (no refund path); **[LOW]** admin can't run cash-up (guard is `create payment`).
+
 ## Epic 18 — Pickup Auth & Observations
 
 38. **[MED · child-safety · P2-E03-S03] Hand-off never verifies the collector against the authorised

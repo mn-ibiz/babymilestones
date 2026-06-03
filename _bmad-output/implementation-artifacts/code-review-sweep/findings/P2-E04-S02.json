@@ -1,0 +1,19 @@
+{
+  "id": "P2-E04-S02",
+  "verdict": "clean",
+  "diff_summary": "Pinned commit cec2787394 is an epic-level POS review-fix (idempotency-retry + role gating, mostly S04). The S02 product-catalogue-read implementation lives in catalog (packages/catalog/src/products.ts: createProduct/findProductByCode/searchProductsByName), the read API (apps/api/src/routes/pos/products.ts: /pos/products/lookup + /search), the contract DTO (packages/contracts PosProduct), the schema+migration (packages/db products table, 0055_products.sql, 0056_product_permissions.sql), and the POS client (apps/pos ProductSearch.tsx, lib/products.ts, lib/products-api.ts). It serves price+stock to the till and the sale (sales.ts) recomputes money authoritatively from DB prices.",
+  "ac_coverage": "AC1 (scan/keyed SKU-or-barcode lookup, barcode-first deterministic, inactive excluded) implemented + unit-tested (catalog products.test.ts) + API-tested (products.test.ts) + UI auto-focus/Enter in ProductSearch.tsx. AC2 (debounced name search showing price+stock) implemented (250ms debounce + out-of-order race guard) + tested at catalog/API level. AC3 (out-of-stock greyed, included in results, blocked from add) implemented (opacity/aria-disabled + add() re-guard) + tested. Authz (read product → reception/cashier/packer only; parent/treasury excluded) tested (401/403). No dedicated ProductSearch.tsx component test for the debounce/race behavior, but the underlying helpers and API are covered.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Cart can display a stale unit price if the DB price changes between add-to-cart and Pay (no charged-vs-quoted reconciliation in the UI)",
+      "detail": "The S02 read returns the authoritative DB price and the sale ALWAYS recomputes totals from DB prices server-side (apps/api/src/routes/pos/sales.ts:223-240 'never trust client prices'), so there is NO price-tampering / wrong-price-charged defect — the core S02 concern is fully met. The only residual is a UX/trust gap that belongs to S04: a cart line holds a product snapshot captured at add time (apps/pos/lib/cart.ts:38-44 refreshes only on re-scan), and PayPanel renders the client-side totalCents (apps/pos/app/components/PayPanel.tsx:139). For the wallet method the server debits its own recomputed total without surfacing any difference, so if a product's price changed since the cart was built the wallet customer can be charged an amount that differs from the figure the cashier quoted, with no explicit confirmation. Cash is protected because the server validates tendered >= server-total (sales.ts:257); wallet is not reconciled in the UI. This is a price-drift race in the S04 pay flow, not in the S02 catalogue read, and is low impact (P2 products carry a single inline price edited rarely; effective-dated price history is deferred to P4-E01).",
+      "location": "apps/pos/app/components/PayPanel.tsx:139; apps/pos/lib/cart.ts:38-44",
+      "fix": "Out of S02 scope — defer to S04/P4. Option: have the create-sale response echo the server unit prices/line totals and, when they differ from the client cart, show the cashier a 'price changed, now KES X' confirmation before treating the sale as paid (especially for wallet). No change needed for S02 itself.",
+      "ac_ref": ""
+    }
+  ]
+}

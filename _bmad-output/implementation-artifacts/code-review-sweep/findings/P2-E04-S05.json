@@ -1,0 +1,59 @@
+{
+  "id": "P2-E04-S05",
+  "verdict": "issues",
+  "diff_summary": "End-of-day POS cash-up: migration 0058 pos_cashups + cashed_up_at on pos_sales (0057), cashup.ts route (GET /pos/cashup/expected preview + POST /pos/cashup close), pure variance helpers (apps/pos/lib/cashup.ts), CashUp.tsx UI, contracts (threshold/schemas), audit action pos.cashup.closed. Pinned commit cec2787394 is the epic-19 review-fix commit and does NOT touch cash-up; the actual implementation lives in 1bd80d8 — reviewed against the working tree.",
+  "ac_coverage": "AC1 (expected cash/M-Pesa/Paystack) implemented & tested; AC2 (variance) implemented & tested; AC3 (>KES500 reason gate) implemented & tested both client+server; AC4 (audit + Treasury reconciliation feed) implemented & tested. All 4 ACs covered. Gaps are around idempotency/double-close and per-till float attribution (below).",
+  "dismissed_count": 6,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "POST /pos/cashup is not idempotent — a double close posts a spurious reconciliation adjustment",
+      "detail": "There is no idempotency key, no unique constraint, and no server-side guard against closing the same till twice in quick succession (the only protection is the client `busy` flag in CashUp.tsx, which does NOT survive a network retry, a second tab, or a back-button re-POST). The first POST atomically claims ALL of the cashier's uncashed paid sales (UPDATE … WHERE cashed_up_at IS NULL) and computes variance against the full expected total. A second POST then claims ZERO sales, so expected=0 and varianceCents = countedCashCents. If the resubmitted counted amount is non-zero and <= KES 500, the route SILENTLY inserts a SECOND `reconciliation_adjustments` row against the cash-drawer float (no reason required) and a SECOND `pos_cashups` row — double-signalling Treasury with a fabricated variance. If > KES 500 it 400s (reason required), which is merely confusing. This is a money-feed correctness gap on a MONEY-CRITICAL path. Note the sibling sales route (sales.ts) DOES use an idempotency key for exactly this reason; cash-up does not.",
+      "location": "apps/api/src/routes/pos/cashup.ts:117-206; apps/pos/app/components/CashUp.tsx:34-54",
+      "fix": "Options: (a) accept a client idempotency key on the close (mirror pos_sales: unique partial index, replay returns the prior cashup); or (b) reject a close that would claim zero sales AND has no reason (a no-sales close is almost never legitimate); or (c) add a short server-side 'one open close per cashier per N seconds' guard. Needs a product decision because an immediate legitimate re-close in the 'since last cash-up' model is theoretically valid (e.g. a second drawer count) — but a silent zero-expected adjustment is not.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Variance posts against a single global cash-drawer float, not the cashier's till — multi-till deployments conflate variances",
+      "detail": "The close picks `floatAccounts WHERE kind='cash_drawer' AND active=true ORDER BY created_at ASC LIMIT 1` — i.e. always the OLDEST active cash drawer, with no link to which till/cashier produced the variance. The dev notes call this a 'deterministic float pick', but determinism here just means every cashier's variance is always posted to the same one drawer. A site running two or more tills (two cash_drawer float accounts) will see till-2's variance booked against till-1's float, so the Treasury reconciliation feed cannot attribute a discrepancy to the till that caused it. pos_cashups has no float_account_id either, so the link is unrecoverable after the fact. Correct for a single-till clinic; wrong for multi-till.",
+      "location": "apps/api/src/routes/pos/cashup.ts:131-136",
+      "fix": "Decision needed: either (a) accept single-till scope explicitly and document/constrain that exactly one active cash_drawer float exists, or (b) attribute the cash-drawer float per till/cashier (a cashier→float mapping, or carry the float_account_id on pos_cashups and select the till's own drawer). Deferred-style decision because the float-account model in P1-E06 has no per-till concept yet.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Admin cannot run cash-up — AC names 'cashier/admin' but the guard is `create payment` (cashier/reception only)",
+      "detail": "The spec/brief authz is cashier/admin. The route guards on requirePermission('create','payment'). Per the RBAC matrix (packages/auth/src/rbac.ts), `cashier` and `reception` hold `create payment`; `admin` does NOT (admin has manage receipt/refund/wallet/user, no create-payment), so an admin gets 403 on /pos/cashup. super_admin passes via its wildcard. The dev intentionally scoped to 'the till operators' (cashier/reception), which is defensible, but it diverges from the AC's literal 'cashier/admin'. Note: `parent` also holds `create payment`, but parents resolve via a separate table and resolveUser queries `users` (staff) only, so a parent cannot reach this route (returns 401) — not exploitable.",
+      "location": "apps/api/src/routes/pos/cashup.ts:90",
+      "fix": "Confirm intended operator set. If admin should be able to close a till, add admin to the guard (e.g. allow `manage receipt` or a named cashup capability). If 'cashier/admin' in the AC was shorthand for 'till staff', leave as-is and update the spec. Product decision.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Cash-up adjustment does not correct any tracked float drift — system balance is wallet-ledger-derived, POS cash sales never touch it",
+      "detail": "floatLiabilities() computes a float account's systemCents as openingBalance + SUM(wallet_ledger.amount) for that account, and reconciliation drift = system − real. POS cash SALES are recorded in pos_sales, not wallet_ledger, so they never move the cash_drawer float's system balance. Consequently the cash-up's posted adjustment (amount = counted − expected) is a standalone signal in the Treasury feed rather than a correction of a tracked drift — once approved it shifts the system reconciliation figure for a balance that the cash takings never contributed to in the first place. This matches the story's stated design ('writes to Treasury reconciliation feed'), the dual-approval gate prevents auto-application, and the sign convention is directionally consistent (a shortage → negative amount, as in the P1-E06 test 'Cash short at till close' → amount -2500). Flagged so Treasury is aware the cash-up adjustment is a manual signal, not a ledger-backed reconciliation.",
+      "location": "apps/api/src/routes/pos/cashup.ts:154-166; packages/wallet/src/index.ts:332-364",
+      "fix": "Pre-existing/cross-cutting model question, out of this story's scope: whether POS cash takings should post into a till float ledger so the cash-drawer system balance reflects them. Defer to a Treasury/float-model decision; no code change in this story.",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "UI live variance is computed against the stale GET preview; authoritative server variance may differ",
+      "detail": "CashUp.tsx fetches /pos/cashup/expected on mount and shows the live variance against that snapshot. The POST close recomputes expected authoritatively via the atomic claim. If the same cashier rings up additional cash sales between opening the cash-up screen and submitting it, the server's expectedCash (and thus variance) will be larger than what the UI displayed — e.g. the screen shows 'Balanced' but the close records a shortage, or unexpectedly trips the >KES500 reason gate (400). The server is authoritative and correct (no money error), so this is a UX/consistency surprise, not a data bug.",
+      "location": "apps/pos/app/components/CashUp.tsx:24-32; apps/api/src/routes/pos/cashup.ts:140-142",
+      "fix": "Optional: surface the server's recomputed expected/variance on a 400, or refresh the preview just before submit. Minor; defer.",
+      "ac_ref": "AC2"
+    }
+  ]
+}
