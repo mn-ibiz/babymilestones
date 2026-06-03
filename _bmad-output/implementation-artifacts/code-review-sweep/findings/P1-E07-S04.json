@@ -1,0 +1,8 @@
+{
+  "id": "P1-E07-S04",
+  "verdict": "clean",
+  "diff_summary": "Adds non-null tax_treatment ENUM on services (vat_inclusive|vat_exclusive|vat_exempt|zero_rated, default vat_exempt) via additive/idempotent migration 0031; wires it through @bm/db schema, @bm/contracts (TAX_TREATMENTS/DEFAULT_TAX_TREATMENT/isTaxTreatment + create/update Zod schemas), @bm/catalog (create/update/read + getServiceTaxTreatment/serviceTaxTreatment + a pure float-free computeLineTax helper, KENYA_VAT_RATE_BPS=1600), the admin services API (serialize + create/update audit), and the admin service form (selector defaulting to vat_exempt).",
+  "ac_coverage": "AC1 (tax_treatment ENUM with 4 values) — implemented: DB CHECK in migration 0031, TaxTreatment type, contracts enum, catalog guard; tested at DB-CHECK, contract, catalog, API, and form layers. AC2 (receipt-engine line-tax) — receipt engine (P1-E08) not yet present; this story correctly exposes the field cleanly (getServiceTaxTreatment/serviceTaxTreatment) plus a pure float-free computeLineTax helper with full unit tests covering exempt/zero-rated/exclusive/inclusive + custom rate. AC3 (default vat_exempt) — implemented at DB default, contract default, and form default; tested at all layers. All ACs implemented and tested.",
+  "dismissed_count": 4,
+  "findings": []
+}

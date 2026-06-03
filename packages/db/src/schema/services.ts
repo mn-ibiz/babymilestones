@@ -7,8 +7,10 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * `services` (P1-E07-S01) — the paid services the centre offers, managed by
@@ -177,6 +179,12 @@ export const servicePrices = pgTable(
       t.serviceId,
       t.effectiveFrom,
     ),
+    // At most one OPEN (current) price row per service — prevents concurrent
+    // setServicePrice calls from creating two effective_to IS NULL rows, which
+    // would make the price applied to a booking non-deterministic (P1-E07-S01).
+    oneOpenPerService: uniqueIndex("service_prices_one_open_per_service")
+      .on(t.serviceId)
+      .where(sql`${t.effectiveTo} IS NULL`),
   }),
 );
 

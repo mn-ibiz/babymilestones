@@ -283,6 +283,19 @@ export async function setServicePrice(
   input: { serviceId: string; amountCents: number; effectiveFrom: string },
 ) {
   return db.transaction(async (tx) => {
+    // Serialise all price changes for this service (including the very first, when
+    // there is no open row to lock) by locking the parent services row, so two
+    // concurrent setServicePrice calls cannot both create an open
+    // (effective_to IS NULL) row. The partial unique index
+    // `service_prices_one_open_per_service` is the durable backstop.
+    const [svc] = await tx
+      .select({ id: services.id })
+      .from(services)
+      .where(eq(services.id, input.serviceId))
+      .for("update");
+    if (!svc) {
+      throw new Error(`setServicePrice: service ${input.serviceId} not found`);
+    }
     // Find the current open row (null effectiveTo). A new price must start
     // strictly AFTER it — otherwise closing the old row to `effectiveFrom` would
     // produce an invalid (from >= to) range and the catalogue would gain a

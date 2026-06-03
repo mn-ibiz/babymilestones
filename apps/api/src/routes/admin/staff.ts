@@ -137,20 +137,27 @@ export function registerAdminStaff(app: FastifyInstance, deps: AdminStaffDeps): 
 
     const { active, ...fields } = parsed.data;
     let row = existing;
+    let changed = false;
     // displayName / role are a live-row patch — never rewrites attribution history.
     if (fields.displayName !== undefined || fields.role !== undefined) {
       row = (await updateStaff(db, id, fields)) ?? row;
+      changed = true;
     }
     // active toggles soft-retirement (stamps/clears terminatedAt) — no hard delete.
     if (active !== undefined && active !== row.active) {
       row = (await setStaffActive(db, id, active)) ?? row;
+      changed = true;
     }
-    await audit(db, {
-      actor: actor.id,
-      action: "catalog.staff.update",
-      target: { table: "staff", id },
-      payload: { changes: parsed.data, ip: req.ip },
-    });
+    // Only audit when something actually changed — a no-op PATCH (e.g. toggling
+    // active to its current value) must not emit a misleading change audit row.
+    if (changed) {
+      await audit(db, {
+        actor: actor.id,
+        action: "catalog.staff.update",
+        target: { table: "staff", id },
+        payload: { changes: parsed.data, ip: req.ip },
+      });
+    }
     return reply.code(200).send(serializeStaff(row));
   });
 }

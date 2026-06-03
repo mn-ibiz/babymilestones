@@ -54,7 +54,7 @@
     "4": "done",
     "5": "done",
     "6": "done",
-    "7": "todo",
+    "7": "done",
     "8": "todo",
     "9": "todo",
     "11": "todo",
@@ -712,7 +712,7 @@
         "ccba586eda0de67f702e4b6e6ed546723ba211cf"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "7-2-attribution-role-per-service",
@@ -746,7 +746,7 @@
         "ff92fb21d397f23098d04061b460c57aa5a53143"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "7-4-vat-tax-flag-per-service",
@@ -763,7 +763,7 @@
         "fda68636c02fbf83c1c89825d3c306afef0b93c2"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "8-1-receipt-schema-with-nullable-etims-fields",
@@ -3076,8 +3076,16 @@
       "decisions_needed": 2,
       "dismissed": 4,
       "commit": ""
+    },
+    "7": {
+      "stories_reviewed": 3,
+      "patches": 2,
+      "deferred": 3,
+      "decisions_needed": 0,
+      "dismissed": 11,
+      "commit": ""
     }
   },
-  "epics_done": 6,
+  "epics_done": 7,
   "epics_total": 35
 }

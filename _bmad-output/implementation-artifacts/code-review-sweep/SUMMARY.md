@@ -14,7 +14,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 4  | 3 | ✅ | 3 (cron state-guard, paystack err-log, bank diff-parent 409) | 3 | 2 | 10 |
 | 5  | 2 | ✅ | 5 (reception IDOR ×3, receipt txn-SMS, receipt abs-amount) | 1 | 3 | 5 |
 | 6  | 1 | ✅ | 1 (CSV formula-injection guard, repo-wide ×3) | 1 | 2 | 4 |
-| 7  | 3 | ⬜ | | | | |
+| 7  | 3 | ✅ | 2 (price one-open-row index+lock, staff no-op audit) | 3 | 0 | 11 |
 | 8  | 2 | ⬜ | | | | |
 | 9  | 2 | ⬜ | | | | |
 | 11 | 1 | ⬜ | | | | |

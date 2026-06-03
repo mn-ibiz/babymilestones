@@ -1,0 +1,39 @@
+{
+  "id": "P1-E07-S03",
+  "verdict": "issues",
+  "diff_summary": "Adds a `staff` data-record table (migration 0030 + drizzle schema, no user_id/PIN/auth FK), catalog CRUD primitives (packages/catalog/src/staff.ts), zod contracts (staffCreate/Update + STAFF_ROLES = ATTRIBUTION_ROLES), an admin-only /admin/staff CRUD API (manage-service guard + audit on every mutation + soft-deactivate), and an admin UI screen.",
+  "ac_coverage": "AC1-AC4 all implemented & tested. AC1: migration 0030 (display_name/role CHECK/active/terminated_at) + catalog test asserts column set. AC2: admin-only `manage service` guard (rbac matrix grants it only to admin + super_admin), no auth association — column-set assertion confirms no user_id; reception-forbidden + no-phone/userId-leak tests. AC3: commission correctly out of scope (role only). AC4: updateStaff mutates only the live row (test asserts same id, role/active untouched); booking name-at-time snapshot is a forward dependency on S04 (not implementable in this story).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Mutation + audit_outbox write are not atomic (no transaction)",
+      "detail": "POST and PATCH perform the staff write (createStaff / updateStaff / setStaffActive) and the audit() insert as separate, un-transacted statements. If the business write commits but the audit() call fails (e.g. transient DB error), the mutation persists with no audit row, weakening DoD #4 (audited actions must write audit_outbox). The audit-outbox pattern explicitly supports passing a `tx` so the audit row participates in the caller's transaction (see packages/db/src/audit.ts AuditExecutor doc), but neither route wraps the work in db.transaction(...). Verified in working tree apps/api/src/routes/admin/staff.ts:105-111 and :141-153.",
+      "location": "apps/api/src/routes/admin/staff.ts:105",
+      "fix": "Pre-existing house pattern: the sibling P1-E07-S02 route apps/api/src/routes/admin/services.ts does the exact same non-transactional write-then-audit (lines 141-142, 190-191, 237). Deferred as a cross-route consistency item, not unique to this story. If addressed, wrap each handler's write + audit in db.transaction(async (tx) => { ...; await audit(tx, ...) }).",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Malformed (non-UUID) :id returns 500 instead of 404",
+      "detail": "GET/PATCH /admin/staff/:id pass the raw path param straight into eq(staff.id, id) on a uuid column with no shape validation. A non-UUID id (e.g. /admin/staff/not-a-uuid) makes Postgres throw `invalid input syntax for type uuid`, which the global error handler (apps/api/src/app.ts:238) maps to a 500 `Internal Server Error` rather than the intended 404. The 404 test only exercises a well-formed all-zeros UUID, so this path is uncovered. No security/data impact (drizzle params are safe; query simply errors).",
+      "location": "apps/api/src/routes/admin/staff.ts:119",
+      "fix": "Pre-existing pattern shared with apps/api/src/routes/admin/services.ts:159/169 (same unvalidated :id). Deferred for cross-route consistency. If fixed: validate the param (z.string().uuid()) and return 404/400 on a non-UUID id before querying.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "PATCH always writes an audit row even when nothing actually changed",
+      "detail": "In PATCH, the active toggle is guarded by `active !== undefined && active !== row.active`, so a no-op toggle (e.g. {active:false} on an already-inactive member) correctly skips setStaffActive. But the audit() call at the end fires unconditionally with payload.changes = the raw request body, so a no-op PATCH (or a PATCH whose values equal the current row) still emits a `catalog.staff.update` audit row claiming a change that did not occur. This pollutes the audit trail with phantom edits. Verified apps/api/src/routes/admin/staff.ts:138-154.",
+      "location": "apps/api/src/routes/admin/staff.ts:148",
+      "fix": "Track whether a real mutation happened (e.g. a `mutated` boolean set when updateStaff/setStaffActive actually runs and changes a value) and only call audit() when mutated is true; otherwise return 200 with the unchanged row and no audit entry. Low severity / not blocking — audit over-recording is conservative, not lossy.",
+      "ac_ref": ""
+    }
+  ]
+}

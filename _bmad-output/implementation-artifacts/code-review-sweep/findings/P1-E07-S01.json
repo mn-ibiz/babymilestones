@@ -1,0 +1,29 @@
+{
+  "id": "P1-E07-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds services + service_prices tables (additive migration 0028), @bm/catalog domain logic (create/update soft-delete, setServicePrice atomic close-old+insert-new, resolveServicePriceAt half-open range lookup), admin API under /admin/services* guarded by `manage service` with audit on each mutation, contracts Zod schemas, and an admin services screen with pure form logic.",
+  "ac_coverage": "AC1 services table (impl + tests) OK. AC2 service_prices integer-cents bigint half-open range OK. AC3 price change preserves old row + inserts new, never mutates in place (impl + tests) OK. AC4 resolveServicePriceAt half-open [from,to) lookup incl. boundary + before-first + open-range, future-dated NOT applied early — verified by tests, OK. AC5 audit on create/update/price_change present, but the price-change audit is NOT atomic with the price write (see findings).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "setServicePrice has no row lock / no DB uniqueness on the open price row — concurrent price changes can create two open rows",
+      "detail": "setServicePrice SELECTs the current open row (effectiveTo IS NULL) without FOR UPDATE, and there is no DB constraint enforcing at most one open row per service (the schema/migration define only a non-unique (service_id, effective_from) index; there is no partial unique index `(service_id) WHERE effective_to IS NULL`). Under Postgres READ COMMITTED, two concurrent setServicePrice calls for the same service both read the same open row R and both pass the order guard. T1 closes R and inserts open row N1; T2's `UPDATE ... WHERE effectiveTo IS NULL` then matches 0 rows (R is now closed) but T2 still INSERTs its own open row N2. Result: two rows with effectiveTo IS NULL for one service. resolveServicePriceAt then iterates oldest-first and returns whichever open row sorts first by effective_from, so the price applied to a booking becomes non-deterministic and history is corrupted (overlapping/duplicate open ranges). The single-threaded test 'at most one open row per service' (services.test.ts:155) does not exercise concurrency, so this is uncaught. This is a money-correctness invariant (the price applied to a transaction) per the story focus. Verified against working tree: packages/catalog/src/services.ts:290-313 and packages/db/src/schema/services.ts:160-181 / migrations/0028 — no FOR UPDATE, no partial unique index.",
+      "location": "packages/catalog/src/services.ts:285-313",
+      "fix": "Two options (needs a human/migration decision): (a) add an additive migration with a partial unique index `CREATE UNIQUE INDEX CONCURRENTLY service_prices_one_open_per_service ON service_prices (service_id) WHERE effective_to IS NULL;` so the second concurrent insert fails loudly (DB is the source of truth), and/or (b) lock the open row in the tx with `.for('update')` on the initial SELECT and re-check before insert. Option (a) is the durable guarantee; (b) alone still races on the FIRST price (no existing open row to lock).",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Price-change audit row is not atomic with the price write (AC5)",
+      "detail": "The route calls setServicePrice(db, ...) (which opens its own internal transaction and commits) and then audit(db, ...) as a separate statement afterward (apps/api/src/routes/admin/services.ts:225-247). If the audit insert fails, the price change has already committed, so an audited action can persist without its audit_outbox row — a soft violation of AC5 'audit on every change'. The audit() helper explicitly supports participating in a caller tx by passing a `tx` handle, and sibling admin routes (auto-credit.ts:101, events.ts:167, schedules.ts:153/212) do wrap mutation+audit in one db.transaction. setServicePrice cannot currently accept a tx (its signature hardcodes `db: Database` and opens its own transaction), which is what blocks atomic wrapping here. The create/update audits have the same non-atomic shape. Deferred because non-atomic audit-after-mutation is a widespread pre-existing pattern across the admin routes, not introduced uniquely by this story.",
+      "location": "apps/api/src/routes/admin/services.ts:225-247",
+      "fix": "Defer. To fix properly: change setServicePrice to accept an Executor (or take a tx), then in the route do `await db.transaction(async (tx) => { const row = await setServicePrice(tx, ...); await audit(tx, ...); })` so the price and its audit commit together — matching auto-credit/events/schedules. Same treatment for create/update.",
+      "ac_ref": "AC5"
+    }
+  ]
+}
