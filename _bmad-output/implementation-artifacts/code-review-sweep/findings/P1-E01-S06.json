@@ -1,0 +1,49 @@
+{
+  "id": "P1-E01-S06",
+  "verdict": "issues",
+  "diff_summary": "Adds packages/auth/src/rbac.ts (PERMISSION_MATRIX, can(), requirePermission(), super_admin-only actAs(), invalidateSessionsOnRoleChange()), migration 0005_roles_permissions.sql seeding 8 roles + (role,action,resource) matrix, db schema/permissions.ts, snapshot + db drift-gate tests, and apps/admin impersonation banner.",
+  "ac_coverage": "AC1 implemented & tested (8 roles seeded in migration + roles test). AC2 partially: can()/requirePermission() implemented & unit-tested, but NOT referenced by the shared middleware (deferred). AC3 implemented & unit-tested at the function level (super_admin-only, both ids in audit input + banner) but no code path persists the audit_outbox row. AC4 implemented & integration-tested (invalidateSessionsOnRoleChange -> destroyAllForUser).",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Drift gate does not actually couple code matrix to DB-seeded rows; a code-only change passes CI while the DB goes stale",
+      "detail": "The story's Tests requirement is 'Snapshot the permission matrix; CI fails if it drifts without migration.' Two INDEPENDENT gates exist: the auth snapshot test pins permissionMatrixRows() against a committed .snap (packages/auth/src/rbac.test.ts), and the db test compares the SEEDED rows against a hand-copied EXPECTED literal (packages/db/src/permissions.test.ts). Neither test cross-checks the auth PERMISSION_MATRIX against the DB-seeded rows, and @bm/db deliberately does not depend on @bm/auth (confirmed: packages/db/package.json has no @bm dependency). Consequence: a developer who edits PERMISSION_MATRIX in rbac.ts AND regenerates the snapshot (one `vitest -u`), but forgets to add the seed migration, gets a fully GREEN CI run while code and database silently diverge. The intended guarantee ('drifts WITHOUT migration fails CI') is not enforced — only the weaker 'changing the snapshot or the migration each requires touching its own hand-maintained list.' The working tree already shows the matrix has grown to include product/config/loyalty/expense rows; it only stayed consistent because follow-up stories happened to add both migrations (0007/0016/0035/0056/0086/0104) and snapshot updates by hand.",
+      "location": "packages/db/src/permissions.test.ts:1-82, packages/auth/src/rbac.test.ts:14-23",
+      "fix": "Decision needed on layering vs. guarantee strength. Option A (preserve layering): in the db test, derive EXPECTED from the seed-migration SQL itself (parse the INSERT) rather than a hand-copied array, and add a third test (in apps/api or a tooling package that may depend on BOTH @bm/auth and @bm/db) asserting permissionMatrixRows() deep-equals the seeded permissions rows. Option B: move the canonical matrix into a shared lower-layer package both auth and the seed generator import, and generate the SQL seed from it so the three lists cannot diverge. Either makes 'matrix change without matching migration' a hard CI failure as the spec requires.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "AC3 impersonation audit input is built but never persisted to audit_outbox by this story",
+      "detail": "actAs() returns a correctly-shaped audit input (actor, action 'rbac.impersonate', target {table:'users', id}, payload {real_user_id, impersonated_user_id}) that matches @bm/db AuditInput, and 'rbac.impersonate' is registered in the audit catalogue. But no code path in this commit (or the working tree) calls actAs() and then audit(db, result.audit) — grep for actAs/impersonate finds only the banner UI, tests, and the catalogue entry. AC3 says both ids must be 'in audit log' and DoD #4 requires audited actions to write to audit_outbox; at the end of this story no impersonation event can actually be recorded because there is no live route. The impl file explicitly defers route wiring to the owning stories, so this is in-scope-as-designed but worth tracking: AC3 is only satisfied at the unit/function level, not end-to-end.",
+      "location": "packages/auth/src/rbac.ts:333-351",
+      "fix": "Defer: ensure the story that introduces the super_admin impersonation route calls audit(db, actAs(...).audit) inside the same transaction so the audit_outbox row is written. Add an integration test that hits the route and asserts an audit_outbox row with both ids. Not fixable here without inventing the route.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "AC2 'permissions table referenced by API middleware' is not wired — requirePermission is unused by middleware.ts",
+      "detail": "AC2 states permissions are 'referenced by API middleware.' packages/auth/src/middleware.ts (validateSession/guardRole) does not import or invoke requirePermission/can; it only does session + CSRF + coarse role-app guarding. requirePermission() exists and is unit-tested but has no consumer. The impl file acknowledges this ('no live route yet gates a permission ... wiring is deferred to those stories'). Real but intentionally deferred; flagging so the AC is not assumed complete.",
+      "location": "packages/auth/src/middleware.ts:1-130, packages/auth/src/rbac.ts:283-298",
+      "fix": "Defer: wire requirePermission into the shared middleware (or per-route guards) in the stories that introduce each guarded resource, as planned. No safe in-scope fix without those resources existing.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Migration seed uses ON CONFLICT DO NOTHING, so a changed permission row is never corrected on re-run",
+      "detail": "0005_roles_permissions.sql is correctly idempotent for re-runs (CREATE TABLE IF NOT EXISTS + INSERT ... ON CONFLICT DO NOTHING). However, because the PK is (role, action, resource), the only conflict is an exact-duplicate row; there is no scenario where an existing row needs updating, so DO NOTHING is appropriate here. The latent caveat (relevant to the additive-only seed convention generally, not a bug in this row set): if a future story needed to REMOVE or CHANGE a granted permission, a forward-only additive INSERT migration cannot do it, and DO NOTHING masks divergence. Permission REVOCATION via this seed pattern is unaddressed. Not a defect in S06's data, but a constraint to note for the RBAC model's evolution.",
+      "location": "packages/db/migrations/0005_roles_permissions.sql:55-75",
+      "fix": "Defer: document that permission revocation requires an explicit DELETE migration (additive in the sense of being a new file), and ensure the drift gates above would catch a revocation done only in code. No change needed to S06's seed.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

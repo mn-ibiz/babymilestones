@@ -1,0 +1,49 @@
+{
+  "id": "P1-E01-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds @bm/auth phone normalisation (phone.ts), weak-PIN guard + argon2id hash (pin.ts), opaque-token session store + bm_session cookie (session.ts); @bm/db users + wallets tables (migration 0002) and Database/Transaction types; apps/api POST /auth/signup that validates phone+PIN, dedupes (pre-check + unique-violation race catch), atomically inserts user+wallet+audit_outbox, then issues a session cookie. Unit tests for phone/pin, 5 signup integration cases on PGlite.",
+  "ac_coverage": "AC1 implemented & tested (account+wallet+session+cookie). AC2 implemented & tested (409 + action:login, no second account) though spec wording says 'redirect to login' and the route returns a JSON action signal — acceptable as the web form is deferred. AC3 implemented & tested. AC4 implemented; unit test covers all 5 weak PINs, route test covers only '1234'. AC5 implemented & tested (argon2id, raw PIN never logged/echoed). AC6 implemented & tested (action/actor/ip/user_agent/created_at). Gap: the unique-violation race branch (isUniqueViolation catch) is never exercised by any test.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Signup PIN hashed with argon2 library-default memory cost (4 MiB), below OWASP-recommended 19 MiB for argon2id",
+      "detail": "hashPin() calls hash(pin) with no options, so @node-rs/argon2 v2.0.2 uses its defaults: memoryCost=4096 KiB (4 MiB), timeCost=3, parallelism=1 (confirmed in node_modules/.pnpm/@node-rs+argon2@2.0.2/.../index.d.ts). OWASP's argon2id minimum is m=19456 (19 MiB), t=2. Notably the later-added DUMMY_PIN_HASH in the same file uses m=19456,t=2 — so the wrong-PIN verify path on login is tuned to OWASP while real signup hashes are weaker, an internal inconsistency. For a 4-digit PIN (10k keyspace) any argon2 cost is largely moot against offline brute force, but storing at below-recommended cost is still a hardening gap. The spec only says 'use argon2id' without parameters, so the exact cost is a product/security decision.",
+      "location": "packages/auth/src/pin.ts:36-38",
+      "fix": "Decide on explicit argon2id parameters (e.g. memoryCost 19456, timeCost 2, parallelism 1) and pass them to hash() in the production branch so the stored cost matches DUMMY_PIN_HASH and OWASP guidance; or formally accept the library defaults. Either way make signup and the login dummy-hash use the same parameters.",
+      "ac_ref": "AC5"
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "Unique-violation race branch is unverified — no test exercises the check→insert race catch",
+      "detail": "The route guards against a duplicate-phone race with a try/catch on db.transaction that returns 409 only for SQLSTATE 23505 (isUniqueViolation). The story file claims 'unique-violation race handled', but the duplicate integration test runs two sequential signups; the second is caught by the pre-insert existing.length>0 check and returns 409 before the transaction ever runs. So the catch branch (and isUniqueViolation classification) has zero coverage, leaving a security-relevant concurrency path unverified — a regression there (e.g. a wrong error.code mapping) would silently mask or surface the wrong status.",
+      "location": "apps/api/src/routes/auth/signup.ts:56-73",
+      "fix": "Add an integration test that forces the race: pre-insert a users row with the target phone directly via db (bypassing the route pre-check), then POST /auth/signup with that phone and assert 409 + action:login and exactly one users row — this drives the transaction to the unique-constraint failure and exercises the catch branch. Also assert a non-23505 transaction error rethrows (no 409 masking).",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Session is created outside the user transaction — a session-store failure leaves a 'created but not logged in' account, weakening AC1's auto-login",
+      "detail": "users+wallets+audit are written atomically in db.transaction, but sessions.create(userId) runs afterward, outside the transaction. If session creation throws (impossible for InMemorySessionStore, but reachable once the deferred Redis store lands in P1-E01-S04), the user and wallet are already committed while the request returns 500, so the account exists but the parent is not auto-logged-in — a partial-success that contradicts AC1's 'auto-logged in'. Today this is dormant (in-memory store), so it is deferred.",
+      "location": "apps/api/src/routes/auth/signup.ts:75-77",
+      "fix": "When the Redis session store lands (P1-E01-S04), handle a session.create failure gracefully — e.g. still return 201 (account exists, parent can log in) rather than 500, or make session issuance retryable/idempotent so the committed signup is never left un-authenticated. Pre-existing scope tied to the deferred store; note, don't fix now.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Signup (and all DB-backed) routes are never wired in production — server.ts builds the app with no db/sessions",
+      "detail": "buildApp registers auth/parent/etc. routes only inside `if (deps.db && deps.sessions)`. apps/api/src/server.ts calls buildApp() with no arguments (unchanged since the monorepo scaffold per git log), so in production POST /auth/signup is never mounted and returns 404. The endpoint only works under tests/local injection. This is a systemic platform gap (no production DB/session/Redis wiring exists anywhere yet) and is explicitly deferred in the story (in-memory store, Redis deferred to S04), not a defect specific to this story's code quality.",
+      "location": "apps/api/src/server.ts:3",
+      "fix": "Out of this story's scope — pre-existing across the whole API. Track the production boot wiring (real Postgres client + Redis SessionStore passed to buildApp) as part of the deploy/SSO epic that owns it (S04 / X8).",
+      "ac_ref": "AC1"
+    }
+  ]
+}

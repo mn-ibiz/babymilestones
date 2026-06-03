@@ -26,15 +26,20 @@ export function generatePin(): string {
 }
 
 // Under test we drop argon2 cost parameters drastically so the (large) auth test
-// suite stays fast and doesn't flake on timeouts. Production keeps the library
-// defaults (strong argon2id). verify() reads params from the hash either way, so
-// a test-cost hash still verifies correctly and the algorithm remains argon2id.
+// suite stays fast and doesn't flake on timeouts. verify() reads params from the
+// hash either way, so a test-cost hash still verifies correctly and the algorithm
+// remains argon2id.
 const IS_TEST = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const TEST_OPTS = { memoryCost: 256, timeCost: 1, parallelism: 1 } as const;
+// Production argon2id parameters: OWASP argon2id minimums (m=19 MiB, t=2). These
+// MUST match the cost baked into DUMMY_PIN_HASH so the login anti-enumeration path
+// (P1-E01-S02 AC4) has exact timing parity, and so stored PINs meet OWASP guidance
+// rather than the lower @node-rs/argon2 library default (m=4 MiB).
+const PROD_OPTS = { memoryCost: 19456, timeCost: 2, parallelism: 1 } as const;
 
 /** argon2id hash. The raw PIN is never logged or echoed (AC5). */
 export function hashPin(pin: string): Promise<string> {
-  return IS_TEST ? hash(pin, TEST_OPTS) : hash(pin); // @node-rs/argon2 defaults to argon2id
+  return hash(pin, IS_TEST ? TEST_OPTS : PROD_OPTS); // @node-rs/argon2 defaults to argon2id
 }
 
 export function verifyPin(pinHash: string, pin: string): Promise<boolean> {

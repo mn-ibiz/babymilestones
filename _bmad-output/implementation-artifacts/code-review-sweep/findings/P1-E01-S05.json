@@ -1,0 +1,39 @@
+{
+  "id": "P1-E01-S05",
+  "verdict": "issues",
+  "diff_summary": "Adds PIN-reset-by-OTP flow: apps/api reset-request/verify/complete routes wired via registerAuthRoutes; @bm/auth otp.ts (CSPRNG 6-digit code + sha256 hash + constant-time verify), reset-token.ts (HMAC-SHA256 audience-bound 15-min single-use token + InMemoryConsumedTokenStore), reset-rate-limit.ts (3/phone/hour); @bm/sms StubSmsSender into sms_outbox; additive migration 0004 (otp_codes + sms_outbox); contracts zod schemas; argon2id re-hash + destroyAllForUser.",
+  "ac_coverage": "AC1 (6-digit/10-min/single-use/sms_outbox) implemented+tested; AC2 (verify→15-min audience-bound single-use token) implemented+tested; AC3 (token+new PIN, sessions invalidated) implemented+tested; AC4 (3 codes/phone/hour) implemented+tested; AC5 (auth.reset.requested/completed audit) implemented+tested. Gap: spec does not call for verify-side brute-force protection but the omission is a real security weakness (see finding 1).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "No brute-force protection on POST /auth/reset/verify — unlimited 6-digit OTP guesses",
+      "detail": "reset-request is rate-limited (ResetRateLimiter, 3/phone/hour) and login guesses are capped by LoginRateLimiter, but the verify endpoint that actually checks the OTP has NO rate limiter and the otp_codes table has no per-code attempt counter (columns: id, phone, code_hash, purpose, expires_at, consumed_at, created_at — confirmed). An attacker who knows a target phone is registered can POST /auth/reset/verify repeatedly and brute-force the 6-digit code (~900k usable values) for the full 10-minute TTL with no throttling and no lockout. Each successful guess mints a reset token and lets the attacker take over the account (then set a new PIN). The generic INVALID response gives no lockout. This is the canonical OWASP 'insufficient OTP attempt limiting' weakness on a security-sensitive reset path. Evidence: apps/api/src/routes/auth/reset-verify.ts destructures only { db, resetTokenSecret, now } — no limiter; packages/db/src/schema/otp.ts has no attempts column.",
+      "location": "apps/api/src/routes/auth/reset-verify.ts:21-49",
+      "fix": "Add an attempt cap on the verify path. Cheapest: pass the existing LoginRateLimiter (or a dedicated verify limiter) into registerResetVerify, check(phone, req.ip) before validating, recordFailure() on every wrong/expired/unknown code, and reset() on success — mirroring login.ts. Alternatively add an integer `attempts` column to otp_codes, increment on each failed verify, and treat the code as consumed once attempts exceeds a small cap (e.g. 5). Decision-needed only on which mechanism (per-phone limiter vs per-code counter) and the threshold; the gap itself is unambiguous and should be closed before this flow ships.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Reset-token HMAC secret defaults to a per-process random value — breaks across instances / restarts in prod",
+      "detail": "buildApp resolves resetTokenSecret as deps.resetTokenSecret ?? process.env.RESET_TOKEN_SECRET ?? randomBytes(32).toString('base64url'). If RESET_TOKEN_SECRET is not set in production, every API process generates its own ephemeral secret. In a multi-instance deployment a token minted by instance A (verify) cannot be validated by instance B (complete) — the user gets 'Invalid or expired reset token' through a load balancer. A single-instance restart between verify and complete invalidates every in-flight reset token. The single-use jti store (InMemoryConsumedTokenStore) has the same per-process-memory problem (a replay can succeed against a different/restarted instance). The impl story acknowledges the in-memory→Redis migration is deferred, so this is partly known, but the silent random-secret fallback can mask a missing prod env var with intermittent failures rather than a hard boot error. Evidence: apps/api/src/app.ts:284-287; packages/auth/src/reset-token.ts InMemoryConsumedTokenStore.",
+      "location": "apps/api/src/app.ts:284-288",
+      "fix": "Decision-needed: either (a) fail fast at boot in production when neither an explicit secret nor RESET_TOKEN_SECRET is set (throw instead of randomBytes fallback), so a misconfiguration surfaces immediately, and/or (b) deliver the deferred Redis-backed secret + consumed-token store before multi-instance deploy. Keeping the random fallback for tests/dev is fine, but gate the fallback on NODE_ENV !== 'production'.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Reset Zod contract schemas are dead code — added to @bm/contracts but never imported by the routes",
+      "detail": "Task 4 added resetRequestSchema / resetVerifySchema / resetCompleteSchema to packages/contracts/src/index.ts, but a repo-wide grep shows they are never imported outside the package and its build output — the three routes do their own manual validation (normalizePhone, /^\\d{6}$/, isValidPinFormat, etc.) instead. Functionally equivalent and consistent with how login/signup validate, so nothing is broken, but the contract schemas are unused and can drift from the hand-rolled checks (e.g. contracts require phone min(1) while routes require a normalisable Kenyan number). Evidence: grep for resetRequestSchema/resetVerifySchema/resetCompleteSchema returns only packages/contracts and dist.",
+      "location": "packages/contracts/src/index.ts:26-44",
+      "fix": "Deferred / minor: either wire the schemas into the routes (parse req.body through them for a single source of truth) or accept the manual validation and treat the contracts as the public API typing only. Not worth blocking the story; flag for the contracts-consistency cleanup.",
+      "ac_ref": ""
+    }
+  ]
+}

@@ -1,0 +1,3043 @@
+{
+  "meta": {
+    "head_at_setup": "35272a58c90c470118e6d2d81b7eaa0408cd65df",
+    "scope": "Epic 1-36, skip already-reviewed & no-code",
+    "fix_mode": "auto-fix patches; collect decision-needed; continue",
+    "persistence": "commit per epic; review by pinned commit SHA (immutable)",
+    "epic_order": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36
+    ]
+  },
+  "counts": {
+    "pending": 128,
+    "skip-already-reviewed": 42
+  },
+  "pending_count": 128,
+  "epic_state": {
+    "1": "done",
+    "2": "todo",
+    "3": "todo",
+    "4": "todo",
+    "5": "todo",
+    "6": "todo",
+    "7": "todo",
+    "8": "todo",
+    "9": "todo",
+    "11": "todo",
+    "12": "todo",
+    "13": "todo",
+    "14": "todo",
+    "15": "todo",
+    "16": "todo",
+    "17": "todo",
+    "18": "todo",
+    "19": "todo",
+    "20": "todo",
+    "21": "todo",
+    "22": "todo",
+    "23": "todo",
+    "24": "todo",
+    "25": "todo",
+    "26": "todo",
+    "27": "todo",
+    "28": "todo",
+    "29": "todo",
+    "30": "todo",
+    "31": "todo",
+    "32": "todo",
+    "33": "todo",
+    "34": "todo",
+    "35": "todo",
+    "36": "todo"
+  },
+  "stories": [
+    {
+      "key": "1-1-parent-signs-up-with-phone-pin",
+      "id": "P1-E01-S01",
+      "epic": 1,
+      "story": 1,
+      "title": "Parent signs up with phone + PIN",
+      "slug": "parent-signs-up-with-phone-pin",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E01-S01.md",
+      "impl_file": "1-1-parent-signs-up-with-phone-pin.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "8201501cc13538258f05ae0d65617583e7dfe5f8"
+      ],
+      "commit_level": "story",
+      "review_state": "done"
+    },
+    {
+      "key": "1-2-parent-logs-in-with-phone-pin",
+      "id": "P1-E01-S02",
+      "epic": 1,
+      "story": 2,
+      "title": "Parent logs in with phone + PIN",
+      "slug": "parent-logs-in-with-phone-pin",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E01-S02.md",
+      "impl_file": "1-2-parent-logs-in-with-phone-pin.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "2e394e5818f725fa04c88072ca00d4aab84d6ec7"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "1-3-admin-reception-cashier-login",
+      "id": "P1-E01-S03",
+      "epic": 1,
+      "story": 3,
+      "title": "Admin / Reception / Cashier login",
+      "slug": "admin-reception-cashier-login",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E01-S03.md",
+      "impl_file": "1-3-admin-reception-cashier-login.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "978794734e89b5405d75f82a821a01ff02210bac"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "1-4-sso-across-subdomains",
+      "id": "P1-E01-S04",
+      "epic": 1,
+      "story": 4,
+      "title": "SSO across subdomains",
+      "slug": "sso-across-subdomains",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E01-S04.md",
+      "impl_file": "1-4-sso-across-subdomains.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "f9af867accfd9e3a9afc97edb6067910521930b0"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "1-5-password-pin-reset-by-otp",
+      "id": "P1-E01-S05",
+      "epic": 1,
+      "story": 5,
+      "title": "Password / PIN reset by OTP",
+      "slug": "password-pin-reset-by-otp",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E01-S05.md",
+      "impl_file": "1-5-password-pin-reset-by-otp.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b374126d0a7fb73e76f18395bb7dc9d2edb1b4be"
+      ],
+      "commit_level": "story",
+      "review_state": "done"
+    },
+    {
+      "key": "1-6-role-permission-model-seeded",
+      "id": "P1-E01-S06",
+      "epic": 1,
+      "story": 6,
+      "title": "Role + Permission model seeded",
+      "slug": "role-permission-model-seeded",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E01-S06.md",
+      "impl_file": "1-6-role-permission-model-seeded.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "0e2f39014c70e53a23d921a7b410fd88356934f2"
+      ],
+      "commit_level": "story",
+      "review_state": "done"
+    },
+    {
+      "key": "2-1-parent-self-registers-with-profile-details",
+      "id": "P1-E02-S01",
+      "epic": 2,
+      "story": 1,
+      "title": "Parent self-registers with profile details",
+      "slug": "parent-self-registers-with-profile-details",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E02-S01.md",
+      "impl_file": "2-1-parent-self-registers-with-profile-details.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "e082585b8c593216f3c005b0f09da4cc58228274"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "2-2-reception-registers-walk-in-parent",
+      "id": "P1-E02-S02",
+      "epic": 2,
+      "story": 2,
+      "title": "Reception registers walk-in parent",
+      "slug": "reception-registers-walk-in-parent",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E02-S02.md",
+      "impl_file": "2-2-reception-registers-walk-in-parent.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "fd088ed2347d5503fa14d9e043565d776fed2f19"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "2-3-add-and-edit-children",
+      "id": "P1-E02-S03",
+      "epic": 2,
+      "story": 3,
+      "title": "Add and edit children",
+      "slug": "add-and-edit-children",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E02-S03.md",
+      "impl_file": "2-3-add-and-edit-children.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "364b5203e5c96920736c22d65434b20510f82d80"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "2-4-photo-and-sms-consent-flags",
+      "id": "P1-E02-S04",
+      "epic": 2,
+      "story": 4,
+      "title": "Photo and SMS consent flags",
+      "slug": "photo-and-sms-consent-flags",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E02-S04.md",
+      "impl_file": "2-4-photo-and-sms-consent-flags.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "fc70a331cd7afa68bbd807609d68fb37aee86d01"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "2-5-data-export-for-a-parent-s-record",
+      "id": "P1-E02-S05",
+      "epic": 2,
+      "story": 5,
+      "title": "Data export for a parent's record",
+      "slug": "data-export-for-a-parent-s-record",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E02-S05.md",
+      "impl_file": "2-5-data-export-for-a-parent-s-record.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "b8f3b97dda0c6b1dbca386a4786cb2e42b318bd3"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "3-1-append-only-wallet-ledger-schema-enforced-at",
+      "id": "P1-E03-S01",
+      "epic": 3,
+      "story": 1,
+      "title": "Append-only `wallet_ledger` schema enforced at DB level",
+      "slug": "append-only-wallet-ledger-schema-enforced-at",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S01.md",
+      "impl_file": "3-1-append-only-wallet-ledger-schema-enforced-at.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "903d99d01fd3456c277d7f89e47e38c2a7d5b98e"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "3-2-balance-is-computed-never-stored",
+      "id": "P1-E03-S02",
+      "epic": 3,
+      "story": 2,
+      "title": "Balance is computed, never stored",
+      "slug": "balance-is-computed-never-stored",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S02.md",
+      "impl_file": "3-2-balance-is-computed-never-stored.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "d73bbde4a4ea2871a991108cdfcc910442a1db53"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "3-3-idempotent-posting-interface",
+      "id": "P1-E03-S03",
+      "epic": 3,
+      "story": 3,
+      "title": "Idempotent posting interface",
+      "slug": "idempotent-posting-interface",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S03.md",
+      "impl_file": "3-3-idempotent-posting-interface.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "3df9a67ce78c8484dc1b3885677fb78ef50fdfcc"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "3-4-top-up-applies-fifo-to-outstanding-invoices",
+      "id": "P1-E03-S04",
+      "epic": 3,
+      "story": 4,
+      "title": "Top-up applies FIFO to outstanding invoices, residual to wallet",
+      "slug": "top-up-applies-fifo-to-outstanding-invoices",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S04.md",
+      "impl_file": "3-4-top-up-applies-fifo-to-outstanding-invoices.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ce0021625e427bba589ebf993010ebcf2f7929ad"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "3-5-debit-at-check-in-pending-invoice-settled",
+      "id": "P1-E03-S05",
+      "epic": 3,
+      "story": 5,
+      "title": "Debit at check-in; pending invoice \u2192 settled",
+      "slug": "debit-at-check-in-pending-invoice-settled",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S05.md",
+      "impl_file": "3-5-debit-at-check-in-pending-invoice-settled.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "68f81c55c8dab87493ef1574947986b641b6fbde"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "3-6-refund-recording-admin-only-creates-a-reversing",
+      "id": "P1-E03-S06",
+      "epic": 3,
+      "story": 6,
+      "title": "Refund recording (admin-only) creates a reversing entry",
+      "slug": "refund-recording-admin-only-creates-a-reversing",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S06.md",
+      "impl_file": "3-6-refund-recording-admin-only-creates-a-reversing.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "5fcd2f5bc393b78df45a535bbf2e25170a0e21fd"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "3-7-auto-credit-toggle-per-parent",
+      "id": "P1-E03-S07",
+      "epic": 3,
+      "story": 7,
+      "title": "Auto-credit toggle per parent",
+      "slug": "auto-credit-toggle-per-parent",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S07.md",
+      "impl_file": "3-7-auto-credit-toggle-per-parent.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "a4d9870533a5ca7c4dfe70729c8be470ac854cd2"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "3-8-statement-export-csv-for-a-parent",
+      "id": "P1-E03-S08",
+      "epic": 3,
+      "story": 8,
+      "title": "Statement export (CSV) for a parent",
+      "slug": "statement-export-csv-for-a-parent",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E03-S08.md",
+      "impl_file": "3-8-statement-export-csv-for-a-parent.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "66c519cd2e8ffd66de586544d50d6d24614d9684"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "4-1-m-pesa-stk-push-initiated-from-parent",
+      "id": "P1-E04-S01",
+      "epic": 4,
+      "story": 1,
+      "title": "M-Pesa STK push initiated from parent dashboard",
+      "slug": "m-pesa-stk-push-initiated-from-parent",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S01.md",
+      "impl_file": "4-1-m-pesa-stk-push-initiated-from-parent.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "e64f5b07ee5cb74e4bfefb1978a7002d08b07e0b"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "4-2-m-pesa-c2b-callback-handler-idempotent",
+      "id": "P1-E04-S02",
+      "epic": 4,
+      "story": 2,
+      "title": "M-Pesa C2B callback handler (idempotent)",
+      "slug": "m-pesa-c2b-callback-handler-idempotent",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S02.md",
+      "impl_file": "4-2-m-pesa-c2b-callback-handler-idempotent.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "bc1db864c79db29d6c6bc6ae03a1d3730642ef3a"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "4-3-stk-reconciliation-cron",
+      "id": "P1-E04-S03",
+      "epic": 4,
+      "story": 3,
+      "title": "STK reconciliation cron",
+      "slug": "stk-reconciliation-cron",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S03.md",
+      "impl_file": "4-3-stk-reconciliation-cron.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "efd7a0f4f566980bc24d2c4c24b9bffa3cba1bff"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "4-4-paystack-card-top-up",
+      "id": "P1-E04-S04",
+      "epic": 4,
+      "story": 4,
+      "title": "Paystack card top-up",
+      "slug": "paystack-card-top-up",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S04.md",
+      "impl_file": "4-4-paystack-card-top-up.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "79991a8148ec8108ecee409f211e4b56b7384f26"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "4-5-paystack-webhook-signature-replay-protection",
+      "id": "P1-E04-S05",
+      "epic": 4,
+      "story": 5,
+      "title": "Paystack webhook (signature + replay protection)",
+      "slug": "paystack-webhook-signature-replay-protection",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S05.md",
+      "impl_file": "4-5-paystack-webhook-signature-replay-protection.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "78d225ea6fc90ad0ff5f8c5fbd3194bdbb342ded"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "4-6-cash-top-up-by-reception",
+      "id": "P1-E04-S06",
+      "epic": 4,
+      "story": 6,
+      "title": "Cash top-up by Reception",
+      "slug": "cash-top-up-by-reception",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S06.md",
+      "impl_file": "4-6-cash-top-up-by-reception.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "e27139472fba830f9cb342663639b6472d2a1a67"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "4-7-bank-transfer-top-up-admin-confirmed",
+      "id": "P1-E04-S07",
+      "epic": 4,
+      "story": 7,
+      "title": "Bank transfer top-up (admin-confirmed)",
+      "slug": "bank-transfer-top-up-admin-confirmed",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E04-S07.md",
+      "impl_file": "4-7-bank-transfer-top-up-admin-confirmed.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "343e4f29ae86202f206150905f7cfe16b101aaf0"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "5-1-search-parent-by-phone-or-name-in",
+      "id": "P1-E05-S01",
+      "epic": 5,
+      "story": 1,
+      "title": "Search parent by phone or name in \u2264300ms",
+      "slug": "search-parent-by-phone-or-name-in",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E05-S01.md",
+      "impl_file": "5-1-search-parent-by-phone-or-name-in.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "4c5f9fcd4437c95ebf3b6a9b6fcf2349f2410e34"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "5-2-parent-profile-header-with-wallet-outstanding-auto",
+      "id": "P1-E05-S02",
+      "epic": 5,
+      "story": 2,
+      "title": "Parent profile header with wallet + outstanding + auto-credit toggle",
+      "slug": "parent-profile-header-with-wallet-outstanding-auto",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E05-S02.md",
+      "impl_file": "5-2-parent-profile-header-with-wallet-outstanding-auto.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "70fef02c117430f10a3109084eeed34becba7fb7"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "5-3-reception-top-up-cash-m-pesa-paystack",
+      "id": "P1-E05-S03",
+      "epic": 5,
+      "story": 3,
+      "title": "Reception top-up (cash / M-Pesa / Paystack)",
+      "slug": "reception-top-up-cash-m-pesa-paystack",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E05-S03.md",
+      "impl_file": "5-3-reception-top-up-cash-m-pesa-paystack.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "64a7d1ae0d8e41f8e9c2401f1b3e6462a9e78e10"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "5-4-record-a-service-visit",
+      "id": "P1-E05-S04",
+      "epic": 5,
+      "story": 4,
+      "title": "Record a service visit",
+      "slug": "record-a-service-visit",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E05-S04.md",
+      "impl_file": "5-4-record-a-service-visit.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "03e625455d056c9f454c0ac9fe23d81593d4adf0"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "5-5-recent-transactions-panel",
+      "id": "P1-E05-S05",
+      "epic": 5,
+      "story": 5,
+      "title": "Recent transactions panel",
+      "slug": "recent-transactions-panel",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E05-S05.md",
+      "impl_file": "5-5-recent-transactions-panel.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "5d9702c64a1ce98c74d1c04e5ac292b900b9da7e"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "5-6-print-sms-stub-receipt-from-reception",
+      "id": "P1-E05-S06",
+      "epic": 5,
+      "story": 6,
+      "title": "Print + SMS-stub receipt from Reception",
+      "slug": "print-sms-stub-receipt-from-reception",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E05-S06.md",
+      "impl_file": "5-6-print-sms-stub-receipt-from-reception.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "5578cc87be55598152628cbcf9713eb9c21aacc5"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "6-1-configure-float-accounts-per-till-per-bank",
+      "id": "P1-E06-S01",
+      "epic": 6,
+      "story": 1,
+      "title": "Configure float accounts (per till / per bank)",
+      "slug": "configure-float-accounts-per-till-per-bank",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E06-S01.md",
+      "impl_file": "6-1-configure-float-accounts-per-till-per-bank.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "13f20c5dd619425046061b4af1771932a1eb4bb9"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "6-2-daily-reconciliation-screen",
+      "id": "P1-E06-S02",
+      "epic": 6,
+      "story": 2,
+      "title": "Daily reconciliation screen",
+      "slug": "daily-reconciliation-screen",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E06-S02.md",
+      "impl_file": "6-2-daily-reconciliation-screen.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "1ba1fc631617ca1de0d8e31fe1d0c819f35a3a43"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "6-3-treasury-role-permissions",
+      "id": "P1-E06-S03",
+      "epic": 6,
+      "story": 3,
+      "title": "Treasury role + permissions",
+      "slug": "treasury-role-permissions",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E06-S03.md",
+      "impl_file": "6-3-treasury-role-permissions.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "7773b7e1d717edfcea93828bb8717d90febbe96c"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "6-4-export-float-reconciliation-for-the-accountant",
+      "id": "P1-E06-S04",
+      "epic": 6,
+      "story": 4,
+      "title": "Export float reconciliation for the accountant",
+      "slug": "export-float-reconciliation-for-the-accountant",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E06-S04.md",
+      "impl_file": "6-4-export-float-reconciliation-for-the-accountant.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "16eeb1b3665396fda0a99c7456f327d27ed91ea0"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "7-1-crud-services-with-effective-dated-price-history",
+      "id": "P1-E07-S01",
+      "epic": 7,
+      "story": 1,
+      "title": "CRUD services with effective-dated price history",
+      "slug": "crud-services-with-effective-dated-price-history",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E07-S01.md",
+      "impl_file": "7-1-crud-services-with-effective-dated-price-history.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ccba586eda0de67f702e4b6e6ed546723ba211cf"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "7-2-attribution-role-per-service",
+      "id": "P1-E07-S02",
+      "epic": 7,
+      "story": 2,
+      "title": "Attribution role per service",
+      "slug": "attribution-role-per-service",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E07-S02.md",
+      "impl_file": "7-2-attribution-role-per-service.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "11278ae8612181ef5732a3de71135c2eeb59e9ac"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "7-3-staff-data-records-no-logins",
+      "id": "P1-E07-S03",
+      "epic": 7,
+      "story": 3,
+      "title": "Staff data records (no logins)",
+      "slug": "staff-data-records-no-logins",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E07-S03.md",
+      "impl_file": "7-3-staff-data-records-no-logins.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ff92fb21d397f23098d04061b460c57aa5a53143"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "7-4-vat-tax-flag-per-service",
+      "id": "P1-E07-S04",
+      "epic": 7,
+      "story": 4,
+      "title": "VAT / tax flag per service",
+      "slug": "vat-tax-flag-per-service",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E07-S04.md",
+      "impl_file": "7-4-vat-tax-flag-per-service.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "fda68636c02fbf83c1c89825d3c306afef0b93c2"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "8-1-receipt-schema-with-nullable-etims-fields",
+      "id": "P1-E08-S01",
+      "epic": 8,
+      "story": 1,
+      "title": "Receipt schema with nullable eTIMS fields",
+      "slug": "receipt-schema-with-nullable-etims-fields",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E08-S01.md",
+      "impl_file": "8-1-receipt-schema-with-nullable-etims-fields.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "546e1a0aef4ae6692e28036c4c5b99307f083c36"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "8-2-receipt-writer-interface",
+      "id": "P1-E08-S02",
+      "epic": 8,
+      "story": 2,
+      "title": "Receipt writer (interface)",
+      "slug": "receipt-writer-interface",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E08-S02.md",
+      "impl_file": "8-2-receipt-writer-interface.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "47a0041bb19ff4aa660e348617868ebd8c16823e"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "8-3-receipt-pdf-render",
+      "id": "P1-E08-S03",
+      "epic": 8,
+      "story": 3,
+      "title": "Receipt PDF render",
+      "slug": "receipt-pdf-render",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E08-S03.md",
+      "impl_file": "8-3-receipt-pdf-render.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "846f596eb879988a9b3eb06a2e3d795de28bc8e3"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "8-4-receipt-reprint",
+      "id": "P1-E08-S04",
+      "epic": 8,
+      "story": 4,
+      "title": "Receipt reprint",
+      "slug": "receipt-reprint",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E08-S04.md",
+      "impl_file": "8-4-receipt-reprint.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "0947e1dee756b64aa80eb209dd5a308ac1315eba"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "8-5-receipt-void-reversing-entry",
+      "id": "P1-E08-S05",
+      "epic": 8,
+      "story": 5,
+      "title": "Receipt void (reversing entry)",
+      "slug": "receipt-void-reversing-entry",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E08-S05.md",
+      "impl_file": "8-5-receipt-void-reversing-entry.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "5ccb0ea65447dd902217156e92b7f7a351667f50"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "9-1-adapter-interface-stub-implementation",
+      "id": "P1-E09-S01",
+      "epic": 9,
+      "story": 1,
+      "title": "Adapter interface + stub implementation",
+      "slug": "adapter-interface-stub-implementation",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E09-S01.md",
+      "impl_file": "9-1-adapter-interface-stub-implementation.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b70f51f146459f167c00f03acbc9fb142f6b72c2"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "9-2-admin-config-table-for-sender-id-url",
+      "id": "P1-E09-S02",
+      "epic": 9,
+      "story": 2,
+      "title": "Admin config table for sender ID + URL + key",
+      "slug": "admin-config-table-for-sender-id-url",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E09-S02.md",
+      "impl_file": "9-2-admin-config-table-for-sender-id-url.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "93059bd399b430aa1dbf245e28fb0dd274f95076"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "9-3-templates-registered-versioned",
+      "id": "P1-E09-S03",
+      "epic": 9,
+      "story": 3,
+      "title": "Templates registered + versioned",
+      "slug": "templates-registered-versioned",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E09-S03.md",
+      "impl_file": "9-3-templates-registered-versioned.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "f6143e351e91b096d02bde07f817a76e01f5a866"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "10-1-nav-shell-role-gated-routes",
+      "id": "P1-E10-S01",
+      "epic": 10,
+      "story": 1,
+      "title": "Nav shell + role-gated routes",
+      "slug": "nav-shell-role-gated-routes",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E10-S01.md",
+      "impl_file": "10-1-nav-shell-role-gated-routes.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "4e4f9460c57a7a1d1b55e5748f520a06d16bb3dc"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "10-2-user-management-staff-crud",
+      "id": "P1-E10-S02",
+      "epic": 10,
+      "story": 2,
+      "title": "User management (staff CRUD)",
+      "slug": "user-management-staff-crud",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E10-S02.md",
+      "impl_file": "10-2-user-management-staff-crud.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "8c46b94152c965ce136b37810d5ef6a6e812c5a7"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "10-3-audit-log-viewer",
+      "id": "P1-E10-S03",
+      "epic": 10,
+      "story": 3,
+      "title": "Audit log viewer",
+      "slug": "audit-log-viewer",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E10-S03.md",
+      "impl_file": "10-3-audit-log-viewer.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "8dae649212044816fcdf0c2a6e93d88ed76d426d"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "10-4-settings-sub-app",
+      "id": "P1-E10-S04",
+      "epic": 10,
+      "story": 4,
+      "title": "Settings sub-app",
+      "slug": "settings-sub-app",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E10-S04.md",
+      "impl_file": "10-4-settings-sub-app.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "7d732d4cac53e86017267f497428e689cfbca098"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "11-1-wallet-page-balance-outstanding-statement",
+      "id": "P1-E11-S01",
+      "epic": 11,
+      "story": 1,
+      "title": "Wallet page (balance + outstanding + statement)",
+      "slug": "wallet-page-balance-outstanding-statement",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E11-S01.md",
+      "impl_file": "11-1-wallet-page-balance-outstanding-statement.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "66c6ff7577d39241ba9028c5bf54e52edbdbbc65"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "11-2-children-list-and-profile-management",
+      "id": "P1-E11-S02",
+      "epic": 11,
+      "story": 2,
+      "title": "Children list and profile management",
+      "slug": "children-list-and-profile-management",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E11-S02.md",
+      "impl_file": "11-2-children-list-and-profile-management.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "156b00b05269a2e8405f2f5706916eeeab118bcd"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "11-3-top-up-flow-from-dashboard",
+      "id": "P1-E11-S03",
+      "epic": 11,
+      "story": 3,
+      "title": "Top-up flow from dashboard",
+      "slug": "top-up-flow-from-dashboard",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E11-S03.md",
+      "impl_file": "11-3-top-up-flow-from-dashboard.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "792956a711d64b04f30e78bcc4bcde34bf63f1fd"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "11-4-profile-consent-management",
+      "id": "P1-E11-S04",
+      "epic": 11,
+      "story": 4,
+      "title": "Profile & consent management",
+      "slug": "profile-consent-management",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E11-S04.md",
+      "impl_file": "11-4-profile-consent-management.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "0d216d24fe84cf794a9307adf65bb06369780a6f"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "11-5-bottom-nav-mobile-first-shell",
+      "id": "P1-E11-S05",
+      "epic": 11,
+      "story": 5,
+      "title": "Bottom nav + mobile-first shell",
+      "slug": "bottom-nav-mobile-first-shell",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E11-S05.md",
+      "impl_file": "11-5-bottom-nav-mobile-first-shell.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "29bc0fb9e38b375df1694454f65589c5c3847388"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "12-1-home-page",
+      "id": "P1-E12-S01",
+      "epic": 12,
+      "story": 1,
+      "title": "Home page",
+      "slug": "home-page",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E12-S01.md",
+      "impl_file": "12-1-home-page.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "f64bb99edcd8f003ceca40a7f9e0267ed367f5b6"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "12-2-per-unit-pages",
+      "id": "P1-E12-S02",
+      "epic": 12,
+      "story": 2,
+      "title": "Per-unit pages",
+      "slug": "per-unit-pages",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E12-S02.md",
+      "impl_file": "12-2-per-unit-pages.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "59406373f43e423363cb451b741c3403d63403a3"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "12-3-deep-link-from-whatsapp-ads",
+      "id": "P1-E12-S03",
+      "epic": 12,
+      "story": 3,
+      "title": "Deep-link from WhatsApp ads",
+      "slug": "deep-link-from-whatsapp-ads",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E12-S03.md",
+      "impl_file": "12-3-deep-link-from-whatsapp-ads.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "f5f3d6c597ceb579f7fad411db65eead1b0e8514"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "12-4-sign-in-sign-up-entry-points",
+      "id": "P1-E12-S04",
+      "epic": 12,
+      "story": 4,
+      "title": "Sign-in / sign-up entry points",
+      "slug": "sign-in-sign-up-entry-points",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/P1-E12-S04.md",
+      "impl_file": "12-4-sign-in-sign-up-entry-points.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "abd7c5264d83d498b79c8681c0ce0a093e8764b4"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "13-1-audit-outbox-table-write-helper",
+      "id": "X5-S01",
+      "epic": 13,
+      "story": 1,
+      "title": "`audit_outbox` table + write helper",
+      "slug": "audit-outbox-table-write-helper",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X5-S01.md",
+      "impl_file": "13-1-audit-outbox-table-write-helper.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "475c9e0a913a2221b9c1da2320ca66063d7e538e"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "13-2-async-drain-worker-audit-log-projection",
+      "id": "X5-S02",
+      "epic": 13,
+      "story": 2,
+      "title": "Async drain worker \u2192 `audit_log` projection",
+      "slug": "async-drain-worker-audit-log-projection",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X5-S02.md",
+      "impl_file": "13-2-async-drain-worker-audit-log-projection.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "2a27e8a9905018a584871959bca154829ebe7b34"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "13-3-audit-catalogue-what-gets-audited",
+      "id": "X5-S03",
+      "epic": 13,
+      "story": 3,
+      "title": "Audit catalogue (what gets audited)",
+      "slug": "audit-catalogue-what-gets-audited",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X5-S03.md",
+      "impl_file": "13-3-audit-catalogue-what-gets-audited.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "c5ae768c2ee0c6d655033e4e2d328e0fe2c72c82"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "14-1-tailwind-preset-with-brand-tokens",
+      "id": "X7-S01",
+      "epic": 14,
+      "story": 1,
+      "title": "Tailwind preset with brand tokens",
+      "slug": "tailwind-preset-with-brand-tokens",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X7-S01.md",
+      "impl_file": "14-1-tailwind-preset-with-brand-tokens.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "7c78d3c7542459f7e50664110d15307d7956b168"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "14-2-primitive-components",
+      "id": "X7-S02",
+      "epic": 14,
+      "story": 2,
+      "title": "Primitive components",
+      "slug": "primitive-components",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X7-S02.md",
+      "impl_file": "14-2-primitive-components.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "cbb537d253f8305b2751e3caff7edd5057a21f4f"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "14-3-compound-components-for-p1-surfaces",
+      "id": "X7-S03",
+      "epic": 14,
+      "story": 3,
+      "title": "Compound components for P1 surfaces",
+      "slug": "compound-components-for-p1-surfaces",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X7-S03.md",
+      "impl_file": "14-3-compound-components-for-p1-surfaces.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "384db03f25469b54a9c85f887f5bf025b596ad41"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "14-4-brand-assets-pipeline",
+      "id": "X7-S04",
+      "epic": 14,
+      "story": 4,
+      "title": "Brand assets pipeline",
+      "slug": "brand-assets-pipeline",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X7-S04.md",
+      "impl_file": "14-4-brand-assets-pipeline.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "f7ce6790ddf4f7e09b463e91456d5df972ae299c"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "15-1-structured-logging-error-tracking",
+      "id": "X8-S01",
+      "epic": 15,
+      "story": 1,
+      "title": "Structured logging + error tracking",
+      "slug": "structured-logging-error-tracking",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X8-S01.md",
+      "impl_file": "15-1-structured-logging-error-tracking.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "1340692710147e97e080fd06aecad39baeee0995",
+        "220c64c0a88f477187add46dcf6b5e7fe9a8afe0"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "15-2-health-endpoints",
+      "id": "X8-S02",
+      "epic": 15,
+      "story": 2,
+      "title": "Health endpoints",
+      "slug": "health-endpoints",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X8-S02.md",
+      "impl_file": "15-2-health-endpoints.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "2a22984e6533faf447aa3e5b2b735ec30db5ede3"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "15-3-daily-db-backup-retention",
+      "id": "X8-S03",
+      "epic": 15,
+      "story": 3,
+      "title": "Daily DB backup + retention",
+      "slug": "daily-db-backup-retention",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X8-S03.md",
+      "impl_file": "15-3-daily-db-backup-retention.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "e1c5e4608d82505a77155d5ad885b8c94eef2f9c"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "15-4-ci-cd-pipelines-per-app",
+      "id": "X8-S04",
+      "epic": 15,
+      "story": 4,
+      "title": "CI/CD pipelines (per app)",
+      "slug": "ci-cd-pipelines-per-app",
+      "spec": "_bmad-output/planning-artifacts/stories/p1/X8-S04.md",
+      "impl_file": "15-4-ci-cd-pipelines-per-app.md",
+      "status": "done",
+      "classification": "skip-already-reviewed",
+      "commits": [
+        "186406464d23f581a15513dc0f0db5450a73ca2c"
+      ],
+      "commit_level": "story",
+      "review_state": "n/a"
+    },
+    {
+      "key": "16-1-time-slot-model-and-capacity-for-services",
+      "id": "P2-E01-S01",
+      "epic": 16,
+      "story": 1,
+      "title": "Time-slot model and capacity for services",
+      "slug": "time-slot-model-and-capacity-for-services",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S01.md",
+      "impl_file": "16-1-time-slot-model-and-capacity-for-services.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "dbdb84e28dba721360487624b3590e282b6f32fa"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "16-2-parent-browses-available-slots-for-a-service",
+      "id": "P2-E01-S02",
+      "epic": 16,
+      "story": 2,
+      "title": "Parent browses available slots for a service",
+      "slug": "parent-browses-available-slots-for-a-service",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S02.md",
+      "impl_file": "16-2-parent-browses-available-slots-for-a-service.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "28123d4ee8f55382f3361acbd94f9076d2e98f08"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "16-3-parent-books-a-slot-creates-pending-invoice",
+      "id": "P2-E01-S03",
+      "epic": 16,
+      "story": 3,
+      "title": "Parent books a slot (creates pending invoice)",
+      "slug": "parent-books-a-slot-creates-pending-invoice",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S03.md",
+      "impl_file": "16-3-parent-books-a-slot-creates-pending-invoice.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "35c2acececb8e3923f36cf44e7dbc513c87917b6"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "16-4-reception-books-on-behalf-of-a-walk-in",
+      "id": "P2-E01-S04",
+      "epic": 16,
+      "story": 4,
+      "title": "Reception books on behalf of a walk-in",
+      "slug": "reception-books-on-behalf-of-a-walk-in",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S04.md",
+      "impl_file": "16-4-reception-books-on-behalf-of-a-walk-in.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1667799008d3845dc6d07400e361efded8b9ba45"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "16-5-parent-reschedules-a-booking",
+      "id": "P2-E01-S05",
+      "epic": 16,
+      "story": 5,
+      "title": "Parent reschedules a booking",
+      "slug": "parent-reschedules-a-booking",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S05.md",
+      "impl_file": "16-5-parent-reschedules-a-booking.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "86e30f1781d29f1fceea07e997deeb0ff480e792"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "16-6-parent-or-reception-cancels-a-booking",
+      "id": "P2-E01-S06",
+      "epic": 16,
+      "story": 6,
+      "title": "Parent or Reception cancels a booking",
+      "slug": "parent-or-reception-cancels-a-booking",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S06.md",
+      "impl_file": "16-6-parent-or-reception-cancels-a-booking.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "931d089114a9e2e789bd68f41d4edb9668e11941"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "16-7-bookings-list-on-parent-dashboard",
+      "id": "P2-E01-S07",
+      "epic": 16,
+      "story": 7,
+      "title": "Bookings list on parent dashboard",
+      "slug": "bookings-list-on-parent-dashboard",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E01-S07.md",
+      "impl_file": "16-7-bookings-list-on-parent-dashboard.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "031cebe9c38d90845658ba3836dc51f09859c889"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "17-1-subscription-plan-catalogue",
+      "id": "P2-E02-S01",
+      "epic": 17,
+      "story": 1,
+      "title": "Subscription plan catalogue",
+      "slug": "subscription-plan-catalogue",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E02-S01.md",
+      "impl_file": "17-1-subscription-plan-catalogue.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "859d2678ede9365446d3d33778fdac76bb717504"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "17-2-parent-subscribes-to-a-plan",
+      "id": "P2-E02-S02",
+      "epic": 17,
+      "story": 2,
+      "title": "Parent subscribes to a plan",
+      "slug": "parent-subscribes-to-a-plan",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E02-S02.md",
+      "impl_file": "17-2-parent-subscribes-to-a-plan.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "99caa7fc1f88bbe360c73f054f7015ce53c4d828"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "17-3-bookings-deduct-subscription-entitlement-first",
+      "id": "P2-E02-S03",
+      "epic": 17,
+      "story": 3,
+      "title": "Bookings deduct subscription entitlement first",
+      "slug": "bookings-deduct-subscription-entitlement-first",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E02-S03.md",
+      "impl_file": "17-3-bookings-deduct-subscription-entitlement-first.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "838b1e830601db0404f8a9c222c859c23853f0d1"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "17-4-pause-freeze-and-resume-a-subscription",
+      "id": "P2-E02-S04",
+      "epic": 17,
+      "story": 4,
+      "title": "Pause/freeze and resume a subscription",
+      "slug": "pause-freeze-and-resume-a-subscription",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E02-S04.md",
+      "impl_file": "17-4-pause-freeze-and-resume-a-subscription.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ecb8b0af118900c3f86da850bb57731fb10f0031"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "17-5-renewal-dunning-state-machine",
+      "id": "P2-E02-S05",
+      "epic": 17,
+      "story": 5,
+      "title": "Renewal / dunning state machine",
+      "slug": "renewal-dunning-state-machine",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E02-S05.md",
+      "impl_file": "17-5-renewal-dunning-state-machine.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "4263445b074ab3ed661c01eb6c56905bb1bb3af6"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "17-6-cancel-subscription",
+      "id": "P2-E02-S06",
+      "epic": 17,
+      "story": 6,
+      "title": "Cancel subscription",
+      "slug": "cancel-subscription",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E02-S06.md",
+      "impl_file": "17-6-cancel-subscription.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "839caaff0a0b1710c5ccd3eaf27df6a15487955a"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "18-1-authorised-pickup-list-per-child",
+      "id": "P2-E03-S01",
+      "epic": 18,
+      "story": 1,
+      "title": "Authorised pickup list per child",
+      "slug": "authorised-pickup-list-per-child",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E03-S01.md",
+      "impl_file": "18-1-authorised-pickup-list-per-child.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "18-2-attendant-check-in-screen",
+      "id": "P2-E03-S02",
+      "epic": 18,
+      "story": 2,
+      "title": "Attendant check-in screen",
+      "slug": "attendant-check-in-screen",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E03-S02.md",
+      "impl_file": "18-2-attendant-check-in-screen.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "6b3fad30be75b2a3762910c05bc9a4db8cbcfceb",
+        "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "18-3-pickup-handoff-with-free-text-observations",
+      "id": "P2-E03-S03",
+      "epic": 18,
+      "story": 3,
+      "title": "Pickup handoff with free-text observations",
+      "slug": "pickup-handoff-with-free-text-observations",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E03-S03.md",
+      "impl_file": "18-3-pickup-handoff-with-free-text-observations.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "6b3fad30be75b2a3762910c05bc9a4db8cbcfceb",
+        "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "18-4-observations-feed-in-parent-s-account",
+      "id": "P2-E03-S04",
+      "epic": 18,
+      "story": 4,
+      "title": "Observations feed in parent's account",
+      "slug": "observations-feed-in-parent-s-account",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E03-S04.md",
+      "impl_file": "18-4-observations-feed-in-parent-s-account.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "6b3fad30be75b2a3762910c05bc9a4db8cbcfceb",
+        "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "18-5-24-month-retention-anonymisation",
+      "id": "P2-E03-S05",
+      "epic": 18,
+      "story": 5,
+      "title": "24-month retention + anonymisation",
+      "slug": "24-month-retention-anonymisation",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E03-S05.md",
+      "impl_file": "18-5-24-month-retention-anonymisation.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "6b3fad30be75b2a3762910c05bc9a4db8cbcfceb",
+        "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "19-1-pos-app-scaffold-auth",
+      "id": "P2-E04-S01",
+      "epic": 19,
+      "story": 1,
+      "title": "POS app scaffold + auth",
+      "slug": "pos-app-scaffold-auth",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E04-S01.md",
+      "impl_file": "19-1-pos-app-scaffold-auth.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "cec2787394f23e8a8fbe15aa011fd71380a19c23",
+        "1bd80d8fe9eff386337165f51ffd7d93228654b7"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "19-2-product-catalogue-read-for-pos",
+      "id": "P2-E04-S02",
+      "epic": 19,
+      "story": 2,
+      "title": "Product catalogue read for POS",
+      "slug": "product-catalogue-read-for-pos",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E04-S02.md",
+      "impl_file": "19-2-product-catalogue-read-for-pos.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "cec2787394f23e8a8fbe15aa011fd71380a19c23",
+        "1bd80d8fe9eff386337165f51ffd7d93228654b7"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "19-3-cart-line-discounts-overall-discount",
+      "id": "P2-E04-S03",
+      "epic": 19,
+      "story": 3,
+      "title": "Cart + line discounts + overall discount",
+      "slug": "cart-line-discounts-overall-discount",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E04-S03.md",
+      "impl_file": "19-3-cart-line-discounts-overall-discount.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "cec2787394f23e8a8fbe15aa011fd71380a19c23",
+        "1bd80d8fe9eff386337165f51ffd7d93228654b7"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet",
+      "id": "P2-E04-S04",
+      "epic": 19,
+      "story": 4,
+      "title": "Payment at POS (cash / M-Pesa STK / Paystack card / wallet)",
+      "slug": "payment-at-pos-cash-m-pesa-stk-paystack-card-wallet",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E04-S04.md",
+      "impl_file": "19-4-payment-at-pos-cash-m-pesa-stk-paystack-card-wallet.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "cec2787394f23e8a8fbe15aa011fd71380a19c23",
+        "1bd80d8fe9eff386337165f51ffd7d93228654b7"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "19-5-end-of-day-cash-up",
+      "id": "P2-E04-S05",
+      "epic": 19,
+      "story": 5,
+      "title": "End-of-day cash-up",
+      "slug": "end-of-day-cash-up",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E04-S05.md",
+      "impl_file": "19-5-end-of-day-cash-up.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "cec2787394f23e8a8fbe15aa011fd71380a19c23",
+        "1bd80d8fe9eff386337165f51ffd7d93228654b7"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "20-1-loyalty-earn-ledger-already-shipped-p1-harden-here",
+      "id": "P2-E05-S01",
+      "epic": 20,
+      "story": 1,
+      "title": "Loyalty earn ledger (already shipped P1, harden here)",
+      "slug": "loyalty-earn-ledger-already-shipped-p1-harden-here",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E05-S01.md",
+      "impl_file": "20-1-loyalty-earn-ledger-already-shipped-p1-harden-here.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "20-2-configurable-earn-and-redeem-rates",
+      "id": "P2-E05-S02",
+      "epic": 20,
+      "story": 2,
+      "title": "Configurable earn and redeem rates",
+      "slug": "configurable-earn-and-redeem-rates",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E05-S02.md",
+      "impl_file": "20-2-configurable-earn-and-redeem-rates.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "20-3-redemption-at-parent-checkout",
+      "id": "P2-E05-S03",
+      "epic": 20,
+      "story": 3,
+      "title": "Redemption at parent checkout",
+      "slug": "redemption-at-parent-checkout",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E05-S03.md",
+      "impl_file": "20-3-redemption-at-parent-checkout.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "20-4-loyalty-balance-and-history-in-parent-app",
+      "id": "P2-E05-S04",
+      "epic": 20,
+      "story": 4,
+      "title": "Loyalty balance and history in parent app",
+      "slug": "loyalty-balance-and-history-in-parent-app",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E05-S04.md",
+      "impl_file": "20-4-loyalty-balance-and-history-in-parent-app.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "789c9d4145c6d28bbd4dcf4cea7f7f89aca9d224"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "21-1-settings-for-backup-retention-policy",
+      "id": "P2-E06-S01",
+      "epic": 21,
+      "story": 1,
+      "title": "Settings for backup retention policy",
+      "slug": "settings-for-backup-retention-policy",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E06-S01.md",
+      "impl_file": "21-1-settings-for-backup-retention-policy.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "992c2946353eccfc98b38fea1f9914af206d8969"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "21-2-backup-pruner-respects-policy",
+      "id": "P2-E06-S02",
+      "epic": 21,
+      "story": 2,
+      "title": "Backup pruner respects policy",
+      "slug": "backup-pruner-respects-policy",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E06-S02.md",
+      "impl_file": "21-2-backup-pruner-respects-policy.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "992c2946353eccfc98b38fea1f9914af206d8969"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "22-1-outstanding-balance-banner-on-parent-dashboard",
+      "id": "P2-E07-S01",
+      "epic": 22,
+      "story": 1,
+      "title": "Outstanding-balance banner on parent dashboard",
+      "slug": "outstanding-balance-banner-on-parent-dashboard",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E07-S01.md",
+      "impl_file": "22-1-outstanding-balance-banner-on-parent-dashboard.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "d487083c2e363d44bbb70885c37f461cb84b6164"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "22-2-sms-stub-nudge-templates-for-outstanding-balances",
+      "id": "P2-E07-S02",
+      "epic": 22,
+      "story": 2,
+      "title": "SMS-stub nudge templates for outstanding balances",
+      "slug": "sms-stub-nudge-templates-for-outstanding-balances",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E07-S02.md",
+      "impl_file": "22-2-sms-stub-nudge-templates-for-outstanding-balances.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "d098318acad6c55afe6b6929dd3662a33527f828",
+        "d487083c2e363d44bbb70885c37f461cb84b6164"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "22-3-auto-credit-toggle-visibility-for-parent-read-only",
+      "id": "P2-E07-S03",
+      "epic": 22,
+      "story": 3,
+      "title": "Auto-credit toggle visibility for parent (read-only)",
+      "slug": "auto-credit-toggle-visibility-for-parent-read-only",
+      "spec": "_bmad-output/planning-artifacts/stories/p2/P2-E07-S03.md",
+      "impl_file": "22-3-auto-credit-toggle-visibility-for-parent-read-only.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "d098318acad6c55afe6b6929dd3662a33527f828",
+        "d487083c2e363d44bbb70885c37f461cb84b6164"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "23-1-per-staff-commission-rate-with-effective-dating",
+      "id": "P3-E01-S01",
+      "epic": 23,
+      "story": 1,
+      "title": "Per-staff commission rate with effective dating",
+      "slug": "per-staff-commission-rate-with-effective-dating",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E01-S01.md",
+      "impl_file": "23-1-per-staff-commission-rate-with-effective-dating.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "45fe5dae3c45237cb21b359bdb17f5135ac8633e",
+        "e2a59291daa9ef90e69d52b556757ae03abebf19"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "23-2-commission-line-recorded-on-every-attributed-booking",
+      "id": "P3-E01-S02",
+      "epic": 23,
+      "story": 2,
+      "title": "Commission line recorded on every attributed booking",
+      "slug": "commission-line-recorded-on-every-attributed-booking",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E01-S02.md",
+      "impl_file": "23-2-commission-line-recorded-on-every-attributed-booking.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "45fe5dae3c45237cb21b359bdb17f5135ac8633e",
+        "e2a59291daa9ef90e69d52b556757ae03abebf19"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "23-3-monthly-commission-run-scheduled-job",
+      "id": "P3-E01-S03",
+      "epic": 23,
+      "story": 3,
+      "title": "Monthly commission run (scheduled job)",
+      "slug": "monthly-commission-run-scheduled-job",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E01-S03.md",
+      "impl_file": "23-3-monthly-commission-run-scheduled-job.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "45fe5dae3c45237cb21b359bdb17f5135ac8633e",
+        "e2a59291daa9ef90e69d52b556757ae03abebf19"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "23-4-ad-hoc-commission-calculation-e-g-on-the-15th",
+      "id": "P3-E01-S04",
+      "epic": 23,
+      "story": 4,
+      "title": "Ad-hoc commission calculation (e.g., on the 15th)",
+      "slug": "ad-hoc-commission-calculation-e-g-on-the-15th",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E01-S04.md",
+      "impl_file": "23-4-ad-hoc-commission-calculation-e-g-on-the-15th.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "45fe5dae3c45237cb21b359bdb17f5135ac8633e",
+        "e2a59291daa9ef90e69d52b556757ae03abebf19"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "23-5-commission-payout-export-csv",
+      "id": "P3-E01-S05",
+      "epic": 23,
+      "story": 5,
+      "title": "Commission payout export (CSV)",
+      "slug": "commission-payout-export-csv",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E01-S05.md",
+      "impl_file": "23-5-commission-payout-export-csv.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "45fe5dae3c45237cb21b359bdb17f5135ac8633e",
+        "e2a59291daa9ef90e69d52b556757ae03abebf19"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "24-1-public-but-named-commission-viewer-route",
+      "id": "P3-E02-S01",
+      "epic": 24,
+      "story": 1,
+      "title": "Public-but-named commission viewer route",
+      "slug": "public-but-named-commission-viewer-route",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E02-S01.md",
+      "impl_file": "24-1-public-but-named-commission-viewer-route.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "c59545758708124b8fc84f9a81e967a960677b3f"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "24-2-earnings-breakdown-count-of-visits-top-services",
+      "id": "P3-E02-S02",
+      "epic": 24,
+      "story": 2,
+      "title": "Earnings breakdown (count of visits, top services)",
+      "slug": "earnings-breakdown-count-of-visits-top-services",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E02-S02.md",
+      "impl_file": "24-2-earnings-breakdown-count-of-visits-top-services.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "c59545758708124b8fc84f9a81e967a960677b3f"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "25-1-stylist-availability-and-slot-creation",
+      "id": "P3-E03-S01",
+      "epic": 25,
+      "story": 1,
+      "title": "Stylist availability and slot creation",
+      "slug": "stylist-availability-and-slot-creation",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E03-S01.md",
+      "impl_file": "25-1-stylist-availability-and-slot-creation.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1737207e770f28796a92aff6f30ae00dba1b735f",
+        "ba52cbfbe3de52c23c234b76add6817c422665d5"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "25-2-parent-picks-a-service-then-a-stylist-then-a-slot",
+      "id": "P3-E03-S02",
+      "epic": 25,
+      "story": 2,
+      "title": "Parent picks a service, then a stylist, then a slot",
+      "slug": "parent-picks-a-service-then-a-stylist-then-a-slot",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E03-S02.md",
+      "impl_file": "25-2-parent-picks-a-service-then-a-stylist-then-a-slot.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1737207e770f28796a92aff6f30ae00dba1b735f",
+        "ba52cbfbe3de52c23c234b76add6817c422665d5"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "25-3-salon-counter-check-in-and-service-completion",
+      "id": "P3-E03-S03",
+      "epic": 25,
+      "story": 3,
+      "title": "Salon counter check-in and service completion",
+      "slug": "salon-counter-check-in-and-service-completion",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E03-S03.md",
+      "impl_file": "25-3-salon-counter-check-in-and-service-completion.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1737207e770f28796a92aff6f30ae00dba1b735f",
+        "ba52cbfbe3de52c23c234b76add6817c422665d5"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "25-4-reassign-a-salon-booking-between-stylists",
+      "id": "P3-E03-S04",
+      "epic": 25,
+      "story": 4,
+      "title": "Reassign a salon booking between stylists",
+      "slug": "reassign-a-salon-booking-between-stylists",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E03-S04.md",
+      "impl_file": "25-4-reassign-a-salon-booking-between-stylists.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1737207e770f28796a92aff6f30ae00dba1b735f",
+        "ba52cbfbe3de52c23c234b76add6817c422665d5"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "25-5-salon-specific-reporting-tile",
+      "id": "P3-E03-S05",
+      "epic": 25,
+      "story": 5,
+      "title": "Salon-specific reporting tile",
+      "slug": "salon-specific-reporting-tile",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E03-S05.md",
+      "impl_file": "25-5-salon-specific-reporting-tile.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1737207e770f28796a92aff6f30ae00dba1b735f",
+        "ba52cbfbe3de52c23c234b76add6817c422665d5"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "26-1-proportional-loyalty-clawback-on-refund",
+      "id": "P3-E04-S01",
+      "epic": 26,
+      "story": 1,
+      "title": "Proportional loyalty clawback on refund",
+      "slug": "proportional-loyalty-clawback-on-refund",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E04-S01.md",
+      "impl_file": "26-1-proportional-loyalty-clawback-on-refund.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "26-2-negative-loyalty-carry-repaid-by-future-earnings",
+      "id": "P3-E04-S02",
+      "epic": 26,
+      "story": 2,
+      "title": "Negative-loyalty carry repaid by future earnings",
+      "slug": "negative-loyalty-carry-repaid-by-future-earnings",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E04-S02.md",
+      "impl_file": "26-2-negative-loyalty-carry-repaid-by-future-earnings.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "26-3-admin-manual-loyalty-adjustment",
+      "id": "P3-E04-S03",
+      "epic": 26,
+      "story": 3,
+      "title": "Admin manual loyalty adjustment",
+      "slug": "admin-manual-loyalty-adjustment",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E04-S03.md",
+      "impl_file": "26-3-admin-manual-loyalty-adjustment.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "26-4-loyalty-redemption-respects-pending-settlement",
+      "id": "P3-E04-S04",
+      "epic": 26,
+      "story": 4,
+      "title": "Loyalty redemption respects pending settlement",
+      "slug": "loyalty-redemption-respects-pending-settlement",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E04-S04.md",
+      "impl_file": "26-4-loyalty-redemption-respects-pending-settlement.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "27-1-daily-operations-dashboard",
+      "id": "P3-E05-S01",
+      "epic": 27,
+      "story": 1,
+      "title": "Daily operations dashboard",
+      "slug": "daily-operations-dashboard",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E05-S01.md",
+      "impl_file": "27-1-daily-operations-dashboard.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "23c1a70c33f576b976cd1761a0d488b388e2b72b"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "27-2-revenue-by-unit-by-period",
+      "id": "P3-E05-S02",
+      "epic": 27,
+      "story": 2,
+      "title": "Revenue by unit by period",
+      "slug": "revenue-by-unit-by-period",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E05-S02.md",
+      "impl_file": "27-2-revenue-by-unit-by-period.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "23c1a70c33f576b976cd1761a0d488b388e2b72b"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "27-3-top-staff-leaderboard",
+      "id": "P3-E05-S03",
+      "epic": 27,
+      "story": 3,
+      "title": "Top-staff leaderboard",
+      "slug": "top-staff-leaderboard",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E05-S03.md",
+      "impl_file": "27-3-top-staff-leaderboard.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "23c1a70c33f576b976cd1761a0d488b388e2b72b"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "27-4-wallet-aging-report",
+      "id": "P3-E05-S04",
+      "epic": 27,
+      "story": 4,
+      "title": "Wallet aging report",
+      "slug": "wallet-aging-report",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E05-S04.md",
+      "impl_file": "27-4-wallet-aging-report.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "23c1a70c33f576b976cd1761a0d488b388e2b72b"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "27-5-peak-hours-heatmap",
+      "id": "P3-E05-S05",
+      "epic": 27,
+      "story": 5,
+      "title": "Peak-hours heatmap",
+      "slug": "peak-hours-heatmap",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E05-S05.md",
+      "impl_file": "27-5-peak-hours-heatmap.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "23c1a70c33f576b976cd1761a0d488b388e2b72b"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "28-1-job-framework-scheduling-observability",
+      "id": "P3-E06-S01",
+      "epic": 28,
+      "story": 1,
+      "title": "Job framework: scheduling + observability",
+      "slug": "job-framework-scheduling-observability",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E06-S01.md",
+      "impl_file": "28-1-job-framework-scheduling-observability.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "32a0f53328ff421855732b85be1e55fd5a0dda0d",
+        "547b0902ef6ddd17ab02a68e7446547be36b07f0"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "28-2-anonymisation-worker-registered",
+      "id": "P3-E06-S02",
+      "epic": 28,
+      "story": 2,
+      "title": "Anonymisation worker registered",
+      "slug": "anonymisation-worker-registered",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E06-S02.md",
+      "impl_file": "28-2-anonymisation-worker-registered.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "32a0f53328ff421855732b85be1e55fd5a0dda0d",
+        "547b0902ef6ddd17ab02a68e7446547be36b07f0"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "28-3-commission-run-registered",
+      "id": "P3-E06-S03",
+      "epic": 28,
+      "story": 3,
+      "title": "Commission run registered",
+      "slug": "commission-run-registered",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E06-S03.md",
+      "impl_file": "28-3-commission-run-registered.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "32a0f53328ff421855732b85be1e55fd5a0dda0d"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "28-4-sms-retry-worker-registered",
+      "id": "P3-E06-S04",
+      "epic": 28,
+      "story": 4,
+      "title": "SMS retry worker registered",
+      "slug": "sms-retry-worker-registered",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E06-S04.md",
+      "impl_file": "28-4-sms-retry-worker-registered.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "32a0f53328ff421855732b85be1e55fd5a0dda0d",
+        "547b0902ef6ddd17ab02a68e7446547be36b07f0"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "28-5-m-pesa-stk-reconciliation-cron-now-under-framework",
+      "id": "P3-E06-S05",
+      "epic": 28,
+      "story": 5,
+      "title": "M-Pesa STK reconciliation cron now under framework",
+      "slug": "m-pesa-stk-reconciliation-cron-now-under-framework",
+      "spec": "_bmad-output/planning-artifacts/stories/p3/P3-E06-S05.md",
+      "impl_file": "28-5-m-pesa-stk-reconciliation-cron-now-under-framework.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "32a0f53328ff421855732b85be1e55fd5a0dda0d",
+        "547b0902ef6ddd17ab02a68e7446547be36b07f0"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-1-online-orders-tab-in-pos-pulled-from-woocommerce",
+      "id": "P4-E04-S01",
+      "epic": 29,
+      "story": 1,
+      "title": "Online orders tab in POS (pulled from WooCommerce)",
+      "slug": "online-orders-tab-in-pos-pulled-from-woocommerce",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S01.md",
+      "impl_file": "29-1-online-orders-tab-in-pos-pulled-from-woocommerce.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-2-order-status-transitions-sync-back-to-woocommerce",
+      "id": "P4-E04-S02",
+      "epic": 29,
+      "story": 2,
+      "title": "Order status transitions sync back to WooCommerce",
+      "slug": "order-status-transitions-sync-back-to-woocommerce",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S02.md",
+      "impl_file": "29-2-order-status-transitions-sync-back-to-woocommerce.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-3-print-packing-slip",
+      "id": "P4-E04-S03",
+      "epic": 29,
+      "story": 3,
+      "title": "Print packing slip",
+      "slug": "print-packing-slip",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S03.md",
+      "impl_file": "29-3-print-packing-slip.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-4-daily-dispatch-report",
+      "id": "P4-E04-S04",
+      "epic": 29,
+      "story": 4,
+      "title": "Daily dispatch report",
+      "slug": "daily-dispatch-report",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S04.md",
+      "impl_file": "29-4-daily-dispatch-report.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-5-stock-push-pos-catalogue-stock-changes-propagate-to",
+      "id": "P4-E04-S05",
+      "epic": 29,
+      "story": 5,
+      "title": "Stock push: POS catalogue stock changes propagate to WooCommerce",
+      "slug": "stock-push-pos-catalogue-stock-changes-propagate-to",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S05.md",
+      "impl_file": "29-5-stock-push-pos-catalogue-stock-changes-propagate-to.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-6-woocommerce-rest-client-credentials-config",
+      "id": "P4-E04-S06",
+      "epic": 29,
+      "story": 6,
+      "title": "WooCommerce REST client + credentials config",
+      "slug": "woocommerce-rest-client-credentials-config",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S06.md",
+      "impl_file": "29-6-woocommerce-rest-client-credentials-config.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "29-7-sync-scheduler-dead-letter-for-woocommerce-calls",
+      "id": "P4-E04-S07",
+      "epic": 29,
+      "story": 7,
+      "title": "Sync scheduler + dead-letter for WooCommerce calls",
+      "slug": "sync-scheduler-dead-letter-for-woocommerce-calls",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E04-S07.md",
+      "impl_file": "29-7-sync-scheduler-dead-letter-for-woocommerce-calls.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "20b86ef0db67a720ca0d0849218102ac63f817df",
+        "5a8777d0af27d198592e0fb3400ac81183959b04"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "30-1-event-creation",
+      "id": "P4-E05-S01",
+      "epic": 30,
+      "story": 1,
+      "title": "Event creation",
+      "slug": "event-creation",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E05-S01.md",
+      "impl_file": "30-1-event-creation.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "30-2-public-event-listing-detail-page",
+      "id": "P4-E05-S02",
+      "epic": 30,
+      "story": 2,
+      "title": "Public event listing + detail page",
+      "slug": "public-event-listing-detail-page",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E05-S02.md",
+      "impl_file": "30-2-public-event-listing-detail-page.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "30-3-ticket-purchase-with-guest-checkout",
+      "id": "P4-E05-S03",
+      "epic": 30,
+      "story": 3,
+      "title": "Ticket purchase with guest checkout",
+      "slug": "ticket-purchase-with-guest-checkout",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E05-S03.md",
+      "impl_file": "30-3-ticket-purchase-with-guest-checkout.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "30-4-free-events-rsvp-only",
+      "id": "P4-E05-S04",
+      "epic": 30,
+      "story": 4,
+      "title": "Free events (RSVP only)",
+      "slug": "free-events-rsvp-only",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E05-S04.md",
+      "impl_file": "30-4-free-events-rsvp-only.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "30-5-door-check-in-via-ticket-code-or-manual-list",
+      "id": "P4-E05-S05",
+      "epic": 30,
+      "story": 5,
+      "title": "Door check-in via ticket code or manual list",
+      "slug": "door-check-in-via-ticket-code-or-manual-list",
+      "spec": "_bmad-output/planning-artifacts/stories/p4/P4-E05-S05.md",
+      "impl_file": "30-5-door-check-in-via-ticket-code-or-manual-list.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "1fb69480f5a668ca302dc1bc8ba8a7743dfdd5d4"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "31-1-coaching-catalogue-1-1-group",
+      "id": "P5-E01-S01",
+      "epic": 31,
+      "story": 1,
+      "title": "Coaching catalogue (1:1 + group)",
+      "slug": "coaching-catalogue-1-1-group",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E01-S01.md",
+      "impl_file": "31-1-coaching-catalogue-1-1-group.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "609d05a7ccc3df1b96a9dacb9fc03bab60b7fa53"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "31-2-coach-availability-and-1-1-booking",
+      "id": "P5-E01-S02",
+      "epic": 31,
+      "story": 2,
+      "title": "Coach availability and 1:1 booking",
+      "slug": "coach-availability-and-1-1-booking",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E01-S02.md",
+      "impl_file": "31-2-coach-availability-and-1-1-booking.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "d35d2badae2ef9bcc1a136994e52b346846efc3b",
+        "7dafb142be553541859ea87d173cf9bfda8500de",
+        "645cba8c0a993296fb185cb06bd53eaf8abe54e5"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "31-3-group-session-booking",
+      "id": "P5-E01-S03",
+      "epic": 31,
+      "story": 3,
+      "title": "Group session booking",
+      "slug": "group-session-booking",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E01-S03.md",
+      "impl_file": "31-3-group-session-booking.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "5bbd032178946e122af815a6ed1288e4e1e5bccd",
+        "35f038dff5de7858e168d1c89f65d6ded4f0c30a"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "31-4-coach-session-notes-private",
+      "id": "P5-E01-S04",
+      "epic": 31,
+      "story": 4,
+      "title": "Coach session notes (private)",
+      "slug": "coach-session-notes-private",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E01-S04.md",
+      "impl_file": "31-4-coach-session-notes-private.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "3051a25c4ba98ea399751e4b87c11348434a153f",
+        "84a8847e54414491361778f771e1b318038ddb81"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "31-5-sensitive-flow-discreet-billing-labels",
+      "id": "P5-E01-S05",
+      "epic": 31,
+      "story": 5,
+      "title": "Sensitive flow: discreet billing labels",
+      "slug": "sensitive-flow-discreet-billing-labels",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E01-S05.md",
+      "impl_file": "31-5-sensitive-flow-discreet-billing-labels.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "80990c36116615bc91c0a7374304a288c43ac318",
+        "fc6757d5a0a0b8c2061e06644adce958585794e2"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "32-1-etims-adapter-implementation",
+      "id": "P5-E02-S01",
+      "epic": 32,
+      "story": 1,
+      "title": "eTIMS adapter implementation",
+      "slug": "etims-adapter-implementation",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E02-S01.md",
+      "impl_file": "32-1-etims-adapter-implementation.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b79873741e1ea79edaf25c99adb4693525f20440"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "32-2-etims-retry-dead-letter",
+      "id": "P5-E02-S02",
+      "epic": 32,
+      "story": 2,
+      "title": "eTIMS retry + dead-letter",
+      "slug": "etims-retry-dead-letter",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E02-S02.md",
+      "impl_file": "32-2-etims-retry-dead-letter.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b79873741e1ea79edaf25c99adb4693525f20440"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "32-3-switch-flag-with-rollback",
+      "id": "P5-E02-S03",
+      "epic": 32,
+      "story": 3,
+      "title": "Switch flag with rollback",
+      "slug": "switch-flag-with-rollback",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E02-S03.md",
+      "impl_file": "32-3-switch-flag-with-rollback.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b79873741e1ea79edaf25c99adb4693525f20440"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "32-4-vat-registration-metadata",
+      "id": "P5-E02-S04",
+      "epic": 32,
+      "story": 4,
+      "title": "VAT registration metadata",
+      "slug": "vat-registration-metadata",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E02-S04.md",
+      "impl_file": "32-4-vat-registration-metadata.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b79873741e1ea79edaf25c99adb4693525f20440"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "33-1-live-sms-adapter-provider-agnostic",
+      "id": "P5-E03-S01",
+      "epic": 33,
+      "story": 1,
+      "title": "Live SMS adapter (provider-agnostic)",
+      "slug": "live-sms-adapter-provider-agnostic",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E03-S01.md",
+      "impl_file": "33-1-live-sms-adapter-provider-agnostic.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "f3ca875d6b2fcef8f815bbe81d15f64a38ca5eb3"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "33-2-live-stub-switch-flag",
+      "id": "P5-E03-S02",
+      "epic": 33,
+      "story": 2,
+      "title": "Live/stub switch flag",
+      "slug": "live-stub-switch-flag",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E03-S02.md",
+      "impl_file": "33-2-live-stub-switch-flag.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "f3ca875d6b2fcef8f815bbe81d15f64a38ca5eb3"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "33-3-rate-limit-cost-control",
+      "id": "P5-E03-S03",
+      "epic": 33,
+      "story": 3,
+      "title": "Rate limit + cost control",
+      "slug": "rate-limit-cost-control",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E03-S03.md",
+      "impl_file": "33-3-rate-limit-cost-control.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "f3ca875d6b2fcef8f815bbe81d15f64a38ca5eb3"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "33-4-template-editor-admin",
+      "id": "P5-E03-S04",
+      "epic": 33,
+      "story": 4,
+      "title": "Template editor (admin)",
+      "slug": "template-editor-admin",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E03-S04.md",
+      "impl_file": "33-4-template-editor-admin.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "f3ca875d6b2fcef8f815bbe81d15f64a38ca5eb3"
+      ],
+      "commit_level": "epic",
+      "review_state": "todo"
+    },
+    {
+      "key": "34-1-0-5-rating-after-every-paid-touchpoint",
+      "id": "P5-E04-S01",
+      "epic": 34,
+      "story": 1,
+      "title": "0\u20135 rating after every paid touchpoint",
+      "slug": "0-5-rating-after-every-paid-touchpoint",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E04-S01.md",
+      "impl_file": "34-1-0-5-rating-after-every-paid-touchpoint.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "87576f685f1f230a1ec6bd5699139364d6ed8ce1"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "34-2-feedback-dashboard-by-unit-and-by-staff",
+      "id": "P5-E04-S02",
+      "epic": 34,
+      "story": 2,
+      "title": "Feedback dashboard by unit and by staff",
+      "slug": "feedback-dashboard-by-unit-and-by-staff",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E04-S02.md",
+      "impl_file": "34-2-feedback-dashboard-by-unit-and-by-staff.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "35cd990a7ba443172ae5c41ba5b71a0517de6427",
+        "0e1c0a17f7e391b0090427e5402c5aee84740414"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "34-3-negative-feedback-alert",
+      "id": "P5-E04-S03",
+      "epic": 34,
+      "story": 3,
+      "title": "Negative feedback alert",
+      "slug": "negative-feedback-alert",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E04-S03.md",
+      "impl_file": "34-3-negative-feedback-alert.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "9d77a144652b1c7bf5de04a5f0cde3d376f70025",
+        "c9f3be2824bf3c826e8c2642e952fa423b40ef17"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "34-4-public-review-snippets-optional",
+      "id": "P5-E04-S04",
+      "epic": 34,
+      "story": 4,
+      "title": "Public review snippets (optional)",
+      "slug": "public-review-snippets-optional",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E04-S04.md",
+      "impl_file": "34-4-public-review-snippets-optional.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "9dad17956047f1d0e3a36d948c5f9bef5e4394c2",
+        "85f5ec20a48b1ab2c9589a0515c233fd1df189d5"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "35-1-consolidated-p-l-by-period",
+      "id": "P5-E05-S01",
+      "epic": 35,
+      "story": 1,
+      "title": "Consolidated P&L by period",
+      "slug": "consolidated-p-l-by-period",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E05-S01.md",
+      "impl_file": "35-1-consolidated-p-l-by-period.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "2d444ba2309f866f4c176252757c00f6499d495e",
+        "c189bd3a594e1fb141ab814f07bae3baa39ba547"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "35-2-cohort-retention-by-signup-month",
+      "id": "P5-E05-S02",
+      "epic": 35,
+      "story": 2,
+      "title": "Cohort retention by signup month",
+      "slug": "cohort-retention-by-signup-month",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E05-S02.md",
+      "impl_file": "35-2-cohort-retention-by-signup-month.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "a1c6e0cb34c6c93e97b56e12b260951d18159523",
+        "3fda28368317ad95c3325e78310bd85bfddde49c"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "35-3-repeat-attendance-metrics-for-events-and-classes",
+      "id": "P5-E05-S03",
+      "epic": 35,
+      "story": 3,
+      "title": "Repeat-attendance metrics for events and classes",
+      "slug": "repeat-attendance-metrics-for-events-and-classes",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E05-S03.md",
+      "impl_file": "35-3-repeat-attendance-metrics-for-events-and-classes.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "24b86b7c15a2adb8627f7d5f2a925ba0d468fc0a",
+        "ca8cf6f7f7ad47ae653125444ff2b42ba1dbb3da"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "35-4-wallet-float-vs-revenue-snapshot",
+      "id": "P5-E05-S04",
+      "epic": 35,
+      "story": 4,
+      "title": "Wallet float vs revenue snapshot",
+      "slug": "wallet-float-vs-revenue-snapshot",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E05-S04.md",
+      "impl_file": "35-4-wallet-float-vs-revenue-snapshot.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "19d412b279c06e4622e18598b2571fca2fe37609",
+        "a63328cb3187d771a90b67ab51f9ac1d5063a4a0"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "35-5-expenses-module",
+      "id": "P5-E05-S05",
+      "epic": 35,
+      "story": 5,
+      "title": "Expenses module",
+      "slug": "expenses-module",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E05-S05.md",
+      "impl_file": "35-5-expenses-module.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "b310ec5b146e4ad93a281d417c4e9596048353b9"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "35-6-tax-ready-exports",
+      "id": "P5-E05-S06",
+      "epic": 35,
+      "story": 6,
+      "title": "Tax-ready exports",
+      "slug": "tax-ready-exports",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E05-S06.md",
+      "impl_file": "35-6-tax-ready-exports.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "776ad112c9d05be6f66ed9ead2185c253350ac39",
+        "73e9f06241ad0e3839580e3a6bfdc07c42e44dcf"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "36-1-brand-polish-pass",
+      "id": "P5-E06-S01",
+      "epic": 36,
+      "story": 1,
+      "title": "Brand polish pass",
+      "slug": "brand-polish-pass",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E06-S01.md",
+      "impl_file": "36-1-brand-polish-pass.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "cf9dd9d2f43025add679e888af155b3854e8dc9b",
+        "05e7b38d6da4d4138574dd867b0dd067efe3be49"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "36-2-seo-performance-budget-tightening",
+      "id": "P5-E06-S02",
+      "epic": 36,
+      "story": 2,
+      "title": "SEO + performance budget tightening",
+      "slug": "seo-performance-budget-tightening",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E06-S02.md",
+      "impl_file": "36-2-seo-performance-budget-tightening.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "07d3f2e896f830d46201d94f93fbbe9759a4f016",
+        "8a7aaef441f865f95cdbc330105b9e132a29c5a5"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "36-3-cms-driven-unit-pages",
+      "id": "P5-E06-S03",
+      "epic": 36,
+      "story": 3,
+      "title": "CMS-driven unit pages",
+      "slug": "cms-driven-unit-pages",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E06-S03.md",
+      "impl_file": "36-3-cms-driven-unit-pages.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "dc2625cb2ef1ef8b0d7141239b76fdf188b9cb25",
+        "b881711621a892847286e17885339655bd4a9185",
+        "90d981516741aefc0a9dd77cde637976103a6a86"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "36-4-blog-stories-optional",
+      "id": "P5-E06-S04",
+      "epic": 36,
+      "story": 4,
+      "title": "Blog / stories (optional)",
+      "slug": "blog-stories-optional",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E06-S04.md",
+      "impl_file": "36-4-blog-stories-optional.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "ab6a259b1333721c29bce6493ba6ee8ff41e5848",
+        "6af8ce61157474e32531422ee23f0ee788ef057f",
+        "2272e0e6c330d38620b4f60124a6a7b86c2245ec"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    },
+    {
+      "key": "36-5-social-proof-testimonials",
+      "id": "P5-E06-S05",
+      "epic": 36,
+      "story": 5,
+      "title": "Social proof + testimonials",
+      "slug": "social-proof-testimonials",
+      "spec": "_bmad-output/planning-artifacts/stories/p5/P5-E06-S05.md",
+      "impl_file": "36-5-social-proof-testimonials.md",
+      "status": "done",
+      "classification": "pending",
+      "commits": [
+        "3e811fb6ad46ef3ab47240bc21b7cd6936eb3cba"
+      ],
+      "commit_level": "story",
+      "review_state": "todo"
+    }
+  ],
+  "epic_results": {
+    "1": {
+      "stories_reviewed": 3,
+      "patches": 1,
+      "deferred": 7,
+      "decisions_needed": 3,
+      "dismissed": 9,
+      "commit": ""
+    }
+  },
+  "epics_done": 1,
+  "epics_total": 35
+}
