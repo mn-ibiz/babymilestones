@@ -1,0 +1,39 @@
+{
+  "id": "P1-E04-S03",
+  "verdict": "issues",
+  "diff_summary": "apps/jobs/src/jobs/mpesa-reconcile.ts (new 60s cron) + registry/index wiring; packages/payments stkQuery adapter; contracts MpesaStkState += EXPIRED; additive migration 0019 widening the state CHECK. Cron queries Daraja stkpushquery for pending mpesa_stk_request rows >90s old and reconciles SUCCEEDED/FAILED/EXPIRED via the S02 idempotent credit path.",
+  "ac_coverage": "AC1 (60s cadence) ✓ tested; AC2 (>90s pending → stkpushquery) ✓ tested — note: the cron correctly selects STK_SENT (the state requests actually live in) in addition to the spec-literal CALLBACK_PENDING, which is never written anywhere in the codebase, so this is more-correct than the AC text; AC3 (success → same idempotent path, no double-credit) ✓ tested incl. the already-credited case; AC4 (failure → FAILED + SMS-stub + audit) ✓ tested; AC5 (>15min → EXPIRED, no Daraja call) ✓ tested. All five ACs implemented and tested.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Cron overwrites a terminal state set by a concurrent callback (and can send a false failure SMS for an already-credited top-up)",
+      "detail": "reconcileSuccess/reconcileFailure/expire all UPDATE mpesa_stk_request with WHERE only on `id`, never re-checking that the row is still in a pending state. The candidate set is read once at the top of run() (SELECT ... state IN (STK_SENT, CALLBACK_PENDING)); the row object is then held in memory while stkQuery() makes a network round-trip. During that window the real Daraja callback (apps/api/src/routes/payments/mpesa/callback.ts) can credit the wallet and move the same row to SUCCEEDED. If the cron's stkpushquery then returns 'failed' (Daraja read-after-write inconsistency, or a genuinely contradicting status), reconcileFailure unconditionally overwrites state to FAILED and sends the parent a 'Your M-Pesa top-up of KES X could not be completed. No money was deducted.' SMS — for a top-up that WAS credited. Money stays correct (the ledger UNIQUE(idempotency_key) keyed on mpesa_callback.id is the hard guard and is sound), but the request row now lies about its outcome and the parent gets a misleading failure notice. The SMS outbox has no dedup (no UNIQUE/onConflict in packages/sms), so the message really is queued. Symmetric overwrite (FAILED→SUCCEEDED) is also possible. The S02 callback's own success path already guards correctly by only acting when ITS insert wins; the cron lacks the equivalent guard.",
+      "location": "apps/jobs/src/jobs/mpesa-reconcile.ts:173-176, 194-203, 218-222",
+      "fix": "Make the terminal transitions conditional on the row still being pending, and gate the SMS on whether the transition actually happened. In reconcileFailure: `const updated = await db.update(mpesaStkRequests).set({ state: 'FAILED', updatedAt: at }).where(and(eq(mpesaStkRequests.id, request.id), inArray(mpesaStkRequests.state, [...PENDING_STATES]))).returning(); if (updated.length === 0) return;` and only send the SMS / write the audit when updated.length > 0. Apply the same `AND state IN (PENDING_STATES)` guard to the SUCCEEDED update in reconcileSuccess and the EXPIRED update in expire so the cron never resurrects or contradicts a state a concurrent callback already finalised.",
+      "ac_ref": "AC3, AC4"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Candidate query has no supporting index → full table scan every 60s, growing unbounded",
+      "detail": "The cron runs `SELECT * FROM mpesa_stk_request WHERE state IN ('STK_SENT','CALLBACK_PENDING') AND updated_at < cutoff` every 60s. The only index on the table is (parent_id, created_at) (migration 0017); there is no index on (state) or (state, updated_at). Since mpesa_stk_request accumulates one row per top-up forever (terminal rows are never pruned), the planner does a sequential scan over the entire payment history on every tick. Fine at P1 launch volume; degrades as the table grows. No correctness/money impact.",
+      "location": "apps/jobs/src/jobs/mpesa-reconcile.ts:83-91",
+      "fix": "Out of scope for this story. When it matters, add an additive migration with a partial index, e.g. `CREATE INDEX CONCURRENTLY mpesa_stk_request_pending_idx ON mpesa_stk_request (updated_at) WHERE state IN ('INITIATED','STK_SENT','CALLBACK_PENDING')` so only the small live set is scanned.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "No per-row error isolation in the batch loop — a poison row aborts the rest of the run each tick",
+      "detail": "Only the stkQuery() call is wrapped in try/catch. If reconcileSuccess/reconcileFailure/expire throws for one row (e.g. applyTopup hitting a missing wallet FK, an audit/SMS DB error), the whole run() throws; runJob (apps/jobs/src/runner.ts) catches it and marks the run failed, but the remaining candidates in that batch are skipped until the next tick. A deterministically-failing row would re-abort at the same point every run, starving rows behind it. This mirrors the existing convention in sibling jobs (apps/jobs/src/jobs/data-export.ts also has no per-row try/catch), so it is a pre-existing pattern rather than something this story introduced — flagging, not fixing.",
+      "location": "apps/jobs/src/jobs/mpesa-reconcile.ts:98-121",
+      "fix": "Deferred (matches existing project convention). If hardened later, wrap the per-row body in try/catch, capture the error to the tracker with the request id, and `continue` so one bad row cannot starve the batch.",
+      "ac_ref": ""
+    }
+  ]
+}

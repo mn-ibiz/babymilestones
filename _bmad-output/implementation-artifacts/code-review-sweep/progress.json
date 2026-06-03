@@ -51,7 +51,7 @@
     "1": "done",
     "2": "done",
     "3": "done",
-    "4": "todo",
+    "4": "done",
     "5": "todo",
     "6": "todo",
     "7": "todo",
@@ -457,7 +457,7 @@
         "efd7a0f4f566980bc24d2c4c24b9bffa3cba1bff"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "4-4-paystack-card-top-up",
@@ -491,7 +491,7 @@
         "78d225ea6fc90ad0ff5f8c5fbd3194bdbb342ded"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "4-6-cash-top-up-by-reception",
@@ -525,7 +525,7 @@
         "343e4f29ae86202f206150905f7cfe16b101aaf0"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "5-1-search-parent-by-phone-or-name-in",
@@ -3052,8 +3052,16 @@
       "decisions_needed": 4,
       "dismissed": 14,
       "commit": ""
+    },
+    "4": {
+      "stories_reviewed": 3,
+      "patches": 3,
+      "deferred": 3,
+      "decisions_needed": 2,
+      "dismissed": 10,
+      "commit": ""
     }
   },
-  "epics_done": 3,
+  "epics_done": 4,
   "epics_total": 35
 }

@@ -182,6 +182,29 @@ describe("Bank transfer top-up, admin-confirmed (P1-E04-S07)", () => {
     expect(out).toHaveLength(1);
   });
 
+  it("re-confirm naming a DIFFERENT parent → 409, record not falsified (review fix)", async () => {
+    const a = await seedParent();
+    const b = await seedParent();
+    const admin = await loginStaff("0712000010", "7431");
+    const rec = (await record({ amount: 30_000, reference: "FT5" }, admin)).json();
+
+    const first = await confirm(rec.id, { parentId: a.parentId }, admin);
+    expect(first.statusCode).toBe(200);
+    // The money is already with parent A; a second confirm naming parent B must be
+    // rejected rather than silently re-pointing the record at a parent who was
+    // never credited.
+    const second = await confirm(rec.id, { parentId: b.parentId }, admin);
+    expect(second.statusCode).toBe(409);
+
+    const [row] = await dbh.db
+      .select()
+      .from(bankTransferPending)
+      .where(eq(bankTransferPending.id, rec.id));
+    expect(row!.parentId).toBe(a.parentId);
+    const topups = (await dbh.db.select().from(walletLedger)).filter((r) => r.kind === "topup");
+    expect(topups).toHaveLength(1);
+  });
+
   it("reception (no admin/treasury grant) is rejected from record → 403 (AC: guard)", async () => {
     const recep = await loginStaff("0712000012", "7433");
     const res = await record({ amount: 10_000, reference: "X" }, recep);

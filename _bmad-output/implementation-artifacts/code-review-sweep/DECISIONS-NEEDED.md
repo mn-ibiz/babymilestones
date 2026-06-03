@@ -33,6 +33,20 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 4 — Payments Adapter
+
+10. **[HIGH · money · P1-E04-S05] No Paystack reconcile cron / recovery path.** Event-row insert and
+    wallet credit are non-atomic; a crash between them, or an orphan `charge.success` (reference row
+    not yet present), leaves a paid top-up permanently uncredited (re-delivery short-circuits on the
+    event row). M-Pesa has a reconcile cron; Paystack doesn't. **Recommend:** add a Paystack reconcile
+    cron mirroring `apps/jobs/src/jobs/mpesa-reconcile.ts` + a failure-audit row. (Error logging now
+    added so failures are at least visible.) File: `apps/api/src/routes/payments/paystack/webhook.ts:139-205`.
+
+11. **[MED · P1-E04-S05] Paystack replay dedup grain.** Keyed on `data.id` (transaction id) alone,
+    not `(event, data.id)`, so a second event *type* with the same transaction id is silently dropped.
+    Only `charge.success` credits today. **Choose:** composite `(event,id)` dedup vs document
+    single-event-per-id. File: `packages/db/migrations/0021_paystack_event.sql:17`.
+
 ## Epic 3 — Wallet Ledger Core
 
 5. **[HIGH · accuracy · P1-E03-S08] Statement CSV inclusive `to` date drops same-day transactions.**

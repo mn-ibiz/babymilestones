@@ -1,0 +1,19 @@
+{
+  "id": "P1-E04-S07",
+  "verdict": "issues",
+  "diff_summary": "Adds bank_transfer_pending table + additive migration (0022), a @bm/payments confirmBankTransfer adapter over the idempotent FIFO wallet primitive, and admin/treasury-guarded record + confirm API routes (POST /payments/bank/transfers[/:id/confirm]) that credit the wallet with source='bank:manual' keyed on the pending row id, audit to audit_outbox, and fire an SMS-stub once.",
+  "ac_coverage": "AC1 (pending table + manual record route) implemented & tested; AC2 (admin matches + confirms → wallet.post(topup) source='bank:manual', idempotent on pending id) implemented & tested; AC3 (parent SMS-stub) implemented & tested. Authz guard, double-confirm no-double-credit, audit all tested. Gap: no test/guard for re-confirming an already-confirmed row with a DIFFERENT parent (see finding).",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Re-confirming an already-confirmed transfer with a different parent overwrites parent_id/confirmed_by while the credit stays with the original parent",
+      "detail": "The confirm route has no guard against confirming a row whose status is already 'confirmed'. On a second confirm of the same pending id with a DIFFERENT parentId in the body: (1) confirmBankTransfer/applyTopup find the existing credit by idempotency_key=pending.id and return replayed:true, so NO second credit is posted (correct — no money loss; the ledger still credits the ORIGINAL parent). But (2) the route then unconditionally runs UPDATE bank_transfer_pending SET status='confirmed', parentId=<new>, confirmedBy=<new actor>, updatedAt=now (apps/api/src/routes/payments/bank/topup.ts:170-178). This silently rewrites the durable record to point at a parent who never received the money and re-stamps confirmed_by, so the pending table contradicts the authoritative ledger. The audit/SMS are correctly suppressed on replay, meaning the falsified parent match is not even audited. The existing double-confirm test uses the SAME parent both times (apps/api/src/routes/payments/bank/topup.test.ts:142-167), so this path is untested. The wallets.userId/parents.userId unique constraints make parent resolution deterministic, so nothing else blocks this.",
+      "location": "apps/api/src/routes/payments/bank/topup.ts:140-178",
+      "fix": "Reject confirmation of an already-finalized row before crediting: after loading `pending`, add `if (pending.status === 'confirmed') return reply.code(409).send({ error: 'Bank transfer already confirmed' });`. Alternatively gate the UPDATE on the pending state (only set parent_id/confirmed_by when transitioning from pending) and/or only persist parentId when charge.replayed is false. Add a test that re-confirms with a different parent and asserts the row's parent_id/confirmed_by are NOT mutated and the credit remains with the original parent.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

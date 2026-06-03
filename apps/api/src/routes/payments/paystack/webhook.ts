@@ -120,10 +120,13 @@ export function registerPaystackWebhook(app: FastifyInstance, { db, paystack }: 
 
       try {
         await processEvent(db, parsed);
-      } catch {
+      } catch (err) {
         // Never surface a processing failure to Paystack — the event row (when
         // inserted) persists; a re-delivery replays idempotently. Swallow so a
         // transient error does not trigger endless retries against a bad event.
+        // But LOG it: there is no Paystack reconcile cron, so a failed/lost credit
+        // is otherwise completely invisible (see code-review DECISIONS-NEEDED).
+        req.log.error({ err }, "paystack webhook processing failed");
       }
 
       return reply.code(200).send({ status: "ok" });

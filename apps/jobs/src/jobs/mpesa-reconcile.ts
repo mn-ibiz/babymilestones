@@ -170,10 +170,20 @@ async function reconcileSuccess(
     postedBy: request.parentId,
   });
 
-  await db
+  // Only advance the request if it is STILL pending — a concurrent S02 callback
+  // may have already finalised it. The credit above is idempotent regardless, so
+  // this guard only avoids overwriting a state another writer set and re-auditing.
+  const advanced = await db
     .update(mpesaStkRequests)
     .set({ state: "SUCCEEDED", updatedAt: at })
-    .where(eq(mpesaStkRequests.id, request.id));
+    .where(
+      and(
+        eq(mpesaStkRequests.id, request.id),
+        inArray(mpesaStkRequests.state, [...PENDING_STATES]),
+      ),
+    )
+    .returning({ id: mpesaStkRequests.id });
+  if (advanced.length === 0) return;
 
   await audit(db, {
     actor: null,
@@ -191,10 +201,21 @@ async function reconcileFailure(
   sms: SmsSender,
   at: Date,
 ): Promise<void> {
-  await db
+  // Only fail the request if it is STILL pending. A concurrent S02 callback may
+  // have already credited + marked it SUCCEEDED; overwriting to FAILED here would
+  // both falsify the record and fire a false "could not be completed" SMS for a
+  // top-up that actually succeeded.
+  const failedRows = await db
     .update(mpesaStkRequests)
     .set({ state: "FAILED", updatedAt: at })
-    .where(eq(mpesaStkRequests.id, request.id));
+    .where(
+      and(
+        eq(mpesaStkRequests.id, request.id),
+        inArray(mpesaStkRequests.state, [...PENDING_STATES]),
+      ),
+    )
+    .returning({ id: mpesaStkRequests.id });
+  if (failedRows.length === 0) return;
 
   await sms.send({
     to: request.phone,
@@ -216,10 +237,17 @@ async function reconcileFailure(
 
 /** AC5 — abandon a stale (> 15 min) pending request as EXPIRED + audit. */
 async function expire(db: Database, request: MpesaStkRequestRow, at: Date): Promise<void> {
-  await db
+  const expiredRows = await db
     .update(mpesaStkRequests)
     .set({ state: "EXPIRED", updatedAt: at })
-    .where(eq(mpesaStkRequests.id, request.id));
+    .where(
+      and(
+        eq(mpesaStkRequests.id, request.id),
+        inArray(mpesaStkRequests.state, [...PENDING_STATES]),
+      ),
+    )
+    .returning({ id: mpesaStkRequests.id });
+  if (expiredRows.length === 0) return;
 
   await audit(db, {
     actor: null,

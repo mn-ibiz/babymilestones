@@ -142,6 +142,16 @@ export function registerBankTransferRoutes(app: FastifyInstance, deps: PaymentsD
         .from(bankTransferPending)
         .where(eq(bankTransferPending.id, id));
       if (!pending) return reply.code(404).send({ error: "Bank transfer not found" });
+      // A re-confirm with the SAME parent is a benign idempotent retry (the credit
+      // is keyed on the pending id, so no double-credit). But a re-confirm naming a
+      // DIFFERENT parent must be rejected: the money was already credited to the
+      // original parent, and proceeding would overwrite parent_id/confirmed_by
+      // below, falsifying the durable record against the authoritative ledger.
+      if (pending.status === "confirmed" && pending.parentId !== parentId) {
+        return reply
+          .code(409)
+          .send({ error: "Bank transfer already confirmed for a different parent" });
+      }
 
       // Resolve the matched parent: user (for the SMS phone), profile (FIFO keys
       // on parents.id), and wallet (derived server-side, never client-supplied).

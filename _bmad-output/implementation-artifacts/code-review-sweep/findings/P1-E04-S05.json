@@ -1,0 +1,49 @@
+{
+  "id": "P1-E04-S05",
+  "verdict": "issues",
+  "diff_summary": "Adds packages/payments/src/paystack/verify.ts (HMAC-SHA512 raw-body, timingSafeEqual constant-time compare), additive migration 0021_paystack_event.sql (id text PRIMARY KEY) + schema, and apps/api/.../paystack/webhook.ts (POST /webhooks/paystack: verify signature first, idempotent paystack_event insert ON CONFLICT DO NOTHING, charge.success -> @bm/wallet.post keyed by event id with amount from our paystack_transaction row).",
+  "ac_coverage": "AC1 implemented+tested (verify.test.ts, webhook.test.ts). AC2 implemented+tested (tampered/wrong-secret/missing -> 401, zero writes asserted). AC3 implemented+tested (replay 5x -> exactly one ledger entry). AC4 implemented+tested (charge.success credits once, amount from our txn row, audit written). All four ACs pass; gaps are durability/recovery beyond the literal ACs.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "No recovery path for a paid top-up that is never credited (crash window + orphan reference)",
+      "detail": "processEvent (webhook.ts:139-205) commits the paystack_event row (its own auto-committed insert at :142-151) BEFORE and SEPARATELY from the wallet credit (walletPost at :180 opens its own transaction). These are not atomic. Two ways a successfully-paid top-up is permanently lost: (1) Crash/connection-drop window: if the event row commits but the process dies before walletPost commits, Paystack's re-delivery hits `!inserted[0]` at :153 and returns immediately -> the wallet is never credited. (2) Out-of-order/orphan: a charge.success whose `reference` has no paystack_transaction row yet (:166) is audited as `...orphan` and returns -> never credited, and a later re-delivery short-circuits at :153. The handler's catch (:121-127) swallows the error and returns 200, telling Paystack to stop retrying. The sibling M-Pesa callback uses the IDENTICAL non-atomic pattern but is explicitly backstopped by a reconciliation cron (apps/jobs/src/jobs/mpesa-reconcile.ts; see callback.ts:122 'the reconciliation cron (S03) is the safety net for any uncredited success' and :164). No equivalent Paystack reconcile job exists (grep of apps/jobs found none referencing paystack). So Paystack copied the at-risk pattern without the safety net. This is real money loss with no recovery.",
+      "location": "apps/api/src/routes/payments/paystack/webhook.ts:139-205",
+      "fix": "Decision needed: either (a) add a Paystack reconciliation cron mirroring mpesa-reconcile.ts that re-credits paystack_transaction rows in INITIALIZED whose charge succeeded (and re-credits when an event row exists but no ledger entry keyed on it), or (b) make the credit recoverable by not treating the event-row insert as the sole completion fence (e.g. credit first/keep crediting until the ledger row keyed by event id exists). @bm/wallet.post takes a Database and opens its own transaction (index.ts:191,204), so it cannot simply be nested inside an outer tx with the event insert without savepoint support — hence a cron is the repo-consistent choice. Recommend (a).",
+      "ac_ref": "AC4"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Replay dedup keyed on data.id alone, ignoring event type",
+      "detail": "The replay guard is paystack_event.id = String(data.id) as the sole PRIMARY KEY (migration 0021 :17; insert target paystackEvents.id at webhook.ts:150). Paystack's data.id is the transaction id, not a per-delivery event id, and it is shared across different event TYPES for the same transaction (e.g. charge.success and a later refund/charge event can carry the same numeric data.id). Because the conflict target is `id` only (not the pair `(event, id)`), the second distinct event with a reused data.id is silently dropped as a 'replay' at :153 and never recorded or routed. For THIS story only charge.success credits, so the wallet-credit blast radius is small, but it means legitimate non-credit events can be silently lost and the audit/forensics record is incomplete.",
+      "location": "apps/api/src/routes/payments/paystack/webhook.ts:142-153, packages/db/migrations/0021_paystack_event.sql:17",
+      "fix": "Decide the intended dedup grain. Options: (a) key the dedup on (event, data.id) — change the table PK / conflict target to the composite so the same transaction id under a different event type is not dropped; or (b) document explicitly that only one event per data.id is ever persisted and that this is acceptable because only charge.success matters. If forensics for non-credit events matter, prefer (a) (additive: new composite-unique table or a UNIQUE(event,id) replacing the single-column PK).",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Processing errors are swallowed with zero observability",
+      "detail": "The handler catches every error from processEvent and discards it entirely (webhook.ts:121-127) — no logger call, no metric, no audit. Combined with finding #1, a failed credit produces no signal anywhere: Paystack is told 200 (stop retrying), nothing is logged, and there is no reconcile job to catch it. A lost top-up would be invisible until a customer complains. The empty catch also hides IdempotencyConflict (wallet/index.ts:163) and any unexpected DB error.",
+      "location": "apps/api/src/routes/payments/paystack/webhook.ts:121-127",
+      "fix": "At minimum log the error (req.log.error) with the event id and write a failure audit row (e.g. payment.paystack.webhook.error) so a lost credit is observable. Whether to additionally retry is tied to finding #1's decision. Patch-able if logging+audit-on-failure is accepted as the unambiguous minimum, but recommend deciding alongside the reconcile-cron decision.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Post-credit txn-state update and audit are non-atomic with the credit",
+      "detail": "After walletPost commits (webhook.ts:180), the paystack_transaction state->SUCCEEDED update (:190-193) and the credited-audit insert (:195-204) run as further independent statements on the pooled db (not in the credit's transaction). If either fails, the catch swallows it: the money is correctly credited (and a replay short-circuits at :153, so it stays credited exactly once), but the transaction row can be stuck in INITIALIZED and/or the DoD-required audit_outbox row (DoD item 4) is missing. Lower severity because money correctness is preserved; it is a consistency/auditability gap, and it is the same shape as the pre-existing M-Pesa handler, so out of scope to fix here.",
+      "location": "apps/api/src/routes/payments/paystack/webhook.ts:180-204",
+      "fix": "Deferred (pre-existing pattern, no money error). If addressed later, group the state-update + audit into a single transaction with the credit, or have the reconcile cron (finding #1) also repair INITIALIZED rows that already have a ledger credit keyed by their event id.",
+      "ac_ref": ""
+    }
+  ]
+}
