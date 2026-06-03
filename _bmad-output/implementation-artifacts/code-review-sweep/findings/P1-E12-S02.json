@@ -1,0 +1,39 @@
+{
+  "id": "P1-E12-S02",
+  "verdict": "issues",
+  "diff_summary": "Adds five public per-unit marketing pages as a single data-driven (public)/[unit]/page.tsx (SSG via generateStaticParams, notFound() on unknown slug); pure content model in lib/unit-content.ts; extends middleware.ts public allow-list to the five unit paths; 17 tests. No /shop route (Toy Shop is an external WooCommerce link).",
+  "ac_coverage": "AC1 implemented & tested (five slugs, no /shop, external Toy Shop with rel=noopener noreferrer). AC2 partially: photo references point to non-existent assets (Finding A); copy/examples/CTA present; CTA->signup correct for unauthenticated, but authed routing is unwired dead code (Finding B). AC3 implemented & tested (inline serialisable record behind getUnitPage seam; later evolved to CMS-backed in working tree).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "All five unit hero images reference non-existent /units/*.jpg assets (broken images on public marketing pages)",
+      "detail": "unit-content.ts builds every page's image src as `/units/${slug}.jpg`, but there is no apps/platform/public/units/ directory and no units/*.jpg asset exists anywhere in the repo (only public/home/hero-child.jpg is tracked). On this public marketing surface every per-unit page renders a broken <Image>: a 404 at request time. The build does not catch it (next/image does not validate local static files at build) and no test catches it (lib/unit-content.test.ts only asserts image.src.startsWith('/units/'), never that the file resolves). This violates AC2's 'photo' requirement. Confirmed still present in the working tree: the CMS-fallback path (lib/cms-page.ts resolveUnitPageView) still uses staticPage.image.src for the static source, and safeImageSrc('/units/play.jpg') passes isSafeCmsUrl (root-relative is allowed) so the broken <Image> still renders rather than being dropped.",
+      "location": "apps/platform/lib/unit-content.ts:66 (image src `/units/${slug}.jpg`); rendered via apps/platform/app/(public)/[unit]/page.tsx:88",
+      "fix": "Supply the five real unit photographs at apps/platform/public/units/{play,talent,salon,events,coaching}.jpg (real child photos per the model's own doc comment) and verify they resolve. Needs product/design to source the actual images; alternatively agree on a placeholder. As a regression guard, add an existsSync assertion for each static image path in the test suite.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "\"Book now\" CTA is hard-wired to /signup for ALL visitors; bookNowHref(isAuthenticated) is dead code yet tested (false coverage confidence)",
+      "detail": "AC2 says 'Book now CTA -> signup if not logged in'. The page (app/(public)/[unit]/page.tsx) never reads the session and renders the static cta.href, which is unconditionally SIGN_UP_HREF (/signup). An already-authenticated visitor who lands on /play therefore gets sent to /signup instead of the booking funnel. lib/unit-content.ts exports bookNowHref(isAuthenticated) that returns BOOKING_HREF for authed users, and lib/unit-content.test.ts:72-75 asserts bookNowHref(true) routes into booking — but grep confirms bookNowHref has no caller anywhere outside its own tests, so it is dead code and the test gives false confidence that authed CTA routing works. The literal AC2 (unauthenticated case) IS satisfied, and the impl story states authed routing is the S04 hand-off, so this is a deferred-intent decision rather than a hard AC break.",
+      "location": "apps/platform/lib/unit-content.ts:130 (bookNowHref, unused); apps/platform/app/(public)/[unit]/page.tsx:68,79-84 (CTA uses static href, no auth check)",
+      "fix": "Decide whether a unit page reached by an authenticated visitor should route the CTA into the booking funnel (call bookNowHref with the real session state) or intentionally always send to /signup (then delete the dead bookNowHref + its misleading test). Defer to S04 if authed entry is owned there.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Later CMS work can render an internal /shop (or any) page via the [unit] dynamic route, contradicting AC1's 'no /shop route'",
+      "detail": "In the S02 commit getUnitPage('shop') correctly returns undefined so /shop 404s — AC1 holds for this story. In the current working tree (introduced by P6-E06-S03, not this commit) the page has no `export const dynamicParams = false`, so [unit] server-renders on-demand for arbitrary slugs; resolveUnitPageView's own doc says a CMS row for a static-unknown slug 'renders the page' — meaning a published cms_pages row named 'shop' would render an internal /shop page, directly contradicting AC1. It is gated: /shop is not in the middleware PUBLIC_EXACT_PATHS allow-list so unauthenticated visitors are bounced to /login; only an authenticated user could reach it. Out of S02 scope (S02 itself is correct), flagged so the CMS story owner can constrain it.",
+      "location": "apps/platform/app/(public)/[unit]/page.tsx:33-35,57-64 (no dynamicParams=false); apps/platform/lib/cms-page.ts:60-79 (resolveUnitPageView renders CMS-only slugs)",
+      "fix": "In the CMS story, either set `export const dynamicParams = false` on (public)/[unit]/page.tsx so only the five enumerated slugs render, or have resolveUnitPageView reject slugs not in UNIT_SLUGS even when a CMS row exists. Defer: belongs to P6-E06-S03, not P1-E12-S02.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

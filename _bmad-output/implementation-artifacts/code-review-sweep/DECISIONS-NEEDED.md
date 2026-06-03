@@ -33,6 +33,18 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 12 — Marketing & Landing
+
+20. **[HIGH · content · P1-E12-S02] All five per-unit hero images are broken** — they reference
+    `/units/{slug}.jpg` but no `public/units/` assets exist (still broken in the working tree).
+    Needs the real unit photos sourced (product/design) or an agreed placeholder + an `existsSync`
+    regression test. File: `apps/platform/lib/unit-content.ts:66`.
+
+21. **[LOW · P1-E12-S02] "Book now" CTA always routes to `/signup`** (even for authenticated
+    visitors); `bookNowHref(isAuthenticated)` is dead code with a misleading passing test. **Choose:**
+    wire the authed CTA into the booking funnel, or delete the dead helper + test. (May be the S04
+    hand-off.) File: `apps/platform/app/(public)/[unit]/page.tsx`.
+
 ## Epic 8 — Receipt Engine
 
 18. **[MED · fraud · P1-E08-S05] A voided receipt can still be reprinted/rendered (and re-SMS'd) as a

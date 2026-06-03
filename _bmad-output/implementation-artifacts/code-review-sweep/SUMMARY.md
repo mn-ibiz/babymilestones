@@ -18,7 +18,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 8  | 2 | ✅ | 2 (receipt parentId FK, void 409) | 3 | 2 | 6 |
 | 9  | 2 | ✅ | 1 (SSRF IPv4-compat IPv6 guard) | 0 | 0 | 9 |
 | 11 | 1 | ✅ | 0 (code sound) | 2 | 0 | 3 |
-| 12 | 1 | ⬜ | | | | |
+| 12 | 1 | ✅ | 0 (security clean) | 1 | 2 | 4 |
 | 13 | 2 | ⬜ | | | | |
 | 14 | 2 | ⬜ | | | | |
 | 15 | 1 | ⬜ | | | | |

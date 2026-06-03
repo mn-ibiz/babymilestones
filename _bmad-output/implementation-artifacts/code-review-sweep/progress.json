@@ -58,7 +58,7 @@
     "8": "done",
     "9": "done",
     "11": "done",
-    "12": "todo",
+    "12": "done",
     "13": "todo",
     "14": "todo",
     "15": "todo",
@@ -1086,7 +1086,7 @@
         "59406373f43e423363cb451b741c3403d63403a3"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "12-3-deep-link-from-whatsapp-ads",
@@ -3108,8 +3108,16 @@
       "decisions_needed": 0,
       "dismissed": 3,
       "commit": ""
+    },
+    "12": {
+      "stories_reviewed": 1,
+      "patches": 0,
+      "deferred": 1,
+      "decisions_needed": 2,
+      "dismissed": 4,
+      "commit": ""
     }
   },
-  "epics_done": 10,
+  "epics_done": 11,
   "epics_total": 35
 }
