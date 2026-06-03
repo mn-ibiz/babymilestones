@@ -1,0 +1,39 @@
+{
+  "id": "X7-S03",
+  "verdict": "issues",
+  "diff_summary": "Adds six P1 compound components to @bm/ui (WalletBalanceCard, ChildCard, MpesaPushPrompt, ReceiptPreview, ParentShellLayout, StaffShellLayout) + index exports + snapshot/behaviour tests; pure presentational React composed from brand tokens, props typed from @bm/contracts.",
+  "ac_coverage": "AC1 met (all six components added & exported). AC2 met (props derive from @bm/contracts WalletOverview/Child/MpesaStkState/ReceiptDocument; StaffNavItem is a documented UI-only descriptor). AC3 met (6 snapshot tests + behaviour tests, all passing in working tree).",
+  "dismissed_count": 5,
+  "findings": [
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "edge",
+      "title": "formatChildAge renders \"NaN yrs NaN mo\" for non-finite ageInMonths",
+      "detail": "formatChildAge clamps with `Math.max(0, Math.trunc(ageInMonths))`, but `Math.max(0, NaN)` is `NaN`, so the negative-clamp does NOT guard against a non-finite value. A NaN ageInMonths produces the literal string \"NaN yrs NaN mo\" on the card. The Child contract types ageInMonths as plain `number` and the canonical `ageInMonths()` helper clamps NaN to 0, so in normal flows this is unreachable — but the clamp here is misleading (it reads as if it sanitises bad input when it only handles negatives). Low severity / defensive only.",
+      "location": "packages/ui/src/child-card.tsx:17",
+      "fix": "Coerce non-finite to 0 before clamping, e.g. `const months = Math.max(0, Math.trunc(Number.isFinite(ageInMonths) ? ageInMonths : 0));`",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "New @bm/ui compound components are not adopted by any P1 surface (parallel app-local duplicates remain)",
+      "detail": "apps/platform/app/components/WalletBalanceCard.tsx and ParentShellLayout.tsx (and admin reception receipt rendering) are pre-existing app-local components with the same names that do NOT import the new @bm/ui exports — they still hand-roll their own markup. The story's stated goal is 'standardise load-bearing UI patterns' / reusable+consistent, but no P1 surface consumes the new shared components, so the consistency benefit is unrealised. This is out of scope: the spec ACs and impl story scope X7-S03 to *adding* the components to packages/ui (migration/adoption is not an AC). Noting it so a follow-up can wire the apps to the shared components and retire the duplicates.",
+      "location": "apps/platform/app/components/WalletBalanceCard.tsx:12",
+      "fix": "Deferred — out of this story's ACs. Follow-up: migrate apps/platform and apps/admin surfaces to consume the @bm/ui compound components and delete the app-local duplicates.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "ChildCard allergy label has no non-visual/semantic emphasis (relies on color + ⚠ glyph only)",
+      "detail": "Allergy notes are surfaced as `⚠ {allergiesNotes}` styled with the `danger` token. The importance is conveyed only by colour + a decorative warning glyph; there is no role/label distinguishing it as a safety-critical alert (no aria role, no visually-hidden 'Allergy:' label). For a child-safety field on a booking selector this is weak signalling, but it is a presentational/design-polish call rather than a correctness bug, and not specified by the ACs.",
+      "location": "packages/ui/src/child-card.tsx:46",
+      "fix": "Deferred (design decision). Consider a visually-hidden 'Allergy:' label or an aria-label so assistive tech announces the severity, and treat the ⚠ as decorative (aria-hidden).",
+      "ac_ref": ""
+    }
+  ]
+}

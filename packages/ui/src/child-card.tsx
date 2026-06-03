@@ -14,7 +14,9 @@ export interface ChildCardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 /** Humanise whole months into a compact "2 yrs 4 mo" / "8 mo" label. */
 export function formatChildAge(ageInMonths: number): string {
-  const months = Math.max(0, Math.trunc(ageInMonths));
+  // Coerce non-finite (NaN/Infinity) to 0 — `Math.max(0, NaN)` is NaN, which would
+  // otherwise render "NaN yrs NaN mo" on the card.
+  const months = Math.max(0, Math.trunc(Number.isFinite(ageInMonths) ? ageInMonths : 0));
   const years = Math.trunc(months / 12);
   const rem = months % 12;
   if (years === 0) return `${rem} mo`;

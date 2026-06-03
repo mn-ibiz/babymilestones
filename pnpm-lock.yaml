@@ -35,6 +35,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@bm/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@bm/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -155,6 +158,9 @@ importers:
 
   apps/platform:
     dependencies:
+      '@bm/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@bm/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -192,6 +198,9 @@ importers:
 
   apps/pos:
     dependencies:
+      '@bm/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@bm/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

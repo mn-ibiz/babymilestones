@@ -33,6 +33,13 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 14 — Design System Foundation
+
+25. **[LOW · X7-S01] `brand`/`ink`/`surface` token aliases don't re-skin on a palette swap** — they're
+    hardcoded duplicates of `primary.500`/`neutral.900`, so receipt/packing-slip docs (direct token
+    consumers) keep the old colour. **Choose:** derive aliases from the palette, or accept the
+    decoupling (X7-S04 brand-override is the real re-skin) + document. File: `packages/config/tokens.cjs`.
+
 ## Epic 13 — Audit Log (outbox)
 
 22. **[MED · X5-S01] Structurally enforce the audit atomicity contract.** JSDoc warning now added, but

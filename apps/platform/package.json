@@ -17,7 +17,8 @@
     "react-dom": "^19.0.0",
     "@bm/ui": "workspace:*",
     "@bm/contracts": "workspace:*",
-    "@bm/observability": "workspace:*"
+    "@bm/observability": "workspace:*",
+    "@bm/config": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.2",

@@ -1,0 +1,39 @@
+{
+  "id": "X7-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds packages/config/tokens.cjs (canonical brand tokens) + tailwind.preset.cjs (makePreset factory) + .d.cts types; re-exports tokens/preset from the TS entrypoint; wires apps/{platform,pos,admin} with tailwind.config.cjs + postcss.config.cjs extending the preset; adds tailwindcss/postcss/autoprefixer devDeps; vitest preset.test.ts; eslint ignores *.cjs + next-env.d.ts.",
+  "ac_coverage": "AC1 implemented & tested (all token groups exported, asserted in preset.test.ts). AC2 implemented & tested at the preset level (resolveConfig inheritance) but apps require @bm/config without declaring it as a dependency (works only via pnpm hoisting). AC3 tested for primary.500 swap, but the brand/ink/surface aliases are hardcoded duplicates that do NOT re-skin on a palette swap.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Apps require('@bm/config') without declaring it as a dependency (phantom dependency)",
+      "detail": "apps/{platform,pos,admin}/tailwind.config.cjs each do require('@bm/config/tailwind.preset.cjs'), but none of the three apps list @bm/config in package.json dependencies (they only depend on @bm/ui, which transitively pulls @bm/config). Evidence: apps/admin/node_modules/@bm/ contains only contracts, observability, ui — no config symlink; there is no node_modules/@bm/ at the repo root; require.resolve('@bm/config/tailwind.preset.cjs') and require('./tailwind.config.cjs') both fail with MODULE_NOT_FOUND when run from each app dir. It currently works at build time ONLY because pnpm hoists @bm/config into node_modules/.pnpm/node_modules/@bm/config (default hoist=true) and Next/PostCSS resolves through that store (confirmed: apps/platform/.next compiled CSS contains .bg-primary-500/.text-primary-600 from the preset). This is a classic undeclared/phantom dependency: if hoisting is disabled (hoist=false / a hoist-pattern change) or @bm/ui ever drops its @bm/config dep, every app's Tailwind build silently loses the preset (or errors), undermining AC2's 'all apps extend the preset' guarantee.",
+      "location": "apps/admin/package.json:14, apps/platform/package.json:14, apps/pos/package.json:14",
+      "fix": "Add \"@bm/config\": \"workspace:*\" to the dependencies block of apps/admin/package.json, apps/platform/package.json, and apps/pos/package.json (each app directly requires @bm/config in its tailwind.config.cjs), then re-run pnpm install so each app gets a direct @bm/config symlink. Do not rely on transitive hoisting for a direct require.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "brand/ink/surface aliases are hardcoded duplicates and do not re-skin on a palette swap (partial AC3 gap)",
+      "detail": "tokens.cjs defines the back-compat aliases brand:'#FF6B9D' (== primary.500) and ink:'#1A1A2E' (== neutral.900) as independent string literals, not references. The AC3 test (preset.test.ts) only swaps primary.500 and asserts the resolved Tailwind config changes; it never checks the aliases. Direct token consumers — receipt-document.ts and packing-slip-document.ts read tokens.color.brand / tokens.color.ink straight from @bm/config — would therefore NOT re-skin when a designer swaps primary.500/neutral.900: AC3's 'a single token swap re-skins the whole suite' holds for Tailwind utility classes but breaks for these alias consumers, which keep the old colour. Verified: node -e shows primary500=#FF6B9D brand=#FF6B9D and neutral900=#1A1A2E ink=#1A1A2E as separate literals.",
+      "location": "packages/config/tokens.cjs:33-35",
+      "fix": "Option A (single source of truth): derive the aliases from the palette in tokens.cjs (e.g. brand = primary['500'], ink = neutral['900'], or move alias resolution into makePreset so a palette swap cascades). Option B: accept the decoupling as intentional back-compat (the later X7-S04 brand-override layer is the real re-skin mechanism) and document that brand/ink/surface are independent of the palette. Deferring the choice because the alias contract may be intentional; either way AC3 wording is broader than what is tested.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "apps/admin has no tailwind CSS entry, so it extends the preset but never emits any Tailwind output",
+      "detail": "AC2 requires every app to extend the preset. apps/admin/tailwind.config.cjs + postcss.config.cjs are present, but apps/admin has no globals.css with @tailwind directives and apps/admin/app/layout.tsx imports no stylesheet (confirmed at commit time and in the current working tree). So Tailwind/PostCSS never runs for admin and the preset produces zero styles there — unlike platform/pos, which import ./app/globals.css. At the time of this commit none of the three apps had a globals.css (they were added by later stories), so the preset wiring was intentionally config-only and consistent across all three. The admin CSS entry was simply never added by a downstream story. Pre-existing / downstream-app scaffolding scope, not a defect introduced by X7-S01.",
+      "location": "apps/admin/app/layout.tsx:1",
+      "fix": "Out of scope for X7-S01. When admin gets its first styled surface, add apps/admin/app/globals.css with @tailwind base/components/utilities and import it in app/layout.tsx (mirroring platform/pos). Note it; do not fix in this story.",
+      "ac_ref": "AC2"
+    }
+  ]
+}
