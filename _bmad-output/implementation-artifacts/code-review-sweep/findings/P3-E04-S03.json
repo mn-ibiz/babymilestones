@@ -1,0 +1,39 @@
+{
+  "id": "P3-E04-S03",
+  "verdict": "issues",
+  "diff_summary": "Admin manual loyalty adjustment: new POST /admin/parents/:parentId/loyalty/adjust + GET balance route (apps/api/src/routes/admin/loyalty.ts), pure ledger service adjustLoyaltyPoints (packages/wallet/src/loyalty-adjust.ts), loyaltyAdjustSchema + loyaltyAdjustmentDelta contract, `manage loyalty` RBAC grant (admin/super_admin) + seed migration 0086, loyalty.adjust audit action, merged loyalty_ledger schema/migrations 0083/0087 with append-only trigger.",
+  "ac_coverage": "AC1 (adjust amount+reason) implemented & tested. AC2 (loyalty_ledger row kind='adjustment', posted_by=admin) implemented & tested BUT the row's `reason` column is left NULL (reason not persisted on the ledger row, only in audit payload). AC3 (audit logged) implemented & tested, but audit write is not atomic with the ledger write. AC4 (admin/super_admin only) implemented & well tested (reception/cashier 403, anon 401, no-CSRF 403).",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "auditor",
+      "title": "Adjustment reason is never persisted on the loyalty_ledger row (reason column left NULL)",
+      "detail": "loyalty_ledger has a dedicated `reason` column (schema/loyalty.ts:54; migrations 0083:20 / 0087:9) added specifically for this story, and the route validates + accepts a required `reason`. But adjustLoyaltyPoints() inserts `.values({ parentId, pointsDelta, kind, postedBy, negativeCarry })` with NO `reason` key (loyalty-adjust.ts:66-75), so every adjustment row's reason is NULL. The 'why' is only stored in the audit_outbox payload (route loyalty.ts:107-112). Consequence: anyone reading the ledger itself (e.g. the parent loyalty history surface) cannot see why points were credited/debited; the reason and the row are decoupled, and reconstructing the 'why' requires joining to the audit log by ledgerId. The reviewer brief explicitly flags 'append-only + audited (who, why, amount)' and the JTBD is goodwill/correction — the reason is load-bearing. Neither the wallet unit test nor the route integration test asserts row.reason, so the gap is uncaught.",
+      "location": "packages/wallet/src/loyalty-adjust.ts:66-75",
+      "fix": "Pass the reason through to the insert: add `reason` to AdjustLoyaltyPointsInput is already present (input.reason is destructured at line 50 and validated at 58-60). Add `reason` to the insert values: `.values({ parentId, pointsDelta: points, kind: \"adjustment\", postedBy: adminUserId, reason, negativeCarry })`. Add an assertion `expect(row!.reason).toBe(...)` in loyalty-adjust.test.ts and the route test.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Ledger write and audit write are not atomic — a failed audit leaves an unaudited adjustment committed",
+      "detail": "The route calls adjustLoyaltyPoints({ db, ... }) where `db` is the top-level Database (not a transaction), so the loyalty_ledger row commits immediately at loyalty-adjust.ts:66. The audit(db, ...) call (route loyalty.ts:101-113) is a separate, subsequent statement. If the audit insert throws (constraint, connection drop, serialization failure) AFTER the ledger row is committed, the error propagates (route line 126 `throw err`) and the client sees 500, but the points adjustment is already persisted with NO audit_outbox row — violating AC3 / DoD#4 (audited actions write to audit_outbox) for that adjustment. Contrast earnPointsV2 (loyalty.ts:95-125), which wraps the ledger insert + audit in db.transaction. The append-only trigger means the orphaned row also cannot be cleaned up.",
+      "location": "apps/api/src/routes/admin/loyalty.ts:92-113",
+      "fix": "Wrap the ledger insert + audit in a single transaction so they commit or roll back together. Either (a) accept a tx in adjustLoyaltyPoints and have the route do `await db.transaction(async (tx) => { const result = await adjustLoyaltyPoints({ db: tx, ... }); await audit(tx, ...); return result; })`, or (b) move the audit() call inside adjustLoyaltyPoints behind a db.transaction, mirroring earnPointsV2.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Non-atomic balance read then insert can produce a stale negativeCarry flag / returned balance under concurrency",
+      "detail": "adjustLoyaltyPoints reads loyaltyBalance() then inserts in two separate statements with no transaction or row lock (loyalty-adjust.ts:62-75). Two concurrent adjustments (or an adjustment racing an earn/redeem) can each read the same balance, so the persisted `negativeCarry` boolean and the returned `balanceAfter` may not reflect the other concurrent write. This is NOT a money-correctness bug: the authoritative balance is always recomputed via SUM(pointsDelta) over the append-only ledger (loyalty.ts:171-177), and the inserted pointsDelta is an absolute signed value independent of the read. Only the derived `negativeCarry` flag on the row and the response `balance` can be momentarily stale. Pre-existing pattern across the P3-E04 ledger functions (earnPoints has the same read-then-write shape), so deferring rather than patching in this story.",
+      "location": "packages/wallet/src/loyalty-adjust.ts:62-75",
+      "fix": "Out of scope for S03 and not a correctness defect (balance is always derived from the ledger). If hardened later: compute the balance and insert inside a single transaction with a SELECT ... FOR UPDATE-style lock or recompute negativeCarry from a re-read inside the tx. Recommend deferring to an epic-wide concurrency pass.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

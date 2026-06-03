@@ -72,7 +72,7 @@
     "23": "done",
     "24": "done",
     "25": "done",
-    "26": "todo",
+    "26": "done",
     "27": "todo",
     "28": "todo",
     "29": "todo",
@@ -2094,7 +2094,7 @@
         "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "26-2-negative-loyalty-carry-repaid-by-future-earnings",
@@ -2111,7 +2111,7 @@
         "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "26-3-admin-manual-loyalty-adjustment",
@@ -2128,7 +2128,7 @@
         "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "26-4-loyalty-redemption-respects-pending-settlement",
@@ -2145,7 +2145,7 @@
         "ea4aa47282791aef3c5ac7f6da81558a6d1297b8"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "27-1-daily-operations-dashboard",
@@ -3220,8 +3220,16 @@
       "decisions_needed": 5,
       "dismissed": 15,
       "commit": ""
+    },
+    "26": {
+      "stories_reviewed": 4,
+      "patches": 1,
+      "deferred": 2,
+      "decisions_needed": 3,
+      "dismissed": 6,
+      "commit": ""
     }
   },
-  "epics_done": 24,
+  "epics_done": 25,
   "epics_total": 35
 }

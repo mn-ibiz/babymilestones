@@ -32,7 +32,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 23 | 5 | ✅ | 4 (commission double-pay BLOCKER, rate lock, mark-paid idemp, csv-injection test) | 3 | 6 | 15 |
 | 24 | 2 | ✅ | 1 (public viewer malformed-id 500→404) | 2 | 1 | 8 |
 | 25 | 5 | ✅ | 2 (salon counter IDOR BLOCKER, resync cancelled-slot) | 4 | 5 | 15 |
-| 26 | 4 | ⬜ | | | | |
+| 26 | 4 | ✅ | 1 (adjust reason persisted) | 2 | 3 | 6 |
 | 27 | 5 | ⬜ | | | | |
 | 28 | 5 | ⬜ | | | | |
 | 29 | 7 | ⬜ | | | | |

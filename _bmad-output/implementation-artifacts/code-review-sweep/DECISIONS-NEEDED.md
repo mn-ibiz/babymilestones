@@ -33,6 +33,27 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 26 — Loyalty Clawback / Negative Carry  ⚠️ STRUCTURAL
+
+64. **[BLOCKER · money · ARCHITECTURE] The loyalty ledger hosts two disjoint, unbridged engines.**
+    P2-E05 rows are keyed `walletId`/`direction`/`points`; P3-E04 rows (clawback, negative carry,
+    pending-settlement hold, admin adjustment) are keyed `parentId`/`points_delta`/`kind` with the other
+    columns NULL. The ONLY live redeem path (`redeemPoints`) sums the P2 partition and never sees the P3
+    partition — so **clawback, negative carry, AND pending-settlement holds are all invisible to
+    redemption**, and a parent can redeem around all of them (P3-E04-S02 + S04 blockers; the P2-E05-S03
+    #47 gap confirmed). `availableLoyaltyToRedeem` (the correct guard) is dead code and couldn't work
+    without reconciling the owner key. **Decision:** unify the ledger on ONE owner+delta representation
+    so every balance/redeem surface counts all rows. Not a mechanical patch.
+
+65. **[HIGH · P3-E04] Is P3-E04 live or staged?** Neither `clawbackForRefund`, `earnPoints`, nor
+    `availableLoyaltyToRedeem` has a production caller (refund only sets a `loyalty_clawback_pending`
+    flag nothing consumes). When wired (alongside #64): write the `loyalty.clawback` audit row, add
+    DB-level idempotency + a tx + a per-parent row lock to clawback/earn/adjust (all currently
+    read-then-insert unlocked), claw against remaining-clawable points, and add the AC3 available-to-redeem
+    UI field. (S03 admin-adjust IS live and was fixed: reason now persisted on the ledger row.)
+
+66. **[MED · P3-E04-S03] Admin adjust ledger insert + audit not atomic** — wrap in one tx.
+
 ## Epic 25 — Kids-Only Salon Flow
 
 60. **[BLOCKER → money · P3-E03-S04] Re-reassign back to a zero-net stylist silently loses commission.**

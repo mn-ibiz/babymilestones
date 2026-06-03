@@ -1,0 +1,49 @@
+{
+  "id": "P3-E04-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds proportional loyalty clawback: pure integer helper loyaltyClawbackPoints (contracts), clawbackForRefund primitive + loyaltyBalance/earnPoints (packages/wallet), merged append-only loyalty_ledger schema/migrations 0083-0087. Clawback is a NEW reversing loyalty_ledger row (kind='clawback', negative points_delta) referencing the earn and the triggering refund; never mutates history; flags negative_carry when balance crosses zero.",
+  "ac_coverage": "AC1 partial (proportional math from a snapshot is computed by clawbackForRefund, but the 'when wallet_ledger.kind=refund posts' trigger is NOT wired end-to-end and earn_rate-snapshot derivation is left to a non-existent caller); AC2 implemented & tested (reverses_loyalty_ledger_id + source_wallet_ledger_id); AC3 implemented & tested; AC4 implemented & tested; AC5 (append-only/decision 22) honoured via reversing entry + immutability trigger. No end-to-end test of the refund->clawback trigger; no audit_outbox write.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Clawback primitive is never invoked — AC1 refund trigger is not wired end-to-end",
+      "detail": "AC1 requires that 'when wallet_ledger.kind=refund posts, compute the points earned on the original transaction and insert a loyalty_ledger debit'. refund() (packages/wallet/src/refund.ts:162) only sets loyaltyClawbackPending=true and defers the actual clawback to 'a later job'. Nothing in the repo ever reads loyaltyClawbackPending or calls clawbackForRefund: grep shows the only references are its own definition, the barrel re-export (packages/wallet/src/index.ts:98) and tests. There is no job in apps/jobs/src/jobs, no route, no service that picks up pending refunds, derives earnedPoints from the earn's earn_rate snapshot, and calls clawbackForRefund. So a real refund never claws back any points and loyaltyClawbackPending is set but never cleared. The clawback primitive and its integer math are correct in isolation, but the story's headline behaviour does not happen in production.",
+      "location": "packages/wallet/src/refund.ts:162 ; packages/wallet/src/loyalty-clawback.ts:58",
+      "fix": "Pre-existing/cross-story scope: the refund (P1-E03-S06) deliberately defers clawback to 'P3-E04 / a later job', and this story's task list scopes itself to the primitive + pure math. Deferring, but the epic must add the consumer (a drain job over wallet_ledger WHERE loyalty_clawback_pending=true that loads the earn rows for the refunded wallet_ledger entry, derives earnedPoints/originalMinor from each earn's earn_rate snapshot, calls clawbackForRefund, and clears the pending flag) and an end-to-end test, or AC1 is not actually met for the epic.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Money-moving clawback writes no audit_outbox entry despite a registered loyalty.clawback action",
+      "detail": "loyalty.clawback is a registered audited action (packages/auth/src/audit-actions.ts:185) and the DoD requires audited actions to write to audit_outbox. clawbackForRefund inserts a points-eroding (often balance-negative) ledger row but never calls audit() (grep for 'audit' in loyalty-clawback.ts returns nothing). The sibling earnPointsV2 (packages/wallet/src/loyalty.ts:112) and refund() (refund.ts:166) both audit. A clawback that silently reduces a parent's loyalty balance with no audit trail is a money/compliance gap.",
+      "location": "packages/wallet/src/loyalty-clawback.ts:146",
+      "fix": "After the INSERT ... returning() (and in the zero-proportion release branch), call audit(db, { actor: postedBy, action: 'loyalty.clawback', target: { table: 'loyalty_ledger', id: row.id }, payload: { parent_id: parentId, reverses_loyalty_ledger_id: earnLedgerId, source_wallet_ledger_id: refundWalletLedgerId, points_delta: -points, negative_carry: negativeCarry } }). This requires the function to run inside a transaction (see related finding) so the audit and the ledger insert commit atomically.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Idempotency is SELECT-then-INSERT with no unique constraint or transaction — concurrent/retried clawbacks can double-claw",
+      "detail": "Clawback idempotency relies entirely on an application-level read (lines 79-103: select clawback rows tied to source_wallet_ledger_id, early-return if a finalised one exists) followed by an INSERT. Unlike refund()/earnPointsV2, which back idempotency with the UNIQUE idempotency_key column, the P3-E04 clawback path leaves idempotency_key NULL and there is NO unique index on (parent_id, kind, source_wallet_ledger_id) (only a plain index, migration 0087:33; schema/loyalty.ts:74). The function also does not wrap its read+write in db.transaction() — it accepts a plain Database|Transaction and the (non-existent) caller is trusted to pass a tx. If the future drain job runs twice concurrently, or retries after a timeout, two clawback rows for the same refund can be written and the balance is debited twice. The 'idempotent on replay' test (loyalty-clawback.test.ts:193) only covers strictly sequential calls, not concurrency.",
+      "location": "packages/wallet/src/loyalty-clawback.ts:79 ; packages/db/migrations/0087_loyalty_p3e04_columns.sql:33",
+      "fix": "Add a hard DB backstop: either populate idempotency_key (e.g. `clawback:${refundWalletLedgerId}`) on the finalised insert and rely on the existing UNIQUE(idempotency_key), or add `CREATE UNIQUE INDEX loyalty_ledger_clawback_refund_uniq ON loyalty_ledger (source_wallet_ledger_id) WHERE kind='clawback' AND points_delta <> 0` (additive migration). Also wrap the balance read + tied SELECT + INSERT inside db.transaction() so they are atomic, and handle the unique-violation as a no-op replay.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Rounding drift across multiple partial refunds can systematically under-claw",
+      "detail": "Each clawbackForRefund call computes loyaltyClawbackPoints(earnedPoints, refundedMinor, originalMinor) independently against the FULL earnedPoints/originalMinor with round-half-up, with no cross-refund accounting of points already clawed. With many small partial refunds the per-refund rounding can sum to less than a single full-refund clawback. Example: earn 7 points on 30000; three refunds of 10000 each -> round(7*10000/30000)=2 each -> total 6, vs 7 for one full refund (1 point never clawed). Magnitude is tiny but it is a real, repeatable under-clawback that a determined actor could exploit via many micro-refunds.",
+      "location": "packages/wallet/src/loyalty-clawback.ts:109 ; packages/contracts/src/index.ts:4425",
+      "fix": "Deferred (low magnitude, and the trigger is unwired today). When wiring the consumer, claw back against remaining-clawable points (earnedPoints minus points already clawed for prior refunds of the same earn) rather than recomputing the proportion from the full earn each time, so the running total reconciles to the cumulative refunded fraction exactly.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

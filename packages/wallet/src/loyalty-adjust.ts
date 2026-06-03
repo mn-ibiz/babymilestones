@@ -70,6 +70,9 @@ export async function adjustLoyaltyPoints(
       pointsDelta: points,
       kind: "adjustment",
       postedBy: adminUserId,
+      // Persist the WHY on the ledger row itself (the column exists for this) — not
+      // only in the audit payload — so anyone reading the ledger sees the reason.
+      reason: reason.trim(),
       negativeCarry,
     })
     .returning();

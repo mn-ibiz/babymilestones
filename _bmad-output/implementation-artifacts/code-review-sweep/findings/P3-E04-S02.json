@@ -1,0 +1,39 @@
+{
+  "id": "P3-E04-S02",
+  "verdict": "issues",
+  "diff_summary": "packages/wallet/src/loyalty.ts adds P3-E04 earnPoints(parentId,points) that reads loyaltyBalance and calls contracts splitEarnAgainstCarry to repay a negative carry before crediting spendable points, tagging applied_to_negative_carry on a new append-only loyalty_ledger row; backed by contracts splitEarnAgainstCarry pure helper + loyalty-carry.test.ts. Lands on a merged loyalty_ledger that now hosts TWO disjoint engines (P2-E05 walletId/direction/points and P3-E04 parentId/points_delta/kind), columns relaxed to nullable by migration 0087.",
+  "ac_coverage": "AC1 (repay carry first, remainder spendable): pure math + sequential earnPoints path implemented & unit-tested, but the earn function has NO production caller, so the AC is never exercised end-to-end and the carry it would repay is computed on a column space (points_delta) that the live redeem path cannot see. AC2 (tag applied_to_negative_carry portion): implemented & tested for the sequential case, but the tag is computed under a TOCTOU race (no tx/lock) so it can double-count under concurrency.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Negative carry is invisible to the only live redemption path — a parent CAN redeem around it",
+      "detail": "S02's carry lives in the P3-E04 column space: clawbackForRefund / adjustLoyaltyPoints write rows with parentId+points_delta+kind and leave the P2-E05 columns (direction/points) NULL, and loyaltyBalance(parentId) sums points_delta. But the ONLY production redemption path, POST /parents/me/loyalty/redeem (apps/api/src/routes/parents/loyalty.ts:123), calls redeemPoints -> getLoyaltyBalance(walletId) which sums ONLY 'direction'/'points' rows (packages/wallet/src/loyalty.ts:152-156 / loyalty-redeem.ts:84-87). A negative carry created by an admin debit-beyond-balance (adjustLoyaltyPoints, the live S03 route) or by a refund clawback is therefore NOT seen by the redeem balance check. If the parent has any P2-E05 earn rows, they redeem the full P2-E05 balance while the P3-E04 negative carry sits untouched — i.e. they escape the carry exactly as the brief feared. The parent dashboard GET /parents/me/loyalty (loyalty.ts:81-103) is also blind to the carry, showing an overstated balance. Same dual-schema root cause already flagged as a blocker from the redeem side in P3-E04-S04. The whole S02 promise ('future earnings repay the carry before the parent can redeem') is unenforceable across the two engines as wired.",
+      "location": "apps/api/src/routes/parents/loyalty.ts:123, packages/wallet/src/loyalty-redeem.ts:84, packages/wallet/src/loyalty.ts:152",
+      "fix": "Decision needed (epic-wide): unify the loyalty ledger on ONE owner+delta representation. Either (a) collapse to parentId+points_delta and route redeemPoints/getLoyaltyBalance/getLoyaltyTotals through SUM(points_delta) over the parent so clawback/carry/adjustment rows are counted, or (b) map walletId<->parentId and have getLoyaltyBalance include points_delta rows. Until unified, no redemption surface respects the negative carry. Not a mechanical patch — it crosses S01/S02/S03/S04 and the P2-E05 engine.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "earnPoints (the S02 feature) has no production caller — AC1/AC2 never run outside unit tests",
+      "detail": "Neither P3-E04 earnPoints nor P2-E05 earnPointsV2 is invoked anywhere in apps/ (grep of apps/ + jobs finds only the @bm/wallet barrel re-exports and test files). The refund handler (apps/api/src/routes/admin/refund.ts) only sets a loyalty_clawback_pending boolean flag on wallet_ledger; it never calls clawbackForRefund, and no path calls earnPoints. So the entire earn->repay-carry behaviour this story exists to deliver is dead code in production: a negative carry, once created, is never repaid because nothing ever earns into the P3-E04 column space. The DoD ('all AC have a passing test') is met only at the unit level; there is no integration/E2E wiring, and DoD item 6 (PM/designer walked the staging build) cannot be true for a surface that does not exist.",
+      "location": "packages/wallet/src/loyalty.ts:180, apps/api/src/routes/admin/refund.ts",
+      "fix": "Decision needed: confirm whether P3-E04 was intended to ship behind the live P2-E05 engine or to replace it. If it is meant to be live, wire earnPoints into the settled-payment earn flow and clawbackForRefund into the refund handler; if it is staged for a later cutover, the story should not be marked Done/Ready and the carry-repay AC should be flagged as not-yet-wired.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "high",
+      "category": "patch",
+      "lens": "edge",
+      "title": "earnPoints carry split is computed under TOCTOU — concurrent earns double-count applied_to_negative_carry (AC2)",
+      "detail": "earnPoints reads loyaltyBalance(db, parentId) then inserts, with NO transaction and NO row lock (packages/wallet/src/loyalty.ts:193-207). This violates the project's own established pattern: wallet debit.ts wraps read+write in db.transaction with SELECT ... FOR UPDATE on the wallet row precisely to serialise concurrent balance reads (packages/wallet/src/debit.ts:95-126), and redeemPoints does the same. Trigger: two concurrent earns of 100 on a parent at balance -100. Both read -100, both compute splitEarnAgainstCarry(-100,100)={appliedToCarry:100,spendable:0}, both insert appliedToNegativeCarry:100. The running balance ends correct (+100, append-only deltas) but the applied_to_negative_carry tags sum to 200 against a 100 deficit — AC2 traceability is corrupted and any aggregate over applied_to_negative_carry / pending_clawback (e.g. S04's availableLoyaltyToRedeem which SUMs pending_clawback) is now wrong. adjustLoyaltyPoints and clawbackForRefund share the same unlocked read-then-write race (negativeCarry flag can be stale).",
+      "location": "packages/wallet/src/loyalty.ts:193",
+      "fix": "Wrap earnPoints' balance-read + insert in db.transaction with a serialising lock on the parent's loyalty rows (mirror debit.ts: SELECT ... FOR UPDATE on the owner row, or an advisory lock keyed by parentId), so the carry split is computed against a committed balance. Apply the same to adjustLoyaltyPoints and clawbackForRefund. EarnPointsInput already accepts a LedgerReader, so callers can pass a tx, but the function must open/lock its own when given the pooled db.",
+      "ac_ref": "AC2"
+    }
+  ]
+}
