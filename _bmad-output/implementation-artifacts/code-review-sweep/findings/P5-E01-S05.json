@@ -1,0 +1,8 @@
+{"id":"P5-E01-S05","verdict":"issues","patches_applied":1,"decisions":2,"deferred":2,"dismissed":4,
+ "findings":[
+  {"severity":"low","category":"patch","title":"PATCH null-label-while-enabled now 400 (was DB CHECK->500); merged re-check + test","location":"apps/api/src/routes/admin/services.ts:190","status":"FIXED"},
+  {"severity":"medium","category":"decision-needed","title":"Discreet billing fails OPEN (blank label + enabled renders real name)","location":"packages/ui/src/receipt-document.ts:96-101"},
+  {"severity":"low","category":"decision-needed","title":"Substitution coaching-only but column on all services; non-coaching SMS leaks","location":"apps/api/src/routes/parents/booking.ts:196"},
+  {"severity":"medium","category":"defer","title":"Feedback-invite SMS uses real service name (latent leak when coaching feedback ships) — track Epic 34","location":"apps/api/src/feedback.ts:81-94"},
+  {"severity":"low","category":"defer","title":"Reprint re-SMS discreet path untested","location":"apps/api/src/routes/receipts/reprint.test.ts"}
+ ]}

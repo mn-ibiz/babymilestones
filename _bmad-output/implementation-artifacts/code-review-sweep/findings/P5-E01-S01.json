@@ -1,0 +1,5 @@
+{"id":"P5-E01-S01","verdict":"issues","patches_applied":0,"decisions":2,"deferred":0,"dismissed":3,
+ "findings":[
+  {"severity":"medium","category":"decision-needed","title":"Server contract does not enforce group format => capacity>1 (client-only)","location":"packages/contracts/src/index.ts:1768-1869"},
+  {"severity":"low","category":"decision-needed","title":"Coaching attributes accepted on non-coaching units","location":"packages/contracts/src/index.ts:1782-1785"}
+ ]}

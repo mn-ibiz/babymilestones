@@ -1,0 +1,6 @@
+{"id":"P5-E01-S04","verdict":"issues","patches_applied":1,"decisions":2,"deferred":0,"dismissed":6,
+ "findings":[
+  {"severity":"low","category":"patch","title":"Public coach-summary route now UUID-validates before query (was 22P02->500); test added","location":"apps/api/src/routes/public/coaching-notes-summary.ts:63-67","status":"FIXED"},
+  {"severity":"medium","category":"decision-needed","title":"AC2 named-coach decrypted read not delivered; listCoachingSessionNotesForCoach is unwired dead code","location":"packages/catalog/src/coaching-session-notes.ts:202"},
+  {"severity":"low","category":"decision-needed","title":"AC1 'after check-out' not enforced (no booking.status check)","location":"packages/catalog/src/coaching-session-notes.ts:96-101"}
+ ]}

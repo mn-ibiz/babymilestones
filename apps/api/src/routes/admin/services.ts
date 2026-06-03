@@ -187,6 +187,25 @@ export function registerAdminServices(app: FastifyInstance, deps: AdminServicesD
     if (mergedMin != null && mergedMax != null && mergedMin > mergedMax) {
       return reply.code(400).send({ error: "ageMinMonths must be ≤ ageMaxMonths", field: "ageMaxMonths" });
     }
+    // Same merged re-check for discreet billing: clearing the label while the row
+    // stays enabled (e.g. PATCH { discreetBillingLabel: null } on an enabled service)
+    // would violate the services_discreet_billing_ck CHECK and surface as a raw 500.
+    // A privacy feature must never silently fall back to the real service name, so
+    // reject the unsafe pair with a 400.
+    const mergedDiscreetEnabled =
+      parsed.data.discreetBillingEnabled !== undefined
+        ? parsed.data.discreetBillingEnabled
+        : existing.discreetBillingEnabled;
+    const mergedDiscreetLabel =
+      parsed.data.discreetBillingLabel !== undefined
+        ? parsed.data.discreetBillingLabel
+        : existing.discreetBillingLabel;
+    if (mergedDiscreetEnabled && !mergedDiscreetLabel) {
+      return reply.code(400).send({
+        error: "discreetBillingLabel is required when discreet billing is enabled",
+        field: "discreetBillingLabel",
+      });
+    }
     const row = await updateService(db, id, parsed.data);
     await audit(db, {
       actor: actor.id,

@@ -1,0 +1,6 @@
+{"id":"P5-E01-S02","verdict":"issues","patches_applied":0,"decisions":0,"deferred":3,"dismissed":2,
+ "findings":[
+  {"severity":"medium","category":"defer","title":"coaching-reminders cron 0 18 * * * ignored (intervalMs-only scheduler) — systemic","location":"apps/jobs/src/jobs/coaching-reminders.ts:61"},
+  {"severity":"low","category":"defer","title":"coaching-slot-generation omits cron descriptor","location":"apps/jobs/src/jobs/coaching-slot-generation.ts:25-35"},
+  {"severity":"low","category":"defer","title":"Past-time slot still bookable today (pre-existing, shared w/ salon)","location":"packages/catalog/src/coaching.ts:331-343"}
+ ]}

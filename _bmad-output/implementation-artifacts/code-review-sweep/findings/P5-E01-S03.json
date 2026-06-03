@@ -1,0 +1,6 @@
+{"id":"P5-E01-S03","verdict":"issues","patches_applied":0,"decisions":2,"deferred":1,"dismissed":5,
+ "findings":[
+  {"severity":"medium","category":"decision-needed","title":"Same child can take multiple seats in one group slot (no uniqueness guard)","location":"packages/catalog/src/coaching.ts:512"},
+  {"severity":"low","category":"decision-needed","title":"Server doesn't enforce group => capacity>1 (dup of S01)","location":"packages/contracts/src/index.ts:1796"},
+  {"severity":"low","category":"defer","title":"Booking page copy hard-coded 1:1 for group offerings","location":"apps/platform/app/(app)/book/coaching/[serviceId]/page.tsx:99"}
+ ]}

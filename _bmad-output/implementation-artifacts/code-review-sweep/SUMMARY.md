@@ -37,7 +37,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 28 | 5 | ✅ | 1 (commission fail-alert guard) | 4 | 5 | 8 |
 | 29 | 7 | ✅ | 3 (stock lost-update BLOCKER, Woo SSRF BLOCKER, packing-slip print) | 6 | 6 | 18 |
 | 30 | 5 | ✅ | 1 (door double-admit TOCTOU) | 2 | 3 (incl. payment-not-wired BLOCKER, capacity oversell race) | 9 |
-| 31 | 5 | ⬜ | | | | |
+| 31 | 5 | ✅ | 2 (public coach-summary UUID guard, discreet-label PATCH 400-not-500) | 5 | 6 | 16 |
 | 32 | 4 | ⬜ | | | | |
 | 33 | 4 | ⬜ | | | | |
 | 34 | 4 | ⬜ | | | | |

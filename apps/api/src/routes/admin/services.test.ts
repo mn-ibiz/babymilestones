@@ -534,4 +534,26 @@ describe("Service catalogue admin API (P1-E07-S01)", () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().field).toBe("discreetBillingLabel");
   });
+
+  it("rejects clearing the label while discreet billing stays enabled (merged re-check 400, not 500)", async () => {
+    const creds = await loginStaff("+254712000001", "7421");
+    const svc = (
+      await req("POST", "/admin/services", creds, {
+        name: "Coaching",
+        unit: "coaching",
+        discreetBillingEnabled: true,
+        discreetBillingLabel: "BM Coaching Session",
+      })
+    ).json();
+    // The patch omits discreetBillingEnabled (stays true) but nulls the label — this
+    // would violate the DB CHECK and leak the real name. Must be a 400, never a 500.
+    const res = await req("PATCH", `/admin/services/${svc.id}`, creds, {
+      discreetBillingLabel: null,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().field).toBe("discreetBillingLabel");
+    // The stored row is untouched — label still present.
+    const read = await req("GET", `/admin/services/${svc.id}`, creds);
+    expect(read.json().discreetBillingLabel).toBe("BM Coaching Session");
+  });
 });

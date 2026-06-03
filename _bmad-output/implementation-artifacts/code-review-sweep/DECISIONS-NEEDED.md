@@ -3,6 +3,34 @@
 These are real findings where the correct fix requires a human/product decision (ambiguous intent).
 They are NOT auto-fixed. Review and tell me how to resolve each.
 
+## Epic 31 — Mom Coaching & Doula  (sensitive flow)
+
+80. **[MED · privacy · P5-E01-S04] AC2 "named coach can read their OWN notes" is not delivered.** The
+    only decrypted surface is the admin `read audit` route (returns ALL coaches' notes, unscoped). The
+    public coach name-picker is deliberately content-free (counts + dates). `listCoachingSessionNotesForCoach`
+    (coach-scoped decrypt) is written + tested but **unwired dead code**. The dev's rationale (a coach
+    has no login; the picker is internet-reachable, so decrypting there would leak to anyone) is sound,
+    but the coach-visibility half of AC2 is functionally absent. **Decide:** (A) accept summary-only and
+    delete the dead decrypt path, or (B) wire a reception-mediated, coach-scoped decrypted view (never
+    on the public router).
+
+81. **[MED · privacy · P5-E01-S05] Discreet billing fails OPEN.** `receiptLineDescription` falls back to
+    the REAL service name when discreet billing is enabled but the label is empty (a test codifies it).
+    The DB CHECK makes that state unreachable today, but for a privacy feature the fail-safe default
+    should be a generic neutral label ("Service"), not the sensitive name. **Decide** the fallback.
+
+82. **[MED · P5-E01-S03] One parent/child can consume MULTIPLE seats in the same group coaching slot** —
+    no uniqueness guard on `(coachingSlotId, childId)`; only total seat count is enforced. One family
+    can take all N seats + raise N invoices. **Decide** whether a child may book a group session more
+    than once; if not, add an under-lock guard + partial unique index.
+
+83. **[LOW · P5-E01-S01/S03] Server contract doesn't enforce `format='group' ⇒ capacity>1`** (client
+    form only — direct API can create group+capacity-1, silently a 1:1). **[LOW · S05]** discreet
+    substitution is coaching-only but the toggle lives on every service (non-coaching SMS would leak —
+    constrain to `unit='coaching'` or share the helper). **[LOW · S04]** AC1 "after check-out" not
+    enforced (a note can attach to any coaching booking regardless of status). **[LOW · S01]** coaching
+    attributes accepted on non-coaching units despite the "only coaching carries one" invariant.
+
 ## Epic 1 — Identity & SSO
 
 1. **[HIGH · P1-E01-S05] Brute-force protection on `POST /auth/reset/verify`.**

@@ -77,7 +77,7 @@
     "28": "done",
     "29": "done",
     "30": "done",
-    "31": "todo",
+    "31": "done",
     "32": "todo",
     "33": "todo",
     "34": "todo",
@@ -2547,7 +2547,7 @@
         "609d05a7ccc3df1b96a9dacb9fc03bab60b7fa53"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "31-2-coach-availability-and-1-1-booking",
@@ -2566,7 +2566,7 @@
         "645cba8c0a993296fb185cb06bd53eaf8abe54e5"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "31-3-group-session-booking",
@@ -2584,7 +2584,7 @@
         "35f038dff5de7858e168d1c89f65d6ded4f0c30a"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "31-4-coach-session-notes-private",
@@ -2602,7 +2602,7 @@
         "84a8847e54414491361778f771e1b318038ddb81"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "31-5-sensitive-flow-discreet-billing-labels",
@@ -2620,7 +2620,7 @@
         "fc6757d5a0a0b8c2061e06644adce958585794e2"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "32-1-etims-adapter-implementation",
@@ -3260,8 +3260,16 @@
       "decisions_needed": 3,
       "dismissed": 9,
       "commit": ""
+    },
+    "31": {
+      "stories_reviewed": 5,
+      "patches": 2,
+      "deferred": 5,
+      "decisions_needed": 6,
+      "dismissed": 16,
+      "commit": ""
     }
   },
-  "epics_done": 29,
+  "epics_done": 30,
   "epics_total": 35
 }
