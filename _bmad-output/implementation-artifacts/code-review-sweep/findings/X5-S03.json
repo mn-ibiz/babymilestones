@@ -1,0 +1,29 @@
+{
+  "id": "X5-S03",
+  "verdict": "issues",
+  "diff_summary": "New packages/auth/src/audit-actions.ts: category-grouped const AUDIT_ACTION_CATALOGUE, derived AUDIT_ACTIONS tuple + AuditAction union, auditAction()/isAuditAction() helpers; exported from @bm/auth index; audit-actions.test.ts adds shape/category/exclusion/narrowing + a codebase-scan completeness test that asserts every emitted audit() action: literal is registered.",
+  "ac_coverage": "AC1 implemented & tested (typed const map + union + helpers; shape/narrowing tests). AC2 implemented & tested (auth, roleChange incl. rbac.impersonate, ledger postings, refund wallet.refund, settings present; consent and receipt.voided also covered; representative-actions test). AC3 implemented & tested (inline doc + regex test rejecting read/list/view/page/nav/etc). Verified in working tree: independent re-scan finds 0 emitted actions missing from the catalogue; all auth/login/signup/refund/impersonation/void/consent actions are catalogued and emitted.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Catalogue enforcement leans on a static-scan test that is blind to non-literal action values",
+      "detail": "The only LIVE guard keeping the catalogue from drifting is the codebase-scan completeness test (audit-actions.test.ts). audit()'s action is typed plain `string` (by design — @bm/db cannot import upward), and only 11 of ~176 audit() call sites wrap their action in auditAction(); the other ~94% pass raw string literals with no compile-time check. The scan reads only the first statically-readable `action:` literal within a 600-char window after each `audit(`. It cannot see actions passed as a variable: apps/api/src/routes/pos/order-transitions.ts emits `action: auditAction` where `auditAction` is a local const assigned via a ternary (woocommerce.order.transition / _reversed). Today both values happen to be catalogued (the scan picks them up from the ternary literals elsewhere), so there is no live defect — but a future call site that assigns a NOT-yet-catalogued action to a variable before audit() would silently bypass the only enforcement and the catalogue would drift undetected. The spec's intent ('single typed source of truth', not docs that drift) is only partially enforced.",
+      "location": "packages/auth/src/audit-actions.test.ts:115-152 (scan); apps/api/src/routes/pos/order-transitions.ts:133-139 (variable-action blind spot)",
+      "fix": "Decision for the team: (a) accept the documented tradeoff as-is (the scan covers all current sites and 0 are missing), or (b) harden enforcement — e.g. lint/grep rule requiring every audit() action arg to be a literal or an auditAction()/isAuditAction()-checked value, and/or have the scan flag audit() sites whose action is a non-literal it cannot resolve (assert the count of unresolved sites stays at a known allowlist) so a new unresolved site fails CI rather than passing silently.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Completeness scan's directory walk uses statSync and would throw on a broken symlink instead of skipping",
+      "detail": "walk() in audit-actions.test.ts calls statSync(full) inside the loop with no per-entry try/catch; a broken/dangling symlink under apps/ or packages/ would throw ENOENT and crash the whole completeness test (rather than skip the entry). Verified there are currently NO symlinks under apps/ or packages/, so this cannot trigger today — purely a latent robustness gap, not a current failure.",
+      "location": "packages/auth/src/audit-actions.test.ts:94-113",
+      "fix": "Deferred (no live impact). If touched later: wrap statSync per-entry in try/catch (skip on error) or use lstatSync, mirroring the existing readdirSync try/catch.",
+      "ac_ref": ""
+    }
+  ]
+}

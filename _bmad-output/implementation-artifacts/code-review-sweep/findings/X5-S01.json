@@ -1,0 +1,39 @@
+{
+  "id": "X5-S01",
+  "verdict": "issues",
+  "diff_summary": "packages/db: new auditOutbox Drizzle table (schema/audit.ts) + additive migration 0001_audit_outbox.sql, executor-agnostic audit() write helper (audit.ts), PGlite test harness (testing.ts, @bm/db/testing export), AC tests (audit.test.ts); index.ts re-exports schema + audit; package.json adds @electric-sql/pglite dep.",
+  "ac_coverage": "AC1 (table columns/types/nullability) implemented & tested; AC2 (audit() insertable in any TX) implemented & tested; AC3 (outbox row = durable guarantee via TX atomicity) implemented & proven by the rollback test. No missing ACs.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "audit() does not nudge callers toward the transactional (atomic) path — the non-atomic call is just as easy",
+      "detail": "The story's job-to-be-done is 'record an audit event in the SAME transaction as the business write', and AC3 makes the outbox row the durable audit guarantee. That guarantee only holds when a transaction handle is passed. But AuditExecutor = Database | Transaction accepts the top-level (auto-commit) Database just as readily as a tx, with zero type-level or runtime signal that atomicity requires a tx. There is no way to tell, at a call site, whether the audit row will commit/rollback with the business write. Confirmed in the working tree that this is a live foot-gun: e.g. packages/catalog/src/review-snippets.ts:222-238 does db.update(...).returning() then audit(db, ...) as two separate auto-commit statements — if the audit insert fails, the business UPDATE has already committed un-audited (and vice-versa). Many other call sites (apps/api/src/routes/admin/*, apps/jobs/*) also pass the bare db. The helper as shipped makes the non-atomic outcome the path of least resistance, undercutting the very guarantee the story exists to provide. (Some audit(db, ...) calls are legitimately standalone — e.g. a failed-login audit with no business write — so a blanket 'always require tx' is wrong, which is why this is a product/design decision, not an unambiguous patch.)",
+      "location": "packages/db/src/audit.ts:9-35",
+      "fix": "Options: (a) document the atomicity contract loudly in the audit() JSDoc and AuditExecutor — 'pass the surrounding tx whenever an audited business write exists; passing the top-level db means the audit is NOT atomic with any sibling write'; (b) provide two named entry points, e.g. auditInTx(tx, ...) (the default, atomic) and auditStandalone(db, ...), so the non-atomic path is explicit and greppable; (c) add a lint rule / review checklist item that any audit() in the same function as a write must share the executor. Pick per team convention.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "audit_outbox has no DB-layer protection against DELETE or content mutation (unlike the sibling wallet_ledger)",
+      "detail": "An audit trail is only trustworthy if it cannot be silently deleted or rewritten. The sibling append-only ledger wallet_ledger (migrations/0011_wallet_ledger.sql:22-55) enforces this at the database layer with a RAISE-on-UPDATE/DELETE trigger plus a role REVOKE UPDATE,DELETE for bm_app — making mutation impossible even for the app role, not just in TS. audit_outbox (migrations/0001_audit_outbox.sql) ships with no trigger and no REVOKE, so the app role can DELETE rows or overwrite actor/action/target/payload with no DB-layer barrier. Note this is genuinely nuanced: the outbox is NOT strictly append-only — the X5-S02 drain worker must UPDATE processed_at (and later attempt_count/next_attempt_at/dead_lettered_at per migration 0040), so a blanket no-UPDATE trigger like wallet_ledger's would break the drain. The meaningful guarantees here are 'no DELETE' and 'the audit content columns (actor_user_id, action, target_table, target_id, payload, created_at) are immutable once written', leaving only the worker-bookkeeping columns updatable. Deferred because it needs a column-aware trigger design and a security/product call on how strict to be; X5-S01 satisfied its ACs as written (which did not require DB-layer immutability).",
+      "location": "packages/db/migrations/0001_audit_outbox.sql:1-16",
+      "fix": "Defer. Future hardening: add a BEFORE DELETE trigger that RAISEs, and a BEFORE UPDATE trigger that RAISEs only when any of the content columns change (allowing the worker to flip processed_at/backoff columns) — mirror the portable, harness-friendly pattern in 0011_wallet_ledger.sql. Plus the bm_app GRANT/REVOKE for defence-in-depth. Decide scope with security/PM.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "@electric-sql/pglite (test-only WASM Postgres) declared as a production dependency",
+      "detail": "X5-S01 added @electric-sql/pglite to packages/db dependencies (package.json:20), not devDependencies. PGlite is only used by the test harness (src/testing.ts, exposed via the ./testing subpath export). The production paths never import it at runtime: client.ts uses `import type { PgliteDatabase }` (erased at compile), and the prod migration runner (src/migrate.ts) lazily imports the real `postgres` driver, not PGlite. Shipping a multi-MB WASM Postgres in production node_modules / bundles is unnecessary bloat and a (small) supply-chain surface. Not a correctness bug, and the type-only coupling in client.ts (Database = PgliteDatabase<...>) means a naive move to devDependencies must keep the types resolvable — so it is not a one-line move. Deferred.",
+      "location": "packages/db/package.json:19-26",
+      "fix": "Defer. When the prod postgres-js Database wiring lands (already flagged in the impl story's completion notes and client.ts), retype Database off the postgres-js driver and move @electric-sql/pglite to devDependencies so it is excluded from production installs/bundles.",
+      "ac_ref": ""
+    }
+  ]
+}

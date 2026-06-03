@@ -19,7 +19,7 @@ Legend: ✅ done · ⏳ in progress · ⬜ todo
 | 9  | 2 | ✅ | 1 (SSRF IPv4-compat IPv6 guard) | 0 | 0 | 9 |
 | 11 | 1 | ✅ | 0 (code sound) | 2 | 0 | 3 |
 | 12 | 1 | ✅ | 0 (security clean) | 1 | 2 | 4 |
-| 13 | 2 | ⬜ | | | | |
+| 13 | 2 | ✅ | 1 (audit() atomicity JSDoc) | 2 | 3 | 7 |
 | 14 | 2 | ⬜ | | | | |
 | 15 | 1 | ⬜ | | | | |
 | 16 | 7 | ⬜ | | | | |

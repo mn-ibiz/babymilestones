@@ -19,7 +19,15 @@ export interface AuditInput {
   payload?: Record<string, unknown>;
 }
 
-/** Insert one audit_outbox row using the caller's executor. Returns the row. */
+/**
+ * Insert one audit_outbox row using the caller's executor. Returns the row.
+ *
+ * ATOMICITY CONTRACT: when auditing a business write, pass the SAME `tx` handle to
+ * both the write and this call so they commit (or roll back) together. Passing the
+ * top-level `db` here while the business write used a different executor makes the
+ * two non-atomic — the action can persist without its audit row, or vice-versa.
+ * Only pass the bare `db` for genuinely standalone audit events (no paired write).
+ */
 export async function audit(db: AuditExecutor, input: AuditInput): Promise<AuditOutboxRow> {
   const [row] = await db
     .insert(auditOutbox)

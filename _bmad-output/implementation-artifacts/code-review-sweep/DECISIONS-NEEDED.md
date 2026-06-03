@@ -33,6 +33,22 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 13 — Audit Log (outbox)
+
+22. **[MED · X5-S01] Structurally enforce the audit atomicity contract.** JSDoc warning now added, but
+    `audit()` still accepts the bare `db` as easily as a `tx`. **Choose:** `auditInTx`/`auditStandalone`
+    named entry points, or a lint rule. File: `packages/db/src/audit.ts`.
+
+23. **[MED · audit integrity · X5-S01] `audit_outbox` has no DB-layer tamper protection.** No DELETE
+    block / content-immutability (sibling `wallet_ledger` has both). Needs a *column-aware* trigger
+    (freeze content columns; keep the X5-S02 drain's `processed_at`/attempts updatable) + role REVOKE.
+    File: `packages/db/migrations/0001_audit_outbox.sql`.
+
+24. **[MED · X5-S03] Audit-catalogue drift enforcement is a static scan blind to non-literal actions.**
+    ~11/176 sites use `auditAction()`; the rest pass raw literals; a variable-action site with an
+    uncatalogued value would bypass the only guard. **Choose:** accept tradeoff, or add a lint rule /
+    fail-CI-on-unresolved-scan-site. File: `packages/auth/src/audit-actions.test.ts`.
+
 ## Epic 12 — Marketing & Landing
 
 20. **[HIGH · content · P1-E12-S02] All five per-unit hero images are broken** — they reference
