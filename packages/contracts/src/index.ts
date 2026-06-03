@@ -826,10 +826,17 @@ export const pickupAuthorisationSchema = z.object({
     .trim()
     .min(1, "Relationship is required")
     .max(PICKUP_TEXT_MAX, `Relationship must be ${PICKUP_TEXT_MAX} characters or fewer`),
-  photoUrl: optionalPickupText.refine(
-    (v) => v === null || v.length <= PICKUP_PHOTO_URL_MAX,
-    `Photo URL must be ${PICKUP_PHOTO_URL_MAX} characters or fewer`,
-  ),
+  photoUrl: optionalPickupText
+    .refine(
+      (v) => v === null || v.length <= PICKUP_PHOTO_URL_MAX,
+      `Photo URL must be ${PICKUP_PHOTO_URL_MAX} characters or fewer`,
+    )
+    // Shown on the attendant check-in screen — reject javascript:/data:/etc so a
+    // stored value can't become an XSS sink. Reuses the CMS URL-safety guard.
+    .refine(
+      (v) => v === null || isSafeCmsUrl(v),
+      "Photo URL must be a safe http(s) or relative URL",
+    ),
 });
 export type PickupAuthorisationInput = z.infer<typeof pickupAuthorisationSchema>;
 

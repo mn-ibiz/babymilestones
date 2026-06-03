@@ -1,0 +1,39 @@
+{
+  "id": "P2-E03-S01",
+  "verdict": "issues",
+  "diff_summary": "Adds child_pickup_authorisations table (migration 0052 + drizzle schema), pickupAuthorisationSchema + PickupAuthorisation contract, /parents/me/children/:childId/pickups CRUD route with session+CSRF auth and per-mutation audit, platform pickups page + lib, and pickup.* audit actions. Parent CRUDs name/phone/relationship/optional photoUrl for their own child; ownership resolved server-side.",
+  "ac_coverage": "AC1 (name/phone/photoUrl/relationship) implemented & tested. AC2 (parent CRUD from dashboard) implemented & tested. AC3 (audit on every change) implemented & tested (create/update/delete each write one audit_outbox row in-txn). Gap: AC1 photoUrl validation accepts unsafe URL schemes (see finding 1); the check-in/attendant consumer of the list is not built in this story (S02/S03).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "photoUrl accepts javascript:/data:/protocol-relative URLs (stored XSS) — only length is validated",
+      "detail": "pickupAuthorisationSchema validates photoUrl by length only (PICKUP_PHOTO_URL_MAX) with no scheme/shape check. A parent (or anyone with a CSRF-valid parent session) can store photoUrl = 'javascript:alert(document.cookie)', 'data:text/html,<script>...', or '//evil.com/x'. The value is persisted verbatim (pickups.ts insert/update) and is documented to be rendered on the attendant screen (schema/child-pickup-authorisations.ts:19 'shown on the attendant screen'; migration 0052 line 19). When the attendant/check-in UI (P2-E03-S02/S03) renders it as an <img src> or anchor href, this is a stored XSS / clickjacking vector on a child-safety surface. The codebase already established the canonical guard for exactly this case during a prior security review: isSafeCmsUrl() (contracts/src/index.ts:6075) blocks javascript:/data:/vbscript:/protocol-relative URLs and is applied to heroImageUrl/ctaHref; providerUrlSchema (contracts/src/index.ts:4055) is the https-only variant. This story stores the unsafe value rather than reusing either guard, so the attack payload is persisted now even though the renderer lands later. evidence: contracts/src/index.ts:768-781 (photoUrl refine checks length only); pickups.ts:128 and :174 store it unmodified; no second scheme gate exists in the API route.",
+      "location": "packages/contracts/src/index.ts:768",
+      "fix": "In pickupAuthorisationSchema, add a scheme guard to photoUrl reusing the existing exported isSafeCmsUrl helper. Replace the photoUrl field with:\n  photoUrl: optionalPickupText\n    .refine((v) => v === null || v.length <= PICKUP_PHOTO_URL_MAX, `Photo URL must be ${PICKUP_PHOTO_URL_MAX} characters or fewer`)\n    .refine((v) => v === null || isSafeCmsUrl(v), \"Photo URL must be an http(s):// URL\")\n(isSafeCmsUrl is already exported from this same module.) If photos must be remotely hosted only, use the stricter https-only check (new URL(v).protocol === 'https:'). Mirror the same refine in apps/platform/lib/pickups.ts validatePickupDraft for client parity, and add a test asserting a javascript:/data: URL is rejected with 400.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Audit payload omits the changed values (phone, photoUrl, before/after) on update/delete",
+      "detail": "AC3 ('audit on every change') is technically satisfied — create/update/delete each write one audit_outbox row in the same transaction as the mutation, with actor, action, target, child_id, and ip. However the payload only records name + relationship (and child_id) on create/update, and only child_id on delete. It captures neither phone nor photoUrl, and no before/after diff. For a CHILD-SAFETY authorisation list, an investigator reading the audit trail cannot tell what was actually changed (e.g. a phone number being swapped to redirect the safe-pickup contact) — the row proves THAT a change happened, not WHAT changed. Whether to log the full before/after (including phone) is a privacy-vs-traceability product/security decision.",
+      "location": "apps/api/src/routes/parents/pickups.ts:131",
+      "fix": "Options: (a) record a before/after snapshot of all fields in the audit payload (phone included) for create/update, and the deleted row's fields on delete; (b) accept name+relationship-only as sufficient and document the decision. Recommend (a) for a safety-critical list; defer the exact field set to the security owner.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "auditor",
+      "title": "Check-in / attendant screen does not yet read the pickup list as the authoritative source",
+      "detail": "The reception hand-off / check-in route (apps/api/src/routes/reception/handoff.ts) does not read child_pickup_authorisations at all — it records check-out, observation, receipt and SMS but never surfaces or verifies the authorised-pickup list. The schema and migration both state the attendant reads this list at hand-off (P2-E03-S02/S03). For THIS story (S01) the consumer is explicitly future work: the spec scope is the per-child list + parent CRUD + audit, and S01 has no AC for the attendant read path. Flagged because the review brief asks to confirm the list is the authoritative source the check-in screen reads — it is not consumed yet, so that guarantee depends on S02/S03 being implemented against this table.",
+      "location": "apps/api/src/routes/reception/handoff.ts:133",
+      "fix": "No change in S01. Verify in P2-E03-S02/S03 that the attendant/check-in screen reads child_pickup_authorisations (filtered by child) as the sole source for who may collect a child, and that the chosen pickup is recorded/audited at hand-off.",
+      "ac_ref": ""
+    }
+  ]
+}

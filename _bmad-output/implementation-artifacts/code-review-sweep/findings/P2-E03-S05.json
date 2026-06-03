@@ -1,0 +1,29 @@
+{
+  "id": "P2-E03-S05",
+  "verdict": "issues",
+  "diff_summary": "apps/jobs/src/jobs/anonymise-observations.ts (+test) + index.ts wiring: nightly bounded-batch cron that scans observations older than 24mo, NULLs child_id/parent_id, scrubs child+parent first/last names from the free-text note, retains mood/activities/scrubbed-note, writes one observation.anonymised audit per row, logs run counts; idempotent via anonymised_at.",
+  "ac_coverage": "AC1 (24mo scan, oldest-first, batched) implemented+tested; AC2 (strip ids + name scrub) implemented+tested for ASCII but UNTESTED and BROKEN for accented/non-ASCII names; AC3 (aggregate retained, PII cleared) implemented+tested; AC4 (run+count logged) implemented+tested.",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Name scrub silently leaves accented / non-ASCII names un-redacted (PII survives anonymisation)",
+      "detail": "anonymiseNote() wraps each name in `\\b...\\b` with the `giu` flags. In JavaScript, `\\b` is defined against the ASCII `\\w` class ([A-Za-z0-9_]) even under the `u` flag — it is NOT Unicode-aware. So a name that begins or ends with a non-ASCII letter never matches its boundary anchor and is left completely intact. Verified by running the exact shipped function: anonymiseNote('José played with blocks', ['José'], []) returns the UNCHANGED string; same for 'Amará', 'Zoë', 'Omar' (leading Ò), 'Élodie'. The trailing/leading \\b cannot match between an accented letter (a non-\\w char to the regex engine) and a space, so the replacement never fires. For a Kenyan childcare platform, child/parent names with diacritics are entirely plausible, and this is the single feature whose job is to remove their PII after 24 months — it instead seals their real names permanently into a row marked 'anonymised', and the original note text is overwritten so the miss is irreversible and silent (no warn/count). The unit tests (anonymise-observations.test.ts:18-39) only exercise pure-ASCII names, so the gap is wholly untested. Directly violates AC2/AC3 (‘PII cleared’) and is a data-privacy defect.",
+      "location": "apps/jobs/src/jobs/anonymise-observations.ts:67,71 (anonymiseNote)",
+      "fix": "Replace the ASCII `\\b` anchors with Unicode-aware boundary lookarounds so any Unicode letter/number counts as a word char. Build the regex as: `new RegExp(`(?<![\\\\p{L}\\\\p{N}_])${escapeRegExp(t)}(?![\\\\p{L}\\\\p{N}_])`, 'giu')` for both the child and parent loops. This preserves the existing whole-word semantics for ASCII (the substring 'Zolanda' test still passes) while correctly matching names that start/end with accented letters. Add a regression test with an accented name (e.g. anonymiseNote('José smiled', ['José'], []) === '[child] smiled').",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Declared cron '0 2 * * *' (02:00 daily) is not actually honoured — job runs every 24h from process boot",
+      "detail": "The job declares cron: '0 2 * * *' but startScheduler (runner.ts:145-164) schedules purely off intervalMs via setInterval, ignoring the cron expression entirely — cron is documentation/registry surface only. In practice the anonymisation runs every 24h measured from worker boot, not at 02:00 local. The job's own comment is honest about this. This does not affect anonymisation correctness (the job is idempotent, the cutoff is recomputed each run, and it still runs ~daily), and it is a pre-existing P3-E06 single-worker-scheduler limitation shared by every cron in the registry — not introduced or fixable within S05.",
+      "location": "apps/jobs/src/jobs/anonymise-observations.ts:100; apps/jobs/src/runner.ts:151",
+      "fix": "Out of scope for S05 — a real cron-expression-driven scheduler is a P3-E06 framework change. Note only; no action in this story.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

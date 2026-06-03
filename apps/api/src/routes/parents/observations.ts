@@ -72,10 +72,18 @@ export function registerParentObservations(app: FastifyInstance, deps: ParentsDe
       const serviceId = firstParam(q.serviceId);
       const conds = [eq(observations.childId, childId)];
       if (from && ISO_DATE.test(from)) {
-        conds.push(gte(observations.createdAt, new Date(`${from}T00:00:00.000Z`)));
+        // Shape-valid but impossible dates (2026-13-45) yield Invalid Date, which
+        // throws in the driver — ignore them (matches "invalid params are ignored").
+        const d = new Date(`${from}T00:00:00.000Z`);
+        if (!Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === from) {
+          conds.push(gte(observations.createdAt, d));
+        }
       }
       if (to && ISO_DATE.test(to)) {
-        conds.push(lte(observations.createdAt, new Date(`${to}T23:59:59.999Z`)));
+        const d = new Date(`${to}T23:59:59.999Z`);
+        if (!Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === to) {
+          conds.push(lte(observations.createdAt, d));
+        }
       }
       if (serviceId && UUID.test(serviceId)) {
         conds.push(eq(bookings.serviceId, serviceId));

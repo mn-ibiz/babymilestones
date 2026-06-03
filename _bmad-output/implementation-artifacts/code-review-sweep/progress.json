@@ -64,7 +64,7 @@
     "15": "done",
     "16": "done",
     "17": "done",
-    "18": "todo",
+    "18": "done",
     "19": "todo",
     "20": "todo",
     "21": "todo",
@@ -1546,7 +1546,7 @@
         "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "18-2-attendant-check-in-screen",
@@ -1564,7 +1564,7 @@
         "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "18-3-pickup-handoff-with-free-text-observations",
@@ -1582,7 +1582,7 @@
         "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "18-4-observations-feed-in-parent-s-account",
@@ -1600,7 +1600,7 @@
         "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "18-5-24-month-retention-anonymisation",
@@ -1618,7 +1618,7 @@
         "49b4a5ab8be2f8510f646dba972457d150e0ee6d"
       ],
       "commit_level": "epic",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "19-1-pos-app-scaffold-auth",
@@ -3156,8 +3156,16 @@
       "decisions_needed": 12,
       "dismissed": 15,
       "commit": ""
+    },
+    "18": {
+      "stories_reviewed": 5,
+      "patches": 5,
+      "deferred": 2,
+      "decisions_needed": 2,
+      "dismissed": 16,
+      "commit": ""
     }
   },
-  "epics_done": 16,
+  "epics_done": 17,
   "epics_total": 35
 }

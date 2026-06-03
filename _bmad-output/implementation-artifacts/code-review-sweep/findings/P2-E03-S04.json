@@ -1,0 +1,19 @@
+{
+  "id": "P2-E03-S04",
+  "verdict": "issues",
+  "diff_summary": "GET /parents/me/children/:childId/observations (apps/api/src/routes/parents/observations.ts) read-only per-child observations feed; platform timeline page + observations libs + contracts (ObservationFeedItem/Filter, OBSERVATION_FEED_LIMIT=200, filterObservations).",
+  "ac_coverage": "AC1 (mood/activities/note/attendant/date) implemented & tested; AC2 (date-range + service filters) implemented & tested; AC3 (read-only, GET only, no mutation/audit) implemented & tested. IDOR closed (ownership from session->parent->child.parentId, 404 on mismatch, tested). Anonymised-row drop-out tested. Public projection leaks no staff-internal fields (attendantId/parentId/bookingId/anonymisedAt withheld). XSS-safe: note/mood/activities rendered via React JSX text interpolation, no dangerouslySetInnerHTML.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Malformed-but-format-valid from/to date param throws an unhandled 500 instead of being ignored",
+      "detail": "The ISO_DATE guard `/^\\d{4}-\\d{2}-\\d{2}$/u` only checks shape, not validity. A query like `?from=2026-13-45` (or `2026-99-99`) passes the regex, so `new Date('2026-13-45T00:00:00.000Z')` yields an Invalid Date and is pushed into the WHERE via `gte(observations.createdAt, <Invalid Date>)`. Drizzle's timestamp column mapToDriverValue calls `value.toISOString()` (verified in drizzle-orm@0.38.4 pg-core/columns/timestamp.js:34), and `new Date('Invalid Date').toISOString()` throws `RangeError: Invalid time value`. The exception escapes the handler as a 500 on fully user-controllable input. This directly contradicts the route's own documented contract (lines 59-62: 'Invalid/garbage params are ignored (no 400)'). A related correctness gap: format-valid overflow dates such as `?from=2026-02-30` silently roll over to 2026-03-02, shifting the filter boundary. Both are reachable only via hand-crafted queries (the UI uses a native date picker), and neither leaks data, hence medium not blocker; but it's a 500 from untrusted input and an unhandled rejection.",
+      "location": "apps/api/src/routes/parents/observations.ts:74-79",
+      "fix": "Validate the parsed Date before using it. After `if (from && ISO_DATE.test(from))`, build `const d = new Date(`${from}T00:00:00.000Z`); if (!Number.isNaN(d.getTime())) conds.push(gte(observations.createdAt, d));` (and likewise for `to` with the T23:59:59.999Z bound). Or replace the shape-only regex with a parse-then-validate helper that also rejects overflow (compare `d.toISOString().slice(0,10) === from`). Add a regression test asserting `?from=2026-13-45` returns 200 (param ignored), matching the documented behavior.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "P2-E03-S02",
+  "verdict": "issues",
+  "diff_summary": "apps/api/src/routes/reception/attendance.ts (slots/cards/checkin/bulk), apps/admin/lib/attendance.ts + admin reception/attendance page, migration 0053 + attendances schema, contracts. Lists today's slots + per-slot child cards, single + bulk check-in with debit-first idempotent wallet settlement and a UNIQUE(booking_id) double-check-in fence.",
+  "ac_coverage": "AC1 (slots) impl+tested; AC2 (child cards w/ photo consent + drop-off) impl+tested; AC3 (wallet debit + checked_in_at + audit) impl+tested; AC4 (bulk, capped, best-effort) impl+tested. Wallet debit (P1-E03-S05) correctly invoked: stable idempotency key attendance:checkin:<bookingId>, debit-first ordering, replay no-op, DoubleCheckInError + out-of-band-settle handled. Double-check-in guard correct (UNIQUE index -> 23505 -> 409). authz gap below.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Missing isStaffRole gate lets a parent check in / debit any family's booking (IDOR + money movement)",
+      "detail": "registerAttendance gates every endpoint only with requirePermission(\"read\",\"wallet\") (reads) and requirePermission(\"create\",\"payment\") (check-ins). But the parent role holds BOTH of those permissions in PERMISSION_MATRIX (packages/auth/src/rbac.ts:73-77 — parent has {read,wallet} and {create,payment}, granted for their own wallet/self-initiated M-Pesa), and parents share the same session store + principal as staff. Every sibling reception route that moves money or exposes other families' data adds an explicit isStaffRole(role) check on top of the permission guard for exactly this reason — see booking.ts:79-85 ('parents also hold create payment ... the permission guard alone would let a parent enumerate other families' children and book against any wallet'), recent-transactions.ts:51-57, receipt.ts:125, parent-profile.ts:150, statement.ts:148. The attendance route omits this gate. checkInBooking takes an arbitrary bookingId and never scopes it to the caller, so an authenticated parent can POST /reception/attendance/checkin (or /bulk) for ANY booking — triggering a wallet debit against another family's wallet/invoice — and can GET /reception/attendance/slots/:slotId/bookings to enumerate other children's names + photo-consent flags. The 'requires the right role' test (attendance.test.ts:124-135) only exercises a packer (who lacks both perms), so it passes while masking the parent hole; no test asserts a parent is rejected.",
+      "location": "apps/api/src/routes/reception/attendance.ts:230-249",
+      "fix": "In authStaff, after validateSession succeeds and before the permission guard, reject non-staff: `if (!isStaffRole(auth.user.role)) { reply.code(403).send({ error: \"Forbidden: missing permission\" }); return null; }`. Import isStaffRole from @bm/auth (already exported). Add a regression test that logs in a parent session and asserts 403 on the slots/cards/checkin/bulk endpoints, mirroring booking.ts.",
+      "ac_ref": ""
+    }
+  ]
+}

@@ -36,6 +36,13 @@ describe("anonymiseNote (AC2)", () => {
     // Without escaping, "An.a" would also match "Anxa"; escaped, only the literal matches.
     expect(anonymiseNote("Anxa and An.a played", ["An.a"], [])).toBe("Anxa and [child] played");
   });
+  it("redacts ACCENTED / non-ASCII names (Unicode boundaries, review fix)", () => {
+    // ASCII \b would leave these un-redacted, leaking PII irreversibly.
+    expect(anonymiseNote("José hugged Zoë", ["José"], ["Zoë"])).toBe("[child] hugged [parent]");
+    expect(anonymiseNote("Élodie was happy", ["Élodie"], [])).toBe("[child] was happy");
+    // Still respects boundaries: a longer word containing the name is untouched.
+    expect(anonymiseNote("Josénator is not José", ["José"], [])).toBe("Josénator is not [child]");
+  });
 });
 
 describe("subtractMonths", () => {

@@ -13,7 +13,7 @@ import {
   wallets,
   type Database,
 } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import { debit, DoubleCheckInError, recordBookingCommission } from "@bm/wallet";
 import {
   attendanceBulkCheckInSchema,
@@ -238,6 +238,13 @@ export function registerAttendance(app: FastifyInstance, deps: ReceptionDeps): v
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    // Staff-only: parents hold both `read wallet` and `create payment` and share
+    // the session store, so the permission guard alone would let a parent check in
+    // (and debit the wallet of) any family's booking and enumerate other children.
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return null;
     }
     const perm = guard(auth.user);

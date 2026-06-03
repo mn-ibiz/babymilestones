@@ -62,13 +62,18 @@ export function anonymiseNote(
 ): string | null {
   if (!note) return note;
   let out = note;
+  // Unicode-aware word boundaries: JS `\b` is ASCII-only even under /u, so an
+  // accented name (José, Zoë, Élodie, Òmar) would slip through un-redacted and the
+  // PII would survive irreversibly. Use \p{L}\p{N}_ lookarounds instead.
+  const boundary = (t: string) =>
+    new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(t)}(?![\\p{L}\\p{N}_])`, "giu");
   for (const name of childNames) {
     const t = (name ?? "").trim();
-    if (t) out = out.replace(new RegExp(`\\b${escapeRegExp(t)}\\b`, "giu"), "[child]");
+    if (t) out = out.replace(boundary(t), "[child]");
   }
   for (const name of parentNames) {
     const t = (name ?? "").trim();
-    if (t) out = out.replace(new RegExp(`\\b${escapeRegExp(t)}\\b`, "giu"), "[parent]");
+    if (t) out = out.replace(boundary(t), "[parent]");
   }
   return out;
 }

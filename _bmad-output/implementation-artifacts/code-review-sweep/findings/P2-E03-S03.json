@@ -1,0 +1,39 @@
+{
+  "id": "P2-E03-S03",
+  "verdict": "issues",
+  "diff_summary": "apps/api reception/handoff.ts (POST /reception/attendance/handoff + GET observation-options), observations migration 0054 + drizzle schema, contracts handoffSchema/handoffSummary, admin handoff screen + lib, platform parent observations feed + lib, parents/observations.ts route, sms pickup.handoff template, audit-actions attendance.checked_out. Records check-out + observation (mood/activities/free-text note) + visit receipt + audit atomically, then best-effort SMS to the parent.",
+  "ac_coverage": "AC1 (mood picker default 😊 + configurable activity chips + single optional free-text line) implemented & tested; AC2 (checked_out_at + observation row + SMS-stub) implemented & tested; AC3 (voice-to-text) client affordance present (untested, acceptable); AC4 (auto receipt incl. zero-total subscription visit) implemented & tested. All four ACs covered. Gaps are around the epic's child-safety framing (collector verification) and the staff-only authz claim, not the literal S03 ACs.",
+  "dismissed_count": 2,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "defer",
+      "lens": "blind",
+      "title": "Hand-off (a child-safety action) is gated only by `create payment`, which the `parent` role also holds — a logged-in parent can hand over any booking",
+      "detail": "registerHandoff guards the POST with requirePermission(\"create\",\"payment\") and nothing else (no staff-role / flow-isolation gate, no booking-ownership scope). But PERMISSION_MATRIX grants `parent` { action:\"create\", resource:\"payment\" } (packages/auth/src/rbac.ts:73-77) so parents can initiate their own wallet/M-Pesa payments. Parent and staff share ONE session store and a subdomain-wide SSO cookie (apps/api/src/routes/auth/login.ts:86-90, single buildApp in apps/api/src/app.ts). A parent who logs in via /auth/login therefore holds a valid session + CSRF token that passes validateSession, resolves to role `parent`, and satisfies requirePermission(\"create\",\"payment\"). They can then POST /reception/attendance/handoff with any bookingId to force a check-out, write an observation, emit a receipt, and trigger the parent SMS — on a child that is not theirs. The handoff test (handoff.test.ts:258-279) only asserts anon→401 and packer→403; it never tries a parent, which masks the gap. The route comment in the sibling record-visit.ts:64 even asserts \"Staff-only via rbac `create payment`\", which is factually wrong given the matrix. This is a pre-existing systemic pattern: topup, record-visit, and attendance check-in all use the identical guard and shipped before S03 — so it is out of S03's scope to fix, but it lands squarely on this child-safety-sensitive endpoint and should be tracked.",
+      "location": "apps/api/src/routes/reception/handoff.ts:93,133-135; packages/auth/src/rbac.ts:73-88",
+      "fix": "Options (human decision; affects the whole reception/POS surface): (a) introduce a staff-only guard (requireStaff / requireRole(STAFF_ROLES)) layered on top of the resource permission for all operator-surface routes; or (b) split the parent's self-service payment capability from the operator `create payment` capability so the matrix no longer overlaps; or (c) network/host-isolate the reception API from the parent platform. Add a regression test asserting a parent session → 403 on /reception/attendance/handoff. Deferred here because the weakness pre-dates S03 and the correct remediation spans the shared RBAC matrix.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "auditor",
+      "title": "Hand-off never verifies the collector against the authorised-pickup list nor records WHO collected the child",
+      "detail": "The epic is titled \"Pickup Authorisation & Free-Text Observations\" and S01 ships a `child_pickup_authorisations` table (migration 0052) of who may collect each child. At hand-off the code records only `checkedOutBy` (the staff actor = who RELEASED) and `attendantNameSnapshot` (a free-text staff display name, default \"Attendant\"). It captures neither the identity of the person the child was released TO, nor a check against the child's authorised-pickup list. The audit payload (handoff.ts:197-210, action attendance.checked_out) likewise logs actor/booking/child/receipt/mood but no collector. For a child-safety surface this is the highest-value piece of the chain and it is absent. NOTE: the literal S03 ACs (AC1-AC4) do not mention collector verification — they only require mood/activities/note + checkout + observation + SMS + receipt — so the code does satisfy the written ACs. This is a spec/scope gap, not an AC violation.",
+      "location": "apps/api/src/routes/reception/handoff.ts:154,169-211; packages/db/migrations/0054_observations.sql",
+      "fix": "Product/PM decision: should S03 (or a follow-up story) require the attendant to pick the collector from the child's child_pickup_authorisations list (recording pickup_authorisation_id on the observation/attendance and in the audit payload), or at minimum capture a free-text collector name distinct from the releasing staff member? If yes this needs a small additive migration + UI + audit field. Deferred/decision-needed because it is not in the current S03 AC set and changes the data model.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Submitted `activities` are accepted as arbitrary free text, not constrained to the configured chip list",
+      "detail": "handoffSchema validates activities only as an array (≤20) of trimmed strings (≤60 chars) — it does not check membership in the configured/default chip list returned by GET observation-options. loadActivityOptions clamps the OFFERED chips, but the POST will persist any 60-char string a (compromised or scripted) staff client sends. These are stored in observations.activities (jsonb) and later rendered in the parent feed. Rendering is safe (the platform feed uses React JSX which auto-escapes — apps/platform/app/(app)/children/[childId]/observations/page.tsx:88-95 and observationSummary returns a plain string into {} interpolation; no dangerouslySetInnerHTML), so this is a data-integrity / spec-fidelity gap (\"configurable list\"), not an XSS vector.",
+      "location": "packages/contracts/src/index.ts (handoffSchema activities); apps/api/src/routes/reception/handoff.ts:62-75,173-186",
+      "fix": "If the chip list is meant to be a closed set, validate submitted activities against loadActivityOptions(db) server-side (reject unknown labels) so the stored set matches the configured vocabulary. Deferred as low-impact since it is staff-authenticated input that renders safely.",
+      "ac_ref": "AC1"
+    }
+  ]
+}

@@ -33,6 +33,15 @@ They are NOT auto-fixed. Review and tell me how to resolve each.
    actor) — or drop the checkbox until a merge workflow exists. File:
    `apps/admin/app/reception/walk-in/page.tsx:116-122`.
 
+## Epic 18 — Pickup Auth & Observations
+
+38. **[MED · child-safety · P2-E03-S03] Hand-off never verifies the collector against the authorised
+    pickup list (S01) nor records who collected the child** — only who released. The whole epic is
+    "Pickup Authorisation" yet the list is unused at hand-off. Decide whether to require/record the
+    collector (select from the authorised list + store collector id/name + audit it).
+39. **[LOW · P2-E03-S01] Pickup-list audit payload omits the changed values** (phone/photoUrl/before-
+    after) on a safety-critical list. Decide privacy-vs-traceability for what to record.
+
 ## Epic 17 — Subscription Plans  (several HIGH money/finance decisions)
 
 31. **[HIGH · money · P2-E02-S05] Non-atomic renewal can double-charge.** Crash between the pending

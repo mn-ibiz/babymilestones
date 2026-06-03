@@ -12,7 +12,7 @@ import {
   users,
   type Database,
 } from "@bm/db";
-import { validateSession, requirePermission, CSRF_HEADER_NAME } from "@bm/auth";
+import { validateSession, requirePermission, isStaffRole, CSRF_HEADER_NAME } from "@bm/auth";
 import { writeReceipt } from "@bm/payments";
 import { StubSmsSender, type SmsSender } from "@bm/sms";
 import {
@@ -105,6 +105,13 @@ export function registerHandoff(app: FastifyInstance, deps: ReceptionDeps): void
     );
     if (!auth.ok) {
       reply.code(auth.status).send({ error: auth.error });
+      return null;
+    }
+    // Staff-only: parents hold `create payment` and share the session store, so the
+    // permission guard alone would let a parent record a child hand-off on any
+    // booking. Hand-off is a child-safety action — gate on the staff role.
+    if (!isStaffRole(auth.user.role)) {
+      reply.code(403).send({ error: "Forbidden: missing permission" });
       return null;
     }
     const perm = guard(auth.user);
