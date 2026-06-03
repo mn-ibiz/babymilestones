@@ -1,0 +1,19 @@
+{
+  "id": "P1-E03-S07",
+  "verdict": "issues",
+  "diff_summary": "Adds GET/PATCH /admin/parents/:userId/auto-credit (apps/api/src/routes/admin/auto-credit.ts) to read/set wallets.auto_credit_enabled; grants admin `manage wallet` (rbac.ts + migration 0016); adds autoCreditToggleSchema (contracts) and a role-aware view helper (apps/admin/lib/auto-credit-toggle.ts). PATCH is gated by `manage wallet` (admin/super_admin), audited with before/after in-txn.",
+  "ac_coverage": "AC1 (default FALSE) implemented (wallets.auto_credit_enabled NOT NULL DEFAULT FALSE, migration 0014) & tested. AC2 (admin/super_admin may flip; reception/cashier 403) implemented via `manage wallet` & tested for both flip and reject paths; UI affordance helper present and later mounted in parent-header (P1-E05-S02). AC3 (audit) implemented in-transaction with before/after+actor & tested. All ACs covered. Note: AC text said `parents.*` but column lives on `wallets.*` (single source of truth for the debit path) — intentional, documented.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "GET auto-credit is IDOR-readable by any parent (resolves wallet from :userId param, only requires `read wallet` which `parent` holds)",
+      "detail": "GET /admin/parents/:userId/auto-credit guards with requirePermission(\"read\",\"wallet\"). Per packages/auth/src/rbac.ts:73-76 the `parent` role holds `read wallet`. The handler resolves the target wallet from the URL path param (walletForUser(req.params.userId), auto-credit.ts:65-69), NOT from the authenticated session user. There is no surface-level staff guard on /admin/* (app.ts onRequest hook only logs; registerAdminRoutes is mounted with no prefix scope or preHandler). So an authenticated parent can call GET /admin/parents/<other-userId>/auto-credit and read any other parent's auto_credit_enabled boolean — a horizontal-authz / IDOR info leak. This directly contradicts the established platform convention: the parent's own wallet route (apps/api/src/routes/parents/wallet.ts:38-58) deliberately resolves the wallet from the session userId 'never a param, so a parent can only ever read their own wallet'. Impact is limited (a single boolean, UUIDs are hard to enumerate, and the write/PATCH is correctly gated by `manage wallet`), hence medium not blocker. The same shared pattern exists in the P1-E05-S02 reception profile route, so a fix touches an RBAC convention.",
+      "location": "apps/api/src/routes/admin/auto-credit.ts:46-70",
+      "fix": "Decide the intended audience for the read. Options: (a) tighten the GET guard so only staff roles can read it — e.g. add a blanket staff/role guard to the /admin surface, or require a staff-specific permission instead of the broadly-held `read wallet`; or (b) if parents must read their own, scope the lookup to the session user (walletForUser(auth.user.id)) and reject mismatched :userId. Add a test asserting a `parent`-role session gets 403 (or only its own wallet) on this GET. Pre-existing-pattern caveat: align with the P1-E05-S02 reception route to avoid divergence.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

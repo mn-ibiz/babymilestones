@@ -1,0 +1,39 @@
+{
+  "id": "P1-E03-S08",
+  "verdict": "issues",
+  "diff_summary": "Adds @bm/wallet generateStatementCsv (chronological wallet_ledger read, derived running balance-after seeded from pre-window postings, KES cents formatting, RFC-4180 escaping, 12-month sync/async cutoff), parent (/parents/me/statement) + staff-by-id (/parents/:userId/statement) export routes with audit, an async wallet-statement job, and parent/admin download client libs.",
+  "ac_coverage": "AC1 columns/ordering/running-balance implemented & tested. AC2 parent-own + staff-by-id routes with IDOR guard (isStaffRole + read wallet) implemented & tested (own export, staff export, parent-traversal 403). AC3 isAsyncRange 12-month cutoff: sync 200 vs async 202 implemented & tested. Gap: the documented-inclusive `to` boundary only includes start-of-day, silently dropping same-day transactions on the last day of the window (no test exercises a same-day-as-`to` posting).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "high",
+      "category": "decision-needed",
+      "lens": "edge",
+      "title": "Inclusive `to` date only covers 00:00:00Z, dropping same-day transactions on the last day of the window",
+      "detail": "parseRange does `new Date(q.to)`; for a date-only query like `to=2026-12-31` this yields `2026-12-31T00:00:00.000Z`. generateStatementCsv filters with `lte(walletLedger.createdAt, range.to)`, so any posting timestamped later on the `to` day (e.g. `2026-12-31T10:00:00Z`) is EXCLUDED. Both client libs (apps/platform/lib/statement-api.ts and apps/admin/lib/statement-api.ts) document `to` as `YYYY-MM-DD (inclusive)`, and AC1 calls this a date-range statement, so a parent requesting Jan 1 - Dec 31 will silently miss every transaction made on Dec 31. The existing tests never seed a posting whose createdAt falls on the `to` date, so the bug is not caught. This is also a money-accuracy issue: the statement is supposed to reconcile with the ledger but omits a full day of activity at the window edge.",
+      "location": "apps/api/src/routes/parents/statement.ts:36-43; packages/wallet/src/statement.ts:108",
+      "fix": "Normalize a date-only `to` to the end of that day before querying. Decision needed on the boundary timezone: the platform is Kenya/EAT (UTC+3), so end-of-day in EAT vs UTC changes which rows are included. Recommended: in parseRange, when `to` has no time component, set it to end-of-day in the business timezone (EAT) — e.g. `to = endOfDay(parseInDateZone(q.to, 'Africa/Nairobi'))` — or switch the window query to a half-open `< to_plus_one_day` semantics. Then add a test seeding a posting at `to`-day 23:59 and asserting it appears.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "blind",
+      "title": "CSV fields are not neutralized against spreadsheet formula injection (leading =, +, -, @, tab, CR)",
+      "detail": "csvField only does RFC-4180 quoting (quote/escape on `,` `\"` `\\r` `\\n`). It does not prefix-guard cells beginning with `=`, `+`, `-`, `@`, tab or CR, so a field starting with one of those would execute as a formula when the CSV is opened in Excel/Sheets. In THIS export the rendered columns are: timestamp (server ISO), kind/direction (CHECK-constrained enums), amount/balance-after (numeric via formatCents — debits do start with `-` but are pure numerics, low risk), and reference=`source`. Every ledger `source` write in the codebase is a server-controlled constant (mpesa, cash:reception, bank:manual, paystack, pos:wallet, checkin, booking, loyalty, admin, ...) — none is attacker-controlled free text — so the gap is NOT currently exploitable through this statement. It is a latent defense-in-depth weakness, and it is identical across every csvField in the repo (packages/contracts/src/index.ts:3992, packages/catalog/src/commission-run.ts:193), i.e. a pre-existing project-wide pattern, not introduced or unique to this story.",
+      "location": "packages/wallet/src/statement.ts:59-64",
+      "fix": "Pre-existing/project-wide; out of this story's scope. If addressed, do it once for all exporters: a shared csvField that, after RFC-4180 escaping, prefixes a leading TAB (or apostrophe) to any field whose first char is one of = + - @ \\t \\r. Note amount/balance-after legitimately start with `-`; a numeric-aware guard or always-quote-numeric approach is needed so neutralization does not corrupt the numbers.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "Sync path buffers the whole CSV in memory despite \"stream the CSV\" wording",
+      "detail": "generateStatementCsv loads all in-window rows into memory (`await db.select()...`), builds a `string[]` of lines and returns one joined string, and the route does `reply.send(csv)`. The route comment and the impl story say the sync path \"streams the CSV\", but it is fully buffered. The 12-month async cutoff bounds the worst case, so this is acceptable for now, but a high-volume wallet over ~12 months still buffers the entire statement (rows + the joined string) in memory per request. Not a correctness bug; flagging the streaming claim vs reality.",
+      "location": "packages/wallet/src/statement.ts:87-130; apps/api/src/routes/parents/statement.ts:94-108",
+      "fix": "Deferred — within the 12-month bound the size is acceptable. If revisited, stream rows via a cursor/async-iterator and a fastify stream reply, or tighten the sync cutoff. At minimum, correct the \"stream\" wording in the comments to \"buffer and send\".",
+      "ac_ref": "AC3"
+    }
+  ]
+}

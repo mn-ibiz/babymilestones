@@ -1,0 +1,39 @@
+{
+  "id": "P1-E03-S03",
+  "verdict": "issues",
+  "diff_summary": "packages/wallet/src/index.ts adds PostInput, IdempotencyConflict, and post(db, input): inserts one wallet_ledger row in a transaction via onConflictDoNothing on the idempotency_key UNIQUE index, returns the existing row on a same-payload retry, throws IdempotencyConflict on a same-key/different-payload collision; direction derived from amount sign. post.test.ts adds 7 tests incl. the 100-concurrent-same-key exactly-1-row gate.",
+  "ac_coverage": "AC1 (returns ledger row), AC2 (same key twice -> same row, one insert; UNIQUE catches it), AC3 (IdempotencyConflict typed error) all implemented and tested. Append-only enforced at DB layer (trigger + role REVOKE, migration 0011); money is bigint cents (no float). Core logic sound.",
+  "dismissed_count": 3,
+  "findings": [
+    {
+      "severity": "medium",
+      "category": "defer",
+      "lens": "edge",
+      "title": "floatAccountId excluded from idempotency conflict comparison (working-tree regression)",
+      "detail": "post() inserts floatAccountId (index.ts:201) but the same-key conflict comparison (index.ts:230-237) checks only walletId, amount, direction, kind, source, postedBy. Two posts sharing an idempotencyKey but with a DIFFERENT floatAccountId are therefore treated as a benign retry and the pre-existing row is returned silently, instead of raising IdempotencyConflict. Since floatAccountId drives float-account/cash-drawer reconciliation (P1-E06-S02 floatLiabilities sums ledger.amount grouped by float_account_id), a mismatched tag on a retried post would be swallowed and could misattribute float liability. NOT a defect in THIS story's commit (3df9a67ce7) — at that commit the comparison was exhaustive over all inserted fields; the gap was introduced later by P1-E06-S01 which added floatAccountId to the insert values without extending the comparison. Verified in working tree.",
+      "location": "packages/wallet/src/index.ts:230-237",
+      "fix": "Out of P1-E03-S03 scope (introduced by P1-E06-S01). Surface to the float-tagging story owner: add `existing.floatAccountId !== values.floatAccountId` to the conflict comparison so a differing float tag on the same key raises IdempotencyConflict rather than returning the existing row.",
+      "ac_ref": "AC3"
+    },
+    {
+      "severity": "low",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "post() does not validate amount (zero / non-integer / NaN) — the core money primitive lacks the guard its siblings have",
+      "detail": "post() accepts any number for amount with no validation, unlike sibling money functions in the same package which assert Number.isInteger(x) && x > 0 (refund.ts:97, loyalty.ts:68). Verified behaviour against PGlite (real Postgres in WASM): amount=0 is ACCEPTED and persists a zero-value ledger row that consumes the idempotency key (a meaningless no-op posting with zero balance impact); amount=50.5 (float cents) and amount=NaN/Infinity are REJECTED by the bigint column ('invalid input syntax for type bigint'), so there is no silent data corruption but the caller gets a raw low-level driver error inside a rolled-back transaction rather than a clean typed validation error. direction is also derived as `amount >= 0 ? credit : debit`, so amount=0 is classified 'credit' and a topup-kind with a negative amount yields direction 'debit' with no cross-field guard. The DB bigint column is the real integrity backstop; the gap is ergonomic/defensive, not a data-loss bug.",
+      "location": "packages/wallet/src/index.ts:191-202",
+      "fix": "Product/eng decision: either (a) add an explicit guard at the top of post() — `if (!Number.isInteger(input.amount) || input.amount === 0) throw new Error('wallet.post: amount must be a non-zero integer (cents)')` — to fail fast with a typed error and forbid zero/float postings, matching refund()/loyalty() conventions; or (b) consciously rely on the bigint column + caller-side validation and document that post() trusts its callers. The spec (AC1) does not mandate validation, hence decision-needed.",
+      "ac_ref": "AC1"
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "100-concurrent-posts race gate does not exercise true multi-session concurrency (test-fidelity caveat)",
+      "detail": "The critical race test fires 100 post() calls via Promise.all against a single PGlite instance (createTestDb / testing.ts). PGlite 0.2.17 is a single-connection in-process WASM Postgres: all queries/transactions are serialised through one connection, so the 100 'concurrent' transactions execute sequentially rather than racing across distinct backend sessions. The test therefore proves the application logic returns one row for repeated same-key calls, but does NOT actually stress the cross-session INSERT...ON CONFLICT race the gate claims to cover. The underlying mechanism (UNIQUE index on idempotency_key + ON CONFLICT DO NOTHING inside a transaction) IS correct against real multi-session Postgres, so this is not a code defect — only a test that is weaker than its name implies. Note also (out of this story's scope) that Database is still typed PGlite-only (client.ts:8) and the prod postgres-js client wiring 'has not landed yet' per the comment, so isolation-level behaviour under the real driver is currently unverified by any test.",
+      "location": "packages/wallet/src/post.test.ts:103-118",
+      "fix": "Deferred: no code change required for correctness. If higher assurance is wanted, add an integration test against a real Postgres (e.g. via the postgres-js client once wired) that opens N distinct connections and races same-key inserts, asserting exactly one row and that losers observe the winner's row.",
+      "ac_ref": "AC2"
+    }
+  ]
+}

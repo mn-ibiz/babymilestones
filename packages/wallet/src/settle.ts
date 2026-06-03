@@ -8,7 +8,7 @@
  * invoice half-settled (atomicity, AC2/AC5).
  */
 import type { Database } from "@bm/db";
-import { invoices, walletLedger, walletLedgerInvoiceSettlement } from "@bm/db";
+import { invoices, wallets, walletLedger, walletLedgerInvoiceSettlement } from "@bm/db";
 import { and, asc, eq } from "drizzle-orm";
 import type { Cents } from "./index.js";
 
@@ -87,8 +87,13 @@ export async function applyTopup(
         .select()
         .from(walletLedger)
         .where(eq(walletLedger.idempotencyKey, input.idempotencyKey));
+      if (!existing) {
+        throw new Error(
+          "wallet.applyTopup: conflict on idempotency key but no existing row found",
+        );
+      }
       return {
-        ledgerEntryId: existing!.id,
+        ledgerEntryId: existing.id,
         settled: 0,
         residual: 0,
         settlements: [],
@@ -97,6 +102,20 @@ export async function applyTopup(
     }
 
     const creditEntryId = inserted[0].id;
+
+    // Concurrency (AC2): take a row lock on the wallet before the FIFO scan so two
+    // top-ups with DIFFERENT idempotency keys (e.g. a cash top-up and an M-Pesa
+    // callback for the same parent) cannot both read the same outstanding invoices
+    // and double-settle them. Mirrors debit.ts; a top-up and a check-in on the same
+    // wallet now serialise against each other.
+    const [lockedWallet] = await tx
+      .select({ id: wallets.id })
+      .from(wallets)
+      .where(eq(wallets.id, input.walletId))
+      .for("update");
+    if (!lockedWallet) {
+      throw new Error(`wallet.applyTopup: wallet ${input.walletId} not found`);
+    }
 
     // 2) FIFO scan: outstanding invoices for this parent, oldest first.
     const outstanding = await tx

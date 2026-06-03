@@ -1,0 +1,49 @@
+{
+  "id": "P1-E03-S04",
+  "verdict": "issues",
+  "diff_summary": "Adds additive migration 0013 (invoices + wallet_ledger_invoice_settlement tables, FIFO index), drizzle schemas, and applyTopup() in packages/wallet/src/settle.ts: one transaction credits the wallet once (idempotent on credit key), then settles outstanding invoices oldest-first posting a per-invoice debit + linkage row, leaving the residual as SUM-derived wallet balance.",
+  "ac_coverage": "AC1 (oldest created_at first) implemented + tested; AC2 (settle until closed/exhausted) implemented + tested; AC3 (partial settlement) implemented + tested; AC4 (three canonical cases) all tested & passing; AC5 (ledger row + linkage row per settlement) implemented + tested. All ACs covered by green unit tests. Gap: no concurrency test, and no fence against two distinct top-ups racing on the same invoice set (see findings).",
+  "dismissed_count": 4,
+  "findings": [
+    {
+      "severity": "blocker",
+      "category": "patch",
+      "lens": "edge",
+      "title": "Concurrent top-ups for the same parent double-pay the same invoice (money loss)",
+      "detail": "applyTopup() runs in a transaction but takes NO lock on the wallet or on the invoices it reads, and the credit-key dedup (onConflictDoNothing on idempotency_key) only deduplicates IDENTICAL keys. Two top-ups for the same parent with DIFFERENT idempotency keys race: under Postgres default READ COMMITTED, TX-B's `SELECT ... FROM invoices WHERE status='pending'` does not see TX-A's uncommitted UPDATE, so both read invoice X (due 800), both compute applied=min(remaining,800)=800 from the stale snapshot, both post a debit of -800 (distinct keys `A:settle:X` and `B:settle:X`, no conflict), both insert a `kind='topup'` linkage row, and both UPDATE invoice X (WHERE id=X, no status/amount_due predicate) to amount_due=0. Net effect: the 800 invoice is debited 1600 from the wallet — the parent loses 800 — with two linkage rows and one closed invoice. This is reachable in production: applyTopup() is called from the M-Pesa callback route (key=callback.id), the M-Pesa reconcile job, cash topup (key=`cash:...`) and bank topup (key=pending.id) — all distinct key spaces, so a cash top-up and an M-Pesa callback (or two distinct M-Pesa transactions) for the same parent arriving concurrently trigger it. The sibling debit.ts (P1-E03-S05) recognised this exact hazard and added `SELECT ... FOR UPDATE` on the wallet row plus a partial UNIQUE index — but that index is `WHERE kind='checkin'` only (migration 0014), so it does NOT fence the `kind='topup'` settlement rows applyTopup writes; the race remains unfenced even in the current working tree.",
+      "location": "packages/wallet/src/settle.ts:66-154",
+      "fix": "Serialise per-wallet settlement by taking a row lock before the FIFO scan, mirroring debit.ts: after the idempotent credit insert, run `await tx.select().from(wallets).where(eq(wallets.id, input.walletId)).for('update')` so concurrent applyTopup/debit on the same wallet block until commit. (Optionally also `.for('update')` on the outstanding-invoices SELECT.) This forces TX-B to re-read invoice state after TX-A commits, so it sees amount_due=0/status=settled and applies nothing. Add a concurrency regression test driving two overlapping applyTopup() transactions with different keys against one invoice and asserting the invoice is paid exactly once.",
+      "ac_ref": "AC2"
+    },
+    {
+      "severity": "medium",
+      "category": "decision-needed",
+      "lens": "blind",
+      "title": "Idempotent replay returns settled=0 / residual=0 instead of the original figures",
+      "detail": "On replay (credit key already exists) applyTopup() short-circuits and returns `{ settled: 0, residual: 0, settlements: [] }` even though the original run may have settled invoices and left a non-zero residual. These fields are surfaced to callers: recordCashTopup() maps them straight onto CashCharge.settled / CashCharge.residual. A replayed cash (or bank) top-up therefore reports 0 settled and 0 residual to whatever consumes the charge (receipt / SMS / audit payload), which is materially misleading even though the underlying ledger is correct. The ledger itself is not corrupted — this is a reporting-on-replay defect, not a money-movement bug.",
+      "location": "packages/wallet/src/settle.ts:85-97",
+      "fix": "Decide the replay contract: either (a) recompute the true settled/residual on replay by reading the linkage rows tied to debits derived from this credit key and the current wallet balance, returning accurate figures; or (b) explicitly document settled/residual as undefined-on-replay and have callers gate on `replayed` before trusting them. Option (a) is preferable for receipts; needs a product/UX decision on what a replayed top-up should display.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "defer",
+      "lens": "edge",
+      "title": "A pending invoice with amount_due=0 is never closed by a top-up",
+      "detail": "The migration CHECK allows amount_due >= 0, so a `pending` invoice with amount_due=0 is representable. The FIFO loop computes applied=min(remaining,0)=0 then `if (applied <= 0) continue`, skipping it without flipping status to 'settled' — the zero-due invoice stays pending indefinitely and will be re-scanned on every future top-up. Such a row should not arise in the normal create-invoice / settle flow, so impact is low, but the loop has no path to retire an already-zero pending invoice.",
+      "location": "packages/wallet/src/settle.ts:111-114",
+      "fix": "Out of scope for this story (depends on how invoices are created, which is S05/other stories). If addressed: either forbid amount_due=0 pending invoices at insert, or close any encountered zero-due pending invoice (set status='settled') before the `continue`.",
+      "ac_ref": ""
+    },
+    {
+      "severity": "low",
+      "category": "patch",
+      "lens": "blind",
+      "title": "Non-null assertion on the replay-fetch can throw an opaque TypeError",
+      "detail": "On the replay branch the code does `existing!.id` after re-selecting by idempotency_key. If the conflict fired but the subsequent SELECT returns no row (driver/visibility edge), `existing!` dereferences undefined and throws a generic TypeError rather than a meaningful domain error. The sibling post() in index.ts guards this exact case explicitly ('conflict on idempotency key … but no existing row found'). Minor robustness/diagnostics gap.",
+      "location": "packages/wallet/src/settle.ts:86-92",
+      "fix": "Mirror post(): `if (!existing) throw new Error(\\`wallet.applyTopup: conflict on idempotency key \"${input.idempotencyKey}\" but no existing row found\\`);` before returning, instead of the `existing!` assertion.",
+      "ac_ref": ""
+    }
+  ]
+}

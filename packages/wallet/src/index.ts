@@ -233,7 +233,8 @@ export async function post(db: Database, input: PostInput): Promise<WalletLedger
       existing.direction !== values.direction ||
       existing.kind !== values.kind ||
       existing.source !== values.source ||
-      existing.postedBy !== values.postedBy
+      existing.postedBy !== values.postedBy ||
+      existing.floatAccountId !== values.floatAccountId
     ) {
       throw new IdempotencyConflict(input.idempotencyKey, existing);
     }

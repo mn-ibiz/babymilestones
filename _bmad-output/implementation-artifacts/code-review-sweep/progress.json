@@ -50,7 +50,7 @@
   "epic_state": {
     "1": "done",
     "2": "done",
-    "3": "todo",
+    "3": "done",
     "4": "todo",
     "5": "todo",
     "6": "todo",
@@ -321,7 +321,7 @@
         "3df9a67ce78c8484dc1b3885677fb78ef50fdfcc"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "3-4-top-up-applies-fifo-to-outstanding-invoices",
@@ -338,7 +338,7 @@
         "ce0021625e427bba589ebf993010ebcf2f7929ad"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "3-5-debit-at-check-in-pending-invoice-settled",
@@ -389,7 +389,7 @@
         "a4d9870533a5ca7c4dfe70729c8be470ac854cd2"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "3-8-statement-export-csv-for-a-parent",
@@ -406,7 +406,7 @@
         "66c519cd2e8ffd66de586544d50d6d24614d9684"
       ],
       "commit_level": "story",
-      "review_state": "todo"
+      "review_state": "done"
     },
     {
       "key": "4-1-m-pesa-stk-push-initiated-from-parent",
@@ -3044,8 +3044,16 @@
       "decisions_needed": 1,
       "dismissed": 14,
       "commit": ""
+    },
+    "3": {
+      "stories_reviewed": 4,
+      "patches": 3,
+      "deferred": 4,
+      "decisions_needed": 4,
+      "dismissed": 14,
+      "commit": ""
     }
   },
-  "epics_done": 2,
+  "epics_done": 3,
   "epics_total": 35
 }
